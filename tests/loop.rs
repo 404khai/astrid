@@ -1,13 +1,13 @@
 mod support;
 use astrid::{
-    agent::{self, RunError},
     model::{Message, ModelError, ModelProvider, ModelRequest, ToolOutcome},
+    runtime::RunOutcome,
     tools::Tools,
     workspace::Workspace,
 };
 use serde_json::{Value, json};
 use std::{fs, time::Duration};
-use support::{Confirmation, Recording, Server, call, completed, item, reply};
+use support::{Confirmation, Recording, RunError, Server, call, completed, item, reply};
 
 fn tools(root: &std::path::Path) -> Tools {
     Tools::new(Workspace::new(root).unwrap(), Duration::from_secs(30)).unwrap()
@@ -29,7 +29,7 @@ async fn fragmented_tool_calls_wait_for_model_completion_and_execute_sequentiall
     ])
     .await;
     let mut observation = Recording::default();
-    let result = agent::run(
+    let result = support::run(
         &server.provider,
         &tools,
         &mut Confirmation::new(false),
@@ -99,7 +99,7 @@ async fn completed_tool_item_in_interrupted_response_never_mutates() {
     events.pop();
     let server = Server::start(vec![events]).await;
     let mut observation = Recording::default();
-    let error = agent::run(
+    let error = support::run(
         &server.provider,
         &tools,
         &mut Confirmation::new(false),
@@ -112,10 +112,7 @@ async fn completed_tool_item_in_interrupted_response_never_mutates() {
     .unwrap_err();
     assert!(matches!(
         error,
-        RunError::Model {
-            call: 1,
-            source: ModelError::Protocol(_)
-        }
+        RunError::Runtime(RunOutcome::Failed { .. })
     ));
     assert_eq!(observation.text, "Partial text.");
     assert!(observation.results.is_empty());
@@ -143,7 +140,7 @@ async fn failed_incomplete_and_malformed_responses_never_dispatch_tools() {
         let server = Server::start(vec![events]).await;
         let mut observation = Recording::default();
         assert!(
-            agent::run(
+            support::run(
                 &server.provider,
                 &tools,
                 &mut Confirmation::new(false),
@@ -172,7 +169,7 @@ async fn failed_incomplete_and_malformed_responses_never_dispatch_tools() {
     ])]])
     .await;
     assert!(
-        agent::run(
+        support::run(
             &server.provider,
             &tools,
             &mut Confirmation::new(false),
@@ -210,7 +207,7 @@ async fn recoverable_errors_and_shell_denial_are_returned_to_the_model() {
     .await;
     let mut confirmation = Confirmation::new(false);
     let mut observation = Recording::default();
-    agent::run(
+    support::run(
         &server.provider,
         &tools,
         &mut confirmation,
@@ -259,7 +256,7 @@ async fn ceiling_allows_exactly_twenty_calls_and_reports_incomplete_task() {
     let server = Server::start(replies).await;
     let mut observation = Recording::default();
     assert!(matches!(
-        agent::run(
+        support::run(
             &server.provider,
             &tools,
             &mut Confirmation::new(false),
@@ -269,7 +266,10 @@ async fn ceiling_allows_exactly_twenty_calls_and_reports_incomplete_task() {
             20
         )
         .await,
-        Err(RunError::CallLimit(20))
+        Err(RunError::Runtime(RunOutcome::ModelCallLimitReached {
+            limit: 20,
+            ..
+        }))
     ));
     assert_eq!(observation.results.len(), 20);
     assert_eq!(server.finish().await.len(), 20);
@@ -281,7 +281,7 @@ async fn provider_http_failure_is_terminal_and_is_not_retried() {
     let tools = tools(root.path());
     let server = Server::http(429, vec![vec![]]).await;
     assert!(matches!(
-        agent::run(
+        support::run(
             &server.provider,
             &tools,
             &mut Confirmation::new(false),
@@ -291,10 +291,7 @@ async fn provider_http_failure_is_terminal_and_is_not_retried() {
             20
         )
         .await,
-        Err(RunError::Model {
-            source: ModelError::Http { status: 429, .. },
-            ..
-        })
+        Err(RunError::Runtime(RunOutcome::Failed { message,.. })) if message.contains("HTTP 429")
     ));
     assert_eq!(server.finish().await.len(), 1);
 }
@@ -323,7 +320,7 @@ async fn repeated_call_id_cannot_replay_a_mutation() {
     ])
     .await;
     assert!(
-        agent::run(
+        support::run(
             &server.provider,
             &tools,
             &mut Confirmation::new(false),
@@ -357,7 +354,7 @@ async fn only_workspace_root_instructions_are_loaded_and_reasoning_is_replayed()
         reply(&[], "Done"),
     ])
     .await;
-    agent::run(
+    support::run(
         &server.provider,
         &tools,
         &mut Confirmation::new(false),
@@ -397,7 +394,7 @@ async fn fragmented_arguments_that_disagree_with_completion_fail_closed() {
         .unwrap()["delta"] = json!("corrupt");
     let server = Server::start(vec![events]).await;
     assert!(
-        agent::run(
+        support::run(
             &server.provider,
             &tools,
             &mut Confirmation::new(false),
@@ -444,7 +441,7 @@ async fn deterministic_acceptance_fixture_inspects_edits_creates_tests_and_finis
     ]).await;
     let mut observations = Recording::default();
     let mut confirmation = Confirmation::new(true);
-    let result = agent::run(
+    let result = support::run(
         &server.provider,
         &tools,
         &mut confirmation,
@@ -509,7 +506,7 @@ async fn blank_task_and_zero_ceiling_fail_before_provider_access() {
     let server = Server::start(vec![]).await;
     for (task, limit) in [("", 20), ("task", 0)] {
         assert!(matches!(
-            agent::run(
+            support::run(
                 &server.provider,
                 &tools,
                 &mut Confirmation::new(false),
@@ -519,7 +516,7 @@ async fn blank_task_and_zero_ceiling_fail_before_provider_access() {
                 limit
             )
             .await,
-            Err(RunError::Configuration(_))
+            Err(RunError::Configuration)
         ));
     }
     assert!(server.finish().await.is_empty());
@@ -543,7 +540,9 @@ async fn text_sink_failure_prevents_tool_dispatch() {
     assert!(matches!(
         server
             .provider
-            .generate(&request, &mut |_| Err(std::io::Error::other("broken pipe")))
+            .generate(&request, &mut |_: &str| Err(std::io::Error::other(
+                "broken pipe"
+            )))
             .await,
         Err(ModelError::Output(_))
     ));
@@ -569,7 +568,7 @@ async fn missing_content_type_still_requires_successful_completion() {
             replies.push(reply(&[], "done"));
         }
         let server = Server::with_content_type(200, replies, None).await;
-        let result = agent::run(
+        let result = support::run(
             &server.provider,
             &tools(root.path()),
             &mut Confirmation::new(false),
@@ -595,7 +594,7 @@ async fn explicit_non_stream_content_type_fails_without_mutation() {
     );
     let server =
         Server::with_content_type(200, vec![reply(&[write], "")], Some("application/json")).await;
-    let result = agent::run(
+    let result = support::run(
         &server.provider,
         &tools(root.path()),
         &mut Confirmation::new(false),
@@ -607,10 +606,7 @@ async fn explicit_non_stream_content_type_fails_without_mutation() {
     .await;
     assert!(matches!(
         result,
-        Err(RunError::Model {
-            source: ModelError::Protocol(_),
-            ..
-        })
+        Err(RunError::Runtime(RunOutcome::Failed { .. }))
     ));
     assert!(!root.path().join("created").exists());
     server.finish().await;
@@ -636,7 +632,7 @@ async fn empty_terminal_output_uses_completed_items_only_after_success() {
                 json!({"type":"response.output_item.done","output_index":0,"item":support::message("done")}), completed(vec![])]);
         }
         let server = Server::with_content_type(200, replies, None).await;
-        let result = agent::run(
+        let result = support::run(
             &server.provider,
             &tools(root.path()),
             &mut Confirmation::new(false),

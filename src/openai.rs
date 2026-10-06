@@ -66,7 +66,7 @@ impl ModelProvider for OpenAiProvider {
     async fn generate(
         &self,
         request: &ModelRequest<'_>,
-        text: &mut TextSink<'_>,
+        text: &mut dyn TextSink,
     ) -> Result<ModelResponse, ModelError> {
         let token = self
             .auth
@@ -123,7 +123,7 @@ impl ModelProvider for OpenAiProvider {
         let mut assembly = ResponseAssembly::default();
         while let Some(chunk) = stream.next().await {
             for event in decoder.feed(&chunk?)? {
-                if let Some(completed) = assembly.event(event, text)? {
+                if let Some(completed) = assembly.event(event, text).await? {
                     return Ok(completed);
                 }
             }
@@ -224,16 +224,16 @@ struct ResponseAssembly {
 }
 
 impl ResponseAssembly {
-    fn event(
+    async fn event(
         &mut self,
         event: Value,
-        text: &mut TextSink<'_>,
+        text: &mut dyn TextSink,
     ) -> Result<Option<ModelResponse>, ModelError> {
         match string(&event, "type")? {
             "response.output_text.delta" | "response.refusal.delta" => {
                 let delta = string(&event, "delta")?;
                 self.streamed_text.push_str(delta);
-                text(delta)?;
+                text.delta(delta).await?;
             }
             "response.output_item.added" if event["item"]["type"] == "function_call" => {
                 let item = &event["item"];
@@ -313,7 +313,7 @@ impl ResponseAssembly {
                     }
                 }
                 if self.streamed_text.is_empty() && !response.text.is_empty() {
-                    text(&response.text)?;
+                    text.delta(&response.text).await?;
                 } else if self.streamed_text != response.text {
                     return Err(ModelError::Protocol(
                         "streamed text disagrees with final output".into(),

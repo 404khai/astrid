@@ -1,11 +1,12 @@
 mod support;
-use astrid::{model::ToolOutcome, tools::Tools, workspace::Workspace};
+use astrid::{model::ToolOutcome, workspace::Workspace};
 use serde_json::{Value, json};
 use std::{
     fs,
     os::unix::fs::symlink,
     time::{Duration, Instant},
 };
+use support::CheckedTools as Tools;
 use support::{Confirmation, call};
 
 fn tools(root: &std::path::Path) -> Tools {
@@ -19,7 +20,7 @@ fn code(outcome: &ToolOutcome) -> &str {
     }
 }
 fn data(outcome: &ToolOutcome) -> &Value {
-    if let ToolOutcome::Success { data } = outcome {
+    if let ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } = outcome {
         data
     } else {
         panic!("expected success: {outcome:?}")

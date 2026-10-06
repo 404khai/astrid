@@ -1,17 +1,18 @@
 // Different integration test binaries use different subsets of these helpers.
 #![allow(dead_code)]
 use astrid::{
-    agent::{Observer, Progress},
     auth::{AuthError, Authentication, BearerToken},
+    cancellation::Cancellation,
+    events::{EventKind, ExecutionEvent},
     model::{ToolCall, ToolResult},
     openai::OpenAiProvider,
-    tools::ShellConfirmation,
+    runtime::{self, PermissionHandler, RunConfig, RunOutcome, RunResult},
+    tools::{PermissionRequest, ToolExecution, ToolExecutor},
 };
 use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::{
     io,
-    path::Path,
     sync::{Arc, Mutex},
 };
 use tokio::{
@@ -41,38 +42,161 @@ impl Confirmation {
     }
 }
 #[async_trait]
-impl ShellConfirmation for Confirmation {
-    async fn confirm(&mut self, command: &str, _workspace: &Path) -> io::Result<bool> {
-        self.commands.push(command.into());
+impl PermissionHandler for Confirmation {
+    async fn decide(&mut self, request: &PermissionRequest) -> io::Result<bool> {
+        self.commands.push(request.command.clone());
         Ok(self.approved)
     }
 }
 
 #[derive(Default)]
 pub struct Recording {
+    pub events: Vec<ExecutionEvent>,
     pub observations: Vec<String>,
     pub results: Vec<ToolResult>,
     pub text: String,
 }
-impl Observer for Recording {
-    fn observe(&mut self, event: Progress<'_>) -> io::Result<()> {
-        match event {
-            Progress::Text(text) => {
+impl Recording {
+    pub fn record(&mut self, event: ExecutionEvent) {
+        match &event.kind {
+            EventKind::ModelTextDelta { text } => {
                 self.text.push_str(text);
                 self.observations.push("text".into());
             }
-            Progress::ModelStarted(n) => self.observations.push(format!("model {n} started")),
-            Progress::ModelCompleted(n) => self.observations.push(format!("model {n} completed")),
-            Progress::ToolStarted(call) => self
-                .observations
-                .push(format!("tool {} started", call.call_id)),
-            Progress::ToolCompleted(result) => {
-                self.observations
-                    .push(format!("tool {} completed", result.call_id));
-                self.results.push(result.clone());
+            EventKind::ModelCallStarted { number } => {
+                self.observations.push(format!("model {number} started"))
             }
+            EventKind::ModelCallCompleted { .. } => {
+                let number = self
+                    .events
+                    .iter()
+                    .filter(|e| matches!(e.kind, EventKind::ModelCallStarted { .. }))
+                    .count();
+                self.observations.push(format!("model {number} completed"));
+            }
+            EventKind::ToolCallStarted => {
+                let requested = self
+                    .events
+                    .iter()
+                    .find_map(|e| {
+                        if e.tool_call_id == event.tool_call_id {
+                            if let EventKind::ToolCallRequested { call } = &e.kind {
+                                Some(call)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+                self.observations
+                    .push(format!("tool {} started", requested.call_id));
+            }
+            EventKind::ToolCallCompleted { outcome }
+            | EventKind::ToolCallFailed { outcome }
+            | EventKind::ToolCallDenied { outcome }
+            | EventKind::ToolCallTimedOut { outcome } => {
+                let requested = self
+                    .events
+                    .iter()
+                    .find_map(|e| {
+                        if e.tool_call_id == event.tool_call_id {
+                            if let EventKind::ToolCallRequested { call } = &e.kind {
+                                Some(call)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+                self.observations
+                    .push(format!("tool {} completed", requested.call_id));
+                self.results.push(ToolResult {
+                    call_id: requested.call_id.clone(),
+                    name: requested.name.clone(),
+                    outcome: outcome.clone(),
+                });
+            }
+            _ => {}
         }
-        Ok(())
+        self.events.push(event);
+    }
+}
+#[derive(Debug)]
+pub enum RunError {
+    Runtime(RunOutcome),
+    Configuration,
+}
+#[allow(clippy::too_many_arguments)]
+pub async fn run(
+    provider: &dyn astrid::model::ModelProvider,
+    tools: &astrid::tools::Tools,
+    confirmation: &mut Confirmation,
+    recording: &mut Recording,
+    model: &str,
+    task: &str,
+    max_model_calls: usize,
+) -> Result<RunResult, RunError> {
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(4);
+    let execution = runtime::run(
+        provider,
+        tools,
+        confirmation,
+        RunConfig {
+            model: model.into(),
+            task: task.into(),
+            max_model_calls,
+        },
+        Cancellation::default(),
+        Some(sender),
+    );
+    let consume = async {
+        while let Some(event) = receiver.recv().await {
+            recording.record(event);
+        }
+    };
+    let (result, ()) = tokio::join!(execution, consume);
+    let result = result.map_err(|_| RunError::Configuration)?;
+    if result.outcome == RunOutcome::Completed {
+        Ok(result)
+    } else {
+        Err(RunError::Runtime(result.outcome))
+    }
+}
+
+// Direct tool tests use a test-only caller that supplies permission decisions.
+// Production approval orchestration exists exclusively in runtime.rs.
+pub struct CheckedTools(astrid::tools::Tools);
+impl CheckedTools {
+    pub fn workspace(&self) -> &astrid::workspace::Workspace {
+        self.0.workspace()
+    }
+    pub fn new(
+        workspace: astrid::workspace::Workspace,
+        timeout: std::time::Duration,
+    ) -> Result<Self, astrid::tools::ToolError> {
+        astrid::tools::Tools::new(workspace, timeout).map(Self)
+    }
+    pub async fn execute(&self, call: &ToolCall, confirmation: &mut Confirmation) -> ToolResult {
+        if let Some(request) = self.0.permission(call).unwrap()
+            && !confirmation.decide(&request).await.unwrap()
+        {
+            return ToolResult {
+                call_id: call.call_id.clone(),
+                name: call.name.clone(),
+                outcome: astrid::model::ToolOutcome::Error {
+                    code: "permission_denied".into(),
+                    message: "denied".into(),
+                },
+            };
+        }
+        match self.0.execute(call, &Cancellation::default()).await {
+            ToolExecution::Finished(result) => result,
+            other => panic!("unexpected tool execution: {other:?}"),
+        }
     }
 }
 
