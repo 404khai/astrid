@@ -1,8 +1,7 @@
 use astrid::{
     auth::{self, Authentication, ChatGptAuth},
     cancellation::Cancellation,
-    events::{EventKind, ExecutionEvent},
-    model::ToolOutcome,
+    events::EventKind,
     openai::OpenAiProvider,
     runtime::{self, PermissionHandler, RunConfig, RunOutcome},
     tools::{PermissionRequest, Tools},
@@ -11,45 +10,14 @@ use astrid::{
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use std::{
-    fs::OpenOptions,
-    io::{self, IsTerminal, Write},
-    os::fd::AsRawFd,
-    os::unix::fs::OpenOptionsExt,
-    process::ExitCode,
-    sync::Arc,
-    time::Duration,
+    fs::OpenOptions, io, os::fd::AsRawFd, os::unix::fs::OpenOptionsExt, process::ExitCode,
+    sync::Arc, time::Duration,
 };
 
-// Pixel interpretation of the supplied logo.png: bracketed face with two eyes.
-const LOGO: &str = "       ████████████████\n     ████            ████\n██████                  ██████\n██████    ██    ██      ██████\n          ██    ██\n          ██    ██\n██████                  ██████\n██████                  ██████\n     ████            ████\n       ████████████████";
-
-fn terminal_logo() -> String {
-    if std::env::var_os("NO_COLOR").is_some() {
-        return LOGO.into();
-    }
-    let mut result = String::new();
-    for (row, line) in LOGO.lines().enumerate() {
-        if row > 0 {
-            result.push('\n');
-        }
-        for (column, pixel) in line.chars().enumerate() {
-            if pixel == ' ' {
-                result.push(pixel);
-                continue;
-            }
-            let (r, g, b) = if (3..=5).contains(&row) && matches!(column, 10 | 11 | 16 | 17) {
-                (0, 247, 213)
-            } else {
-                // Horizontal gradient: outer blue -> center blue -> outer blue.
-                let t = (column as f64 / 29.0 - 0.5).abs() * 2.0;
-                let blend = |center: f64, edge: f64| (center + (edge - center) * t).round() as u8;
-                (blend(26.0, 68.0), blend(50.0, 89.0), blend(236.0, 249.0))
-            };
-            result.push_str(&format!("\x1b[38;2;{r};{g};{b}m{pixel}\x1b[0m"));
-        }
-    }
-    result
-}
+mod console;
+mod logo;
+use console::Console;
+use logo::LOGO;
 
 #[derive(Parser)]
 #[command(name="astrid", version, about="One repository task, one observable model/tool loop", after_help=LOGO)]
@@ -88,76 +56,7 @@ fn positive(value: &str) -> Result<usize, String> {
         .ok_or_else(|| "value must be a positive integer".into())
 }
 
-fn printable(value: &str) -> String {
-    value
-        .chars()
-        .filter(|c| !c.is_control() || matches!(c, '\n' | '\t'))
-        .collect()
-}
-
-struct Console;
-impl Console {
-    fn render(&mut self, event: &ExecutionEvent) -> io::Result<()> {
-        let mut err = io::stderr().lock();
-        let tool = event
-            .tool_call_id
-            .map(|id| id.to_string())
-            .unwrap_or_default();
-        match &event.kind {
-            EventKind::ModelTextDelta { text } => {
-                let mut out = io::stdout().lock();
-                write!(out, "{}", printable(text))?;
-                out.flush()?;
-            }
-            EventKind::ModelCallStarted { number } => writeln!(err, "[model {number}] started")?,
-            EventKind::ModelCallCompleted { .. } => {
-                writeln!(io::stdout().lock())?;
-                writeln!(err, "[model] completed")?;
-            }
-            EventKind::ModelCallFailed { .. } | EventKind::ModelCallCancelled => {
-                writeln!(err, "\n[response interrupted]")?
-            }
-            EventKind::ToolCallRequested { call } => writeln!(
-                err,
-                "[tool {} {}] requested: {:?}",
-                tool,
-                printable(&call.name),
-                call.arguments
-            )?,
-            EventKind::ToolCallStarted => writeln!(err, "[tool {}] started", tool)?,
-            EventKind::ToolCallCompleted { outcome }
-            | EventKind::ToolCallFailed { outcome }
-            | EventKind::ToolCallDenied { outcome }
-            | EventKind::ToolCallTimedOut { outcome } => {
-                writeln!(
-                    err,
-                    "[tool {}] {}",
-                    tool,
-                    match event.kind {
-                        EventKind::ToolCallCompleted { .. } => "completed",
-                        EventKind::ToolCallDenied { .. } => "denied",
-                        EventKind::ToolCallTimedOut { .. } => "timed out",
-                        _ => "failed",
-                    }
-                )?;
-                match outcome {
-                    ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } => {
-                        writeln!(err, "{}", serde_json::to_string_pretty(data)?)?
-                    }
-                    ToolOutcome::Error { code, message } => {
-                        writeln!(err, "{}: {}", printable(code), printable(message))?
-                    }
-                }
-            }
-            EventKind::ToolCallCancelled => writeln!(err, "[tool {}] cancelled", tool)?,
-            EventKind::ToolCallSkipped { .. } => writeln!(err, "[tool {}] skipped", tool)?,
-            EventKind::CancellationRequested => writeln!(err, "[run] cancellation requested")?,
-            EventKind::RunCompleted { .. } => writeln!(err, "✓ Run completed")?,
-            _ => {}
-        }
-        Ok(())
-    }
-}
+use console::printable;
 
 type DecisionRequest = (
     PermissionRequest,
@@ -180,8 +79,8 @@ impl PermissionHandler for TerminalPermission {
     }
 }
 
-async fn terminal_answer(request: &PermissionRequest) -> io::Result<bool> {
-    let Ok(mut tty) = OpenOptions::new()
+async fn terminal_answer() -> io::Result<bool> {
+    let Ok(tty) = OpenOptions::new()
         .read(true)
         .write(true)
         .custom_flags(libc::O_NONBLOCK)
@@ -189,13 +88,6 @@ async fn terminal_answer(request: &PermissionRequest) -> io::Result<bool> {
     else {
         return Ok(false);
     };
-    writeln!(
-        tty,
-        "\nShell command in {:?}:\n{:?}\nThis command runs with your account's permissions.",
-        request.workspace, request.command
-    )?;
-    write!(tty, "Run this command? Type yes to approve: ")?;
-    tty.flush()?;
     read_permission_answer(tty).await
 }
 
@@ -287,9 +179,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             let tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
             let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
-            if io::stderr().is_terminal() {
-                eprintln!("{}\nAstrid · {model}", terminal_logo());
-            }
+            let mut console = Console::new(&model, tools.workspace())?;
             let cancel = Cancellation::default();
             let (sender, mut receiver) = tokio::sync::mpsc::channel(64);
             let (permission_sender, mut permission_receiver) =
@@ -297,17 +187,16 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             let (rendered_sender, mut rendered_receiver) = tokio::sync::mpsc::channel::<()>(1);
             let permission_ui = tokio::spawn(async move {
                 while rendered_receiver.recv().await.is_some() {
-                    let Some((request, reply)) = permission_receiver.recv().await else {
+                    let Some((_request, reply)) = permission_receiver.recv().await else {
                         break;
                     };
-                    let answer = terminal_answer(&request).await;
+                    let answer = terminal_answer().await;
                     let _ = reply.send(answer);
                 }
             });
             let mut permissions = TerminalPermission {
                 requests: permission_sender,
             };
-            let mut console = Console;
             let execution = runtime::run(
                 &provider,
                 &tools,
@@ -321,12 +210,19 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 Some(sender),
             );
             tokio::pin!(execution);
+            let mut resize = tokio::time::interval(Duration::from_millis(150));
+            resize.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             let mut output_error = None;
             let mut attached = true;
             let mut signal_enabled = true;
             let result = loop {
                 tokio::select! {
                     result=&mut execution=>break result,
+                    _=resize.tick(), if attached=>{
+                        if let Err(err)=console.resize() {
+                            output_error=Some(err);cancel.cancel();receiver.close();attached=false;
+                        }
+                    }
                     signal=tokio::signal::ctrl_c(), if signal_enabled=>{
                         signal_enabled=false;
                         if let Err(err)=signal {output_error=Some(err);}
@@ -360,10 +256,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             if let Some(err) = output_error {
                 return Err(err.into());
             }
-            eprintln!(
-                "[finished] {} model calls, {} tool outcomes",
-                result.model_calls, result.tool_calls
-            );
+            console.finish(result.model_calls, result.tool_calls)?;
             match result.outcome {
                 RunOutcome::Completed=>{},
                 RunOutcome::Cancelled=>return Err("run cancelled".into()),
@@ -380,6 +273,7 @@ mod tests {
     use super::*;
     use std::{
         fs::File,
+        io::Write,
         os::{fd::OwnedFd, unix::net::UnixStream},
     };
     fn input() -> (File, UnixStream) {

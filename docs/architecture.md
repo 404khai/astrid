@@ -131,3 +131,23 @@ without changing state; runtime events are descriptive, not event sourcing.
 
 The maintained contracts are [ADR 0001](adr/0001-phase-0-execution-contract.md)
 and [ADR 0002](adr/0002-phase-1-runtime-and-event-model.md).
+
+## CLI presentation
+
+`src/console.rs` consumes owned runtime events and keeps only presentation state:
+short IDs, visible turn/model-call counters, requested tool names, and display
+lines. It neither validates execution transitions nor decides when to invoke
+a model/tool. The runtime API and permission/cancellation policies are unchanged.
+
+There is no full-screen terminal framework or raw-mode event loop. The supported
+macOS terminal exposes its dimensions through `TIOCGWINSZ`; ANSI scroll margins
+reserve the header and footer on the primary screen. Stream text is sanitized,
+wrapped by Unicode display width, and retained in a bounded redraw buffer.
+A CLI timer checks dimensions between runtime events. Canonical `/dev/tty`
+input and OS Ctrl-C remain in use; the renderer places the approval prompt
+before the existing cancellable input task reads it. Resize is deferred while
+an approval answer is being echoed. An approval larger than the output viewport
+switches to append-only rendering so its command remains reviewable. A drop guard restores normal scroll margins
+and cursor visibility on completion and error paths. Redirected/dumb terminals
+use append-only output. This is a reversible CLI presentation choice, not a
+new runtime abstraction or a change to the Phase 1 execution contract.

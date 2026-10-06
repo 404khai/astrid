@@ -23,3 +23,4 @@ thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "time", "io-util", "net", "sync", "signal"] }
 walkdir = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
+unicode-width = "0.2"

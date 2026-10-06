@@ -49,11 +49,35 @@ not merely a model appearing in a catalog. ChatGPT plan limits still apply.
 
 The invocation directory is the workspace root. Astrid reads only that
 directory's `AGENTS.md` as initial repository instructions; parent and nested
-instruction discovery is deferred. Assistant text streams to stdout. Model
-and tool lifecycle messages, arguments, results, and failures appear on stderr.
-The terminal logo is a pixel interpretation of `logo.png`, with cyan eyes and
-blue gradient arches. Set `NO_COLOR=1` to disable logo colors. Redirected
-output contains no logo or color escapes.
+instruction discovery is deferred.
+
+On an interactive terminal, `astrid run` shows Astrid's existing pixel logo,
+compact model/provider/workspace metadata, and a scrolling execution stream.
+The header and three-line footer stay in place. The footer displays the actual
+run ID, turn, model-call count, and current activity; the bottom prompt accepts
+shell approvals when requested. Tasks still start through `astrid run`; there
+is no interactive conversation composer or mode switch. Ctrl-C cancels the run.
+Tool requests show their target, results show a concise summary, and shell
+stdout/stderr appear separately after the command completes. Completion means
+the run ended normally, not that the task was independently verified.
+
+The logo keeps its blue arches and cyan eyes, with cyan reserved for identity
+and important status. Labels and secondary information use dim terminal text.
+Set `NO_COLOR=1` to disable all styling colors. Narrow/short terminals use a
+compact header, truncate metadata by display width, and wrap execution output;
+the logo is omitted only when it would crowd out the stream. Resize redraws use
+up to 2,000 retained display lines. Resizing during a permission answer is
+applied after the decision to avoid erasing terminal-echoed input. An approval
+that cannot fit in the viewport switches the run to append-only output so the
+complete command remains reviewable in ordinary terminal scrollback.
+
+When either output stream is redirected, or `TERM=dumb`/terminal sizing is
+unavailable, rendering falls back to ordinary append-only text without cursor
+controls or colors. Assistant text continues to stream to stdout; concise tool
+activity, command output, and failures go to stderr. Shell approvals use
+`/dev/tty`, including the complete command and workspace, independently of
+redirected output. No telemetry, context budgets, or unsupported shortcuts are
+shown.
 
 Every successful response without tool calls ends the task. Recoverable tool
 failures return to the model. Provider/protocol errors and an exhausted
@@ -149,7 +173,7 @@ sessions, turns, model calls, and tool calls; provider tool IDs remain protocol
 metadata. Event sequence numbers establish ordering within a run.
 
 Assistant text deltas are provisional. Only validated model completion commits
-assistant output. Interrupted text remains visible with `[response interrupted]`.
+assistant output. Interrupted text remains visible with a `!` or `×` response-interrupted indicator.
 All validated tool requests are announced before sequential execution. Permission
 waiting is distinct from tool execution. Every accepted run and requested tool
 receives exactly one terminal outcome, including denied, cancelled, timed-out,
