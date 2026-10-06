@@ -13,6 +13,7 @@ use tokio::{io::AsyncReadExt, process::Command};
 use walkdir::WalkDir;
 
 use crate::{
+    cancellation::Cancellation,
     model::{ToolCall, ToolOutcome, ToolResult},
     workspace::Workspace,
 };
@@ -25,28 +26,43 @@ pub enum ToolError {
     PathDenied(String),
     #[error("edit requires exactly one match; found {0}")]
     EditAmbiguous(usize),
-    #[error("shell command was not approved")]
-    PermissionDenied,
+    #[error("shell cleanup failed: {0}")]
+    CleanupFailed(String),
     #[error("{0}")]
     Io(#[from] io::Error),
 }
 
 impl ToolError {
-    fn code(&self) -> &'static str {
+    pub(crate) fn code(&self) -> &'static str {
         match self {
             Self::InvalidArguments(_) => "invalid_arguments",
             Self::PathDenied(_) => "path_denied",
             Self::EditAmbiguous(_) => "edit_ambiguous",
-            Self::PermissionDenied => "permission_denied",
+            Self::CleanupFailed(_) => "cleanup_failed",
             Self::Io(_) => "io_error",
         }
     }
 }
 
-/// Every shell invocation requires its own explicit decision.
+#[derive(Debug, Clone)]
+pub struct PermissionRequest {
+    pub command: String,
+    pub workspace: PathBuf,
+}
+
+#[derive(Debug)]
+pub enum ToolExecution {
+    Finished(ToolResult),
+    Cancelled,
+    CleanupFailed(String),
+}
+
+/// Execution seam: permission is coordinated by the runtime, never the tool.
 #[async_trait]
-pub trait ShellConfirmation: Send {
-    async fn confirm(&mut self, command: &str, workspace: &Path) -> io::Result<bool>;
+pub trait ToolExecutor: Send + Sync {
+    fn workspace(&self) -> &Workspace;
+    fn permission(&self, call: &ToolCall) -> Result<Option<PermissionRequest>, ToolError>;
+    async fn execute(&self, call: &ToolCall, cancellation: &Cancellation) -> ToolExecution;
 }
 
 pub struct Tools {
@@ -112,30 +128,7 @@ impl Tools {
         &self.workspace
     }
 
-    pub async fn execute(
-        &self,
-        call: &ToolCall,
-        confirmation: &mut dyn ShellConfirmation,
-    ) -> ToolResult {
-        let outcome = match self.invoke(call, confirmation).await {
-            Ok(data) => ToolOutcome::Success { data },
-            Err(error) => ToolOutcome::Error {
-                code: error.code().into(),
-                message: error.to_string(),
-            },
-        };
-        ToolResult {
-            call_id: call.call_id.clone(),
-            name: call.name.clone(),
-            outcome,
-        }
-    }
-
-    async fn invoke(
-        &self,
-        call: &ToolCall,
-        confirmation: &mut dyn ShellConfirmation,
-    ) -> Result<Value, ToolError> {
+    async fn invoke(&self, call: &ToolCall) -> Result<Value, ToolError> {
         match call.name.as_str() {
             "read_file" => {
                 let args: PathArgs = parse(call)?;
@@ -225,21 +218,9 @@ impl Tools {
                 }
                 Ok(json!({"matches": matches}))
             }
-            "shell" => {
-                let args: ShellArgs = parse(call)?;
-                if args.command.trim().is_empty() {
-                    return Err(ToolError::InvalidArguments(
-                        "command must not be empty".into(),
-                    ));
-                }
-                if !confirmation
-                    .confirm(&args.command, self.workspace.root())
-                    .await?
-                {
-                    return Err(ToolError::PermissionDenied);
-                }
-                self.shell(&args.command).await
-            }
+            "shell" => Err(ToolError::InvalidArguments(
+                "shell uses cancellable execution".into(),
+            )),
             _ => Err(ToolError::InvalidArguments(format!(
                 "unknown tool {}",
                 call.name
@@ -274,7 +255,11 @@ impl Tools {
         Ok(files)
     }
 
-    async fn shell(&self, command: &str) -> Result<Value, ToolError> {
+    async fn shell(
+        &self,
+        command: &str,
+        cancellation: &Cancellation,
+    ) -> Result<Option<Value>, ToolError> {
         let mut process = Command::new("/bin/sh");
         process
             .arg("-c")
@@ -298,43 +283,103 @@ impl Tools {
             .stderr
             .take()
             .ok_or_else(|| io::Error::other("shell stderr missing"))?;
-        let out = tokio::spawn(async move {
-            let mut bytes = Vec::new();
-            stdout.read_to_end(&mut bytes).await?;
-            Ok::<_, io::Error>(bytes)
-        });
-        let err = tokio::spawn(async move {
-            let mut bytes = Vec::new();
-            stderr.read_to_end(&mut bytes).await?;
-            Ok::<_, io::Error>(bytes)
-        });
-        let waited = tokio::time::timeout(self.shell_timeout, async {
-            let status = child.wait().await?;
-            let stdout = out.await.map_err(io::Error::other)??;
-            let stderr = err.await.map_err(io::Error::other)??;
-            Ok::<_, io::Error>((status, stdout, stderr))
-        })
-        .await;
-        match waited {
-            Ok(result) => {
-                let (status, stdout, stderr) = result?;
-                Ok(
-                    json!({"stdout": String::from_utf8_lossy(&stdout), "stderr": String::from_utf8_lossy(&stderr), "exit_code": status.code(), "timed_out": false}),
-                )
+        // Local futures, not detached reader tasks: dropping them closes pipes.
+        let mut out = Vec::new();
+        let mut err = Vec::new();
+        let outcome = {
+            let wait = async {
+                let (status, _, _) = tokio::try_join!(
+                    child.wait(),
+                    stdout.read_to_end(&mut out),
+                    stderr.read_to_end(&mut err)
+                )?;
+                Ok::<_, io::Error>(status)
+            };
+            tokio::select! { biased;
+                _ = cancellation.cancelled() => None,
+                result = tokio::time::timeout(self.shell_timeout, wait) => Some(result),
             }
-            Err(_) => {
-                // The timeout covers pipe draining as well as the shell itself.
-                // Descendants inherit this fresh process group unless they detach.
-                unsafe {
-                    libc::kill(-(pid as i32), libc::SIGKILL);
+        };
+        match outcome {
+            Some(Ok(Ok(status))) => Ok(Some(
+                json!({"stdout":String::from_utf8_lossy(&out),"stderr":String::from_utf8_lossy(&err),"exit_code":status.code(),"timed_out":false}),
+            )),
+            other => {
+                // Cleanup is required for cancellation, timeout, and pipe/wait errors.
+                let killed = unsafe { libc::kill(-(pid as i32), libc::SIGKILL) };
+                if killed != 0 && io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH) {
+                    return Err(ToolError::CleanupFailed(
+                        io::Error::last_os_error().to_string(),
+                    ));
                 }
-                let _ = child.kill().await;
-                let _ = child.wait().await;
-                Ok(
-                    json!({"stdout": null, "stderr": null, "exit_code": null, "timed_out": true, "timeout_seconds": self.shell_timeout.as_secs_f64()}),
-                )
+                child
+                    .wait()
+                    .await
+                    .map_err(|e| ToolError::CleanupFailed(e.to_string()))?;
+                // The leader is reaped and group termination was requested. Detached
+                // descendants are outside this process-group contract.
+                match other {
+                    None => Ok(None),
+                    Some(Err(_)) => Ok(Some(
+                        json!({"stdout":null,"stderr":null,"exit_code":null,"timed_out":true,"timeout_seconds":self.shell_timeout.as_secs_f64()}),
+                    )),
+                    Some(Ok(Err(e))) => Err(e.into()),
+                    _ => unreachable!(),
+                }
             }
         }
+    }
+}
+
+#[async_trait]
+impl ToolExecutor for Tools {
+    fn workspace(&self) -> &Workspace {
+        &self.workspace
+    }
+    fn permission(&self, call: &ToolCall) -> Result<Option<PermissionRequest>, ToolError> {
+        if call.name != "shell" {
+            return Ok(None);
+        }
+        let args: ShellArgs = parse(call)?;
+        if args.command.trim().is_empty() {
+            return Err(ToolError::InvalidArguments(
+                "command must not be empty".into(),
+            ));
+        }
+        Ok(Some(PermissionRequest {
+            command: args.command,
+            workspace: self.workspace.root().to_owned(),
+        }))
+    }
+    async fn execute(&self, call: &ToolCall, cancellation: &Cancellation) -> ToolExecution {
+        if cancellation.is_cancelled() {
+            return ToolExecution::Cancelled;
+        }
+        let result = if call.name == "shell" {
+            match parse::<ShellArgs>(call) {
+                Ok(args) => self.shell(&args.command, cancellation).await,
+                Err(e) => Err(e),
+            }
+        } else {
+            self.invoke(call).await.map(Some)
+        };
+        let outcome = match result {
+            Ok(Some(data)) if data["timed_out"] == true => ToolOutcome::TimedOut { data },
+            Ok(Some(data)) => ToolOutcome::Success { data },
+            Ok(None) => return ToolExecution::Cancelled,
+            Err(e @ ToolError::CleanupFailed(_)) => {
+                return ToolExecution::CleanupFailed(e.to_string());
+            }
+            Err(e) => ToolOutcome::Error {
+                code: e.code().into(),
+                message: e.to_string(),
+            },
+        };
+        ToolExecution::Finished(ToolResult {
+            call_id: call.call_id.clone(),
+            name: call.name.clone(),
+            outcome,
+        })
     }
 }
 

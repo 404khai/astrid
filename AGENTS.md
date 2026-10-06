@@ -1305,10 +1305,10 @@ It is not sacred.
 Current phase:
 
 ```text
-Phase 0 — The Loop
+Phase 1 — Runtime Model
 ```
 
-Unless the user explicitly changes this value, implementation should remain within Phase 0.
+Unless the user explicitly changes this value, implementation should remain within Phase 1.
 
 ---
 

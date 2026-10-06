@@ -1,17 +1,20 @@
 use astrid::{
-    agent::{self, Observer, Progress},
     auth::{self, Authentication, ChatGptAuth},
+    cancellation::Cancellation,
+    events::{EventKind, ExecutionEvent},
     model::ToolOutcome,
     openai::OpenAiProvider,
-    tools::{ShellConfirmation, Tools},
+    runtime::{self, PermissionHandler, RunConfig, RunOutcome},
+    tools::{PermissionRequest, Tools},
     workspace::Workspace,
 };
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use std::{
     fs::OpenOptions,
-    io::{self, BufRead, IsTerminal, Write},
-    path::Path,
+    io::{self, IsTerminal, Write},
+    os::fd::AsRawFd,
+    os::unix::fs::OpenOptionsExt,
     process::ExitCode,
     sync::Arc,
     time::Duration,
@@ -93,75 +96,133 @@ fn printable(value: &str) -> String {
 }
 
 struct Console;
-impl Observer for Console {
-    fn observe(&mut self, progress: Progress<'_>) -> io::Result<()> {
-        match progress {
-            Progress::Text(text) => {
+impl Console {
+    fn render(&mut self, event: &ExecutionEvent) -> io::Result<()> {
+        let mut err = io::stderr().lock();
+        let tool = event
+            .tool_call_id
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+        match &event.kind {
+            EventKind::ModelTextDelta { text } => {
                 let mut out = io::stdout().lock();
                 write!(out, "{}", printable(text))?;
                 out.flush()?;
             }
-            Progress::ModelStarted(number) => {
-                writeln!(io::stderr().lock(), "[model {number}] started")?;
-            }
-            Progress::ModelCompleted(number) => {
+            EventKind::ModelCallStarted { number } => writeln!(err, "[model {number}] started")?,
+            EventKind::ModelCallCompleted { .. } => {
                 writeln!(io::stdout().lock())?;
-                writeln!(io::stderr().lock(), "[model {number}] completed")?;
+                writeln!(err, "[model] completed")?;
             }
-            Progress::ToolStarted(call) => {
-                writeln!(
-                    io::stderr().lock(),
-                    "[tool {} {}] started: {:?}",
-                    call.call_id,
-                    printable(&call.name),
-                    call.arguments
-                )?;
+            EventKind::ModelCallFailed { .. } | EventKind::ModelCallCancelled => {
+                writeln!(err, "\n[response interrupted]")?
             }
-            Progress::ToolCompleted(result) => {
-                let status = if result.is_error() {
-                    "failed"
-                } else {
-                    "completed"
-                };
+            EventKind::ToolCallRequested { call } => writeln!(
+                err,
+                "[tool {} {}] requested: {:?}",
+                tool,
+                printable(&call.name),
+                call.arguments
+            )?,
+            EventKind::ToolCallStarted => writeln!(err, "[tool {}] started", tool)?,
+            EventKind::ToolCallCompleted { outcome }
+            | EventKind::ToolCallFailed { outcome }
+            | EventKind::ToolCallDenied { outcome }
+            | EventKind::ToolCallTimedOut { outcome } => {
                 writeln!(
-                    io::stderr().lock(),
-                    "[tool {} {}] {status}",
-                    result.call_id,
-                    printable(&result.name)
+                    err,
+                    "[tool {}] {}",
+                    tool,
+                    match event.kind {
+                        EventKind::ToolCallCompleted { .. } => "completed",
+                        EventKind::ToolCallDenied { .. } => "denied",
+                        EventKind::ToolCallTimedOut { .. } => "timed out",
+                        _ => "failed",
+                    }
                 )?;
-                match &result.outcome {
-                    ToolOutcome::Success { data } => writeln!(
-                        io::stderr().lock(),
-                        "{}",
-                        serde_json::to_string_pretty(data)?
-                    )?,
-                    ToolOutcome::Error { code, message } => writeln!(
-                        io::stderr().lock(),
-                        "{}: {}",
-                        printable(code),
-                        printable(message)
-                    )?,
+                match outcome {
+                    ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } => {
+                        writeln!(err, "{}", serde_json::to_string_pretty(data)?)?
+                    }
+                    ToolOutcome::Error { code, message } => {
+                        writeln!(err, "{}: {}", printable(code), printable(message))?
+                    }
                 }
             }
+            EventKind::ToolCallCancelled => writeln!(err, "[tool {}] cancelled", tool)?,
+            EventKind::ToolCallSkipped { .. } => writeln!(err, "[tool {}] skipped", tool)?,
+            EventKind::CancellationRequested => writeln!(err, "[run] cancellation requested")?,
+            EventKind::RunCompleted { .. } => writeln!(err, "✓ Run completed")?,
+            _ => {}
         }
         Ok(())
     }
 }
 
-struct TerminalConfirmation;
+type DecisionRequest = (
+    PermissionRequest,
+    tokio::sync::oneshot::Sender<io::Result<bool>>,
+);
+struct TerminalPermission {
+    requests: tokio::sync::mpsc::Sender<DecisionRequest>,
+}
 #[async_trait]
-impl ShellConfirmation for TerminalConfirmation {
-    async fn confirm(&mut self, command: &str, workspace: &Path) -> io::Result<bool> {
-        let command = command.to_owned();
-        let workspace = workspace.to_path_buf();
-        tokio::task::spawn_blocking(move || {
-            let Ok(mut tty)=OpenOptions::new().read(true).write(true).open("/dev/tty") else { return Ok(false); };
-            // Debug escaping makes the exact command visible, including control characters.
-            writeln!(tty,"\nShell command in {:?}:\n{command:?}\nThis command runs with your account's permissions.",workspace)?;
-            write!(tty,"Run this command? Type yes to approve: ")?; tty.flush()?;
-            let mut answer=String::new(); io::BufReader::new(&tty).read_line(&mut answer)?;
-            Ok(answer.trim().eq_ignore_ascii_case("yes"))
-        }).await.map_err(io::Error::other)?
+impl PermissionHandler for TerminalPermission {
+    async fn decide(&mut self, request: &PermissionRequest) -> io::Result<bool> {
+        let (reply, decision) = tokio::sync::oneshot::channel();
+        self.requests
+            .send((request.clone(), reply))
+            .await
+            .map_err(|_| io::Error::other("permission interface closed"))?;
+        decision
+            .await
+            .map_err(|_| io::Error::other("permission interface closed"))?
+    }
+}
+
+async fn terminal_answer(request: &PermissionRequest) -> io::Result<bool> {
+    let Ok(mut tty) = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open("/dev/tty")
+    else {
+        return Ok(false);
+    };
+    writeln!(
+        tty,
+        "\nShell command in {:?}:\n{:?}\nThis command runs with your account's permissions.",
+        request.workspace, request.command
+    )?;
+    write!(tty, "Run this command? Type yes to approve: ")?;
+    tty.flush()?;
+    read_permission_answer(tty).await
+}
+
+async fn read_permission_answer(tty: std::fs::File) -> io::Result<bool> {
+    let mut answer = Vec::new();
+    loop {
+        let mut bytes = [0u8; 256];
+        let count = unsafe { libc::read(tty.as_raw_fd(), bytes.as_mut_ptr().cast(), bytes.len()) };
+        if count < 0 {
+            let err = io::Error::last_os_error();
+            if err.kind() == io::ErrorKind::WouldBlock || err.kind() == io::ErrorKind::Interrupted {
+                // /dev/tty is not kqueue-registerable on all supported Macs.
+                // Nonblocking reads plus a cancellable timer leave no blocked thread.
+                tokio::time::sleep(Duration::from_millis(25)).await;
+                continue;
+            }
+            return Err(err);
+        }
+        if count == 0 {
+            return Ok(false);
+        }
+        answer.extend_from_slice(&bytes[..count as usize]);
+        if answer.contains(&b'\n') {
+            return Ok(String::from_utf8_lossy(&answer)
+                .trim()
+                .eq_ignore_ascii_case("yes"));
+        }
     }
 }
 
@@ -229,21 +290,133 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             if io::stderr().is_terminal() {
                 eprintln!("{}\nAstrid · {model}", terminal_logo());
             }
-            let result = agent::run(
+            let cancel = Cancellation::default();
+            let (sender, mut receiver) = tokio::sync::mpsc::channel(64);
+            let (permission_sender, mut permission_receiver) =
+                tokio::sync::mpsc::channel::<DecisionRequest>(1);
+            let (rendered_sender, mut rendered_receiver) = tokio::sync::mpsc::channel::<()>(1);
+            let permission_ui = tokio::spawn(async move {
+                while rendered_receiver.recv().await.is_some() {
+                    let Some((request, reply)) = permission_receiver.recv().await else {
+                        break;
+                    };
+                    let answer = terminal_answer(&request).await;
+                    let _ = reply.send(answer);
+                }
+            });
+            let mut permissions = TerminalPermission {
+                requests: permission_sender,
+            };
+            let mut console = Console;
+            let execution = runtime::run(
                 &provider,
                 &tools,
-                &mut TerminalConfirmation,
-                &mut Console,
-                &model,
-                &task,
-                max_model_calls,
-            )
-            .await?;
+                &mut permissions,
+                RunConfig {
+                    model,
+                    task,
+                    max_model_calls,
+                },
+                cancel.clone(),
+                Some(sender),
+            );
+            tokio::pin!(execution);
+            let mut output_error = None;
+            let mut attached = true;
+            let mut signal_enabled = true;
+            let result = loop {
+                tokio::select! {
+                    result=&mut execution=>break result,
+                    signal=tokio::signal::ctrl_c(), if signal_enabled=>{
+                        signal_enabled=false;
+                        if let Err(err)=signal {output_error=Some(err);}
+                        cancel.cancel();
+                    }
+                    event=receiver.recv(), if attached=>match event {
+                        Some(event)=>{
+                            if let Err(err)=console.render(&event) {
+                                output_error=Some(err);cancel.cancel();receiver.close();attached=false;
+                            } else if matches!(event.kind,EventKind::PermissionRequested{..}) {
+                                // Start the UI prompt only after preceding events rendered.
+                                let _=rendered_sender.send(()).await;
+                            }
+                        },
+                        None=>attached=false,
+                    }
+                }
+            };
+            permission_ui.abort();
+            let _ = permission_ui.await;
+            let result = result?;
+            // Runtime completion may win select while final events remain queued.
+            if attached {
+                while let Ok(event) = receiver.try_recv() {
+                    if let Err(err) = console.render(&event) {
+                        output_error = Some(err);
+                        break;
+                    }
+                }
+            }
+            if let Some(err) = output_error {
+                return Err(err.into());
+            }
             eprintln!(
-                "[finished] {} model calls, {} tool calls",
+                "[finished] {} model calls, {} tool outcomes",
                 result.model_calls, result.tool_calls
             );
+            match result.outcome {
+                RunOutcome::Completed=>{},
+                RunOutcome::Cancelled=>return Err("run cancelled".into()),
+                RunOutcome::Failed{code,message}=>return Err(format!("{code}: {message}").into()),
+                RunOutcome::ModelCallLimitReached{limit,..}=>return Err(format!("model-call ceiling ({limit}) reached; final tool results were not inspected by the model").into()),
+            }
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs::File,
+        os::{fd::OwnedFd, unix::net::UnixStream},
+    };
+    fn input() -> (File, UnixStream) {
+        let (reader, writer) = UnixStream::pair().unwrap();
+        reader.set_nonblocking(true).unwrap();
+        (File::from(OwnedFd::from(reader)), writer)
+    }
+    #[tokio::test]
+    async fn nonblocking_permission_input_handles_fragmentation_denial_and_eof() {
+        for (answer, expected) in [("yes\n", true), ("no\n", false), ("", false)] {
+            let (reader, mut writer) = input();
+            let supply = async {
+                for byte in answer.as_bytes() {
+                    writer.write_all(&[*byte]).unwrap();
+                    tokio::task::yield_now().await;
+                }
+                drop(writer);
+            };
+            let (decision, ()) = tokio::join!(read_permission_answer(reader), supply);
+            assert_eq!(decision.unwrap(), expected);
+        }
+    }
+    #[tokio::test]
+    async fn nonblocking_permission_input_is_cancellable_without_a_reader_thread() {
+        let (reader, _writer) = input();
+        let cancel = Cancellation::default();
+        let wait = async {
+            tokio::select! {answer=read_permission_answer(reader)=>panic!("unexpected decision: {answer:?}"),_=cancel.cancelled()=>{}}
+        };
+        let stop = async {
+            tokio::task::yield_now().await;
+            cancel.cancel();
+        };
+        tokio::time::timeout(Duration::from_secs(1), async {
+            tokio::join!(wait, stop);
+        })
+        .await
+        .unwrap();
+    }
 }

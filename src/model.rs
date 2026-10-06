@@ -48,11 +48,15 @@ pub struct ToolResult {
 pub enum ToolOutcome {
     Success { data: Value },
     Error { code: String, message: String },
+    TimedOut { data: Value },
 }
 
 impl ToolResult {
     pub fn is_error(&self) -> bool {
-        matches!(self.outcome, ToolOutcome::Error { .. })
+        matches!(
+            self.outcome,
+            ToolOutcome::Error { .. } | ToolOutcome::TimedOut { .. }
+        )
     }
 }
 
@@ -66,11 +70,24 @@ pub enum ModelError {
     Provider(String),
     #[error("invalid provider stream: {0}")]
     Protocol(String),
-    #[error("could not display streamed output: {0}")]
+    #[error("could not deliver streamed text: {0}")]
     Output(#[from] io::Error),
 }
 
-pub type TextSink<'a> = dyn FnMut(&str) -> io::Result<()> + Send + 'a;
+#[async_trait]
+pub trait TextSink: Send {
+    async fn delta(&mut self, text: &str) -> io::Result<()>;
+}
+
+#[async_trait]
+impl<F> TextSink for F
+where
+    F: FnMut(&str) -> io::Result<()> + Send,
+{
+    async fn delta(&mut self, text: &str) -> io::Result<()> {
+        self(text)
+    }
+}
 
 /// A narrow seam for deterministic tests, not a universal provider abstraction.
 #[async_trait]
@@ -78,6 +95,6 @@ pub trait ModelProvider: Send + Sync {
     async fn generate(
         &self,
         request: &ModelRequest<'_>,
-        text: &mut TextSink<'_>,
+        text: &mut dyn TextSink,
     ) -> Result<ModelResponse, ModelError>;
 }
