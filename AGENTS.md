@@ -1228,6 +1228,10 @@ Astrid can execute a model through Phalanx while receiving whatever inference te
 
 # 14. Agent Working Procedure
 
+Use [docs/development.md](docs/development.md) for the repeatable phase-review,
+grilling, ticket, and ADR workflow. Proposed plans and ADRs do not authorize a
+phase transition; the current phase below remains authoritative.
+
 Before implementing substantial work:
 
 1. Read this file.
@@ -1305,10 +1309,10 @@ It is not sacred.
 Current phase:
 
 ```text
-Phase 1 — Runtime Model
+Phase 2 — Execution Environment
 ```
 
-Unless the user explicitly changes this value, implementation should remain within Phase 1.
+Unless the user explicitly changes this value, implementation should remain within Phase 2.
 
 ---
 

@@ -10,16 +10,18 @@ use std::{
     time::Duration,
 };
 use tokio::{io::AsyncReadExt, process::Command};
-use walkdir::WalkDir;
 
 use crate::{
     cancellation::Cancellation,
     model::{ToolCall, ToolOutcome, ToolResult},
+    output::{self, Capture, OutputStream, ToolOutput},
     workspace::Workspace,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum ToolError {
+    #[error("tool execution cancelled")]
+    Cancelled,
     #[error("invalid arguments: {0}")]
     InvalidArguments(String),
     #[error("workspace path denied: {0}")]
@@ -35,6 +37,7 @@ pub enum ToolError {
 impl ToolError {
     pub(crate) fn code(&self) -> &'static str {
         match self {
+            Self::Cancelled => "cancelled",
             Self::InvalidArguments(_) => "invalid_arguments",
             Self::PathDenied(_) => "path_denied",
             Self::EditAmbiguous(_) => "edit_ambiguous",
@@ -54,6 +57,7 @@ pub struct PermissionRequest {
 pub enum ToolExecution {
     Finished(ToolResult),
     Cancelled,
+    CancelledWithOutput { data: Value },
     CleanupFailed(String),
 }
 
@@ -63,6 +67,14 @@ pub trait ToolExecutor: Send + Sync {
     fn workspace(&self) -> &Workspace;
     fn permission(&self, call: &ToolCall) -> Result<Option<PermissionRequest>, ToolError>;
     async fn execute(&self, call: &ToolCall, cancellation: &Cancellation) -> ToolExecution;
+    async fn execute_stream(
+        &self,
+        call: &ToolCall,
+        cancellation: &Cancellation,
+        _output: Option<tokio::sync::mpsc::Sender<ToolOutput>>,
+    ) -> ToolExecution {
+        self.execute(call, cancellation).await
+    }
 }
 
 pub struct Tools {
@@ -70,11 +82,6 @@ pub struct Tools {
     shell_timeout: Duration,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PathArgs {
-    path: String,
-}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WriteArgs {
@@ -88,17 +95,6 @@ struct EditArgs {
     path: String,
     old_text: String,
     new_text: String,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct GlobArgs {
-    pattern: String,
-}
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct GrepArgs {
-    path: String,
-    pattern: String,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -128,13 +124,21 @@ impl Tools {
         &self.workspace
     }
 
-    async fn invoke(&self, call: &ToolCall) -> Result<Value, ToolError> {
+    async fn invoke(
+        &self,
+        call: &ToolCall,
+        cancellation: &Cancellation,
+    ) -> Result<Value, ToolError> {
         match call.name.as_str() {
-            "read_file" => {
-                let args: PathArgs = parse(call)?;
-                let path = self.workspace.resolve(&args.path)?;
-                regular_file(&path)?;
-                Ok(json!({"path": args.path, "content": fs::read_to_string(path)?}))
+            "read_file" | "list_directory" | "glob" | "grep" => {
+                let workspace = self.workspace.clone();
+                let call = call.clone();
+                let cancellation = cancellation.clone();
+                tokio::task::spawn_blocking(move || {
+                    crate::native::invoke(&workspace, &call, &cancellation)
+                })
+                .await
+                .map_err(|error| ToolError::Io(io::Error::other(error)))?
             }
             "write_file" => {
                 let args: WriteArgs = parse(call)?;
@@ -164,60 +168,6 @@ impl Tools {
                 atomic_write(&path, &edited, true)?;
                 Ok(json!({"path": args.path, "replacements": 1, "bytes_written": edited.len()}))
             }
-            "list_directory" => {
-                let args: PathArgs = parse(call)?;
-                let path = self.workspace.resolve(&args.path)?;
-                let mut entries = fs::read_dir(path)?.map(|entry| {
-                    let entry = entry?;
-                    let kind = entry.file_type()?;
-                    Ok(json!({"name": entry.file_name().to_string_lossy(), "kind": if kind.is_symlink() { "symlink" } else if kind.is_dir() { "directory" } else if kind.is_file() { "file" } else { "other" }}))
-                }).collect::<Result<Vec<_>, io::Error>>()?;
-                entries.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-                Ok(json!({"path": args.path, "entries": entries}))
-            }
-            "glob" => {
-                let args: GlobArgs = parse(call)?;
-                if Path::new(&args.pattern).is_absolute()
-                    || args.pattern.split('/').any(|part| part == "..")
-                {
-                    return Err(ToolError::PathDenied(args.pattern));
-                }
-                let pattern = globset::GlobBuilder::new(&args.pattern)
-                    .literal_separator(true)
-                    .build()
-                    .map_err(|e| ToolError::InvalidArguments(e.to_string()))?
-                    .compile_matcher();
-                let files = self
-                    .files(self.workspace.root())?
-                    .into_iter()
-                    .map(|path| self.workspace.relative(&path))
-                    .filter(|path| pattern.is_match(path))
-                    .collect::<Vec<_>>();
-                Ok(json!({"files": files}))
-            }
-            "grep" => {
-                let args: GrepArgs = parse(call)?;
-                let path = self.workspace.resolve(&args.path)?;
-                let pattern = regex::Regex::new(&args.pattern)
-                    .map_err(|e| ToolError::InvalidArguments(e.to_string()))?;
-                let mut matches = Vec::new();
-                for file in self.files(&path)? {
-                    let bytes = fs::read(&file)?;
-                    // Binary files are deliberately excluded from textual search.
-                    if bytes.contains(&0) {
-                        continue;
-                    }
-                    let Ok(content) = String::from_utf8(bytes) else {
-                        continue;
-                    };
-                    for (index, line) in content.lines().enumerate() {
-                        if pattern.is_match(line) {
-                            matches.push(json!({"path": self.workspace.relative(&file), "line": index + 1, "text": line}));
-                        }
-                    }
-                }
-                Ok(json!({"matches": matches}))
-            }
             "shell" => Err(ToolError::InvalidArguments(
                 "shell uses cancellable execution".into(),
             )),
@@ -228,38 +178,12 @@ impl Tools {
         }
     }
 
-    fn files(&self, path: &Path) -> Result<Vec<PathBuf>, ToolError> {
-        let metadata = fs::symlink_metadata(path)?;
-        if metadata.is_file() {
-            return Ok(vec![path.to_path_buf()]);
-        }
-        if !metadata.is_dir() {
-            return Err(ToolError::PathDenied(path.display().to_string()));
-        }
-        let mut files = Vec::new();
-        for entry in WalkDir::new(path)
-            .follow_links(false)
-            .into_iter()
-            .filter_entry(|entry| entry.file_name() != ".git")
-        {
-            let entry = entry.map_err(|error| ToolError::Io(io::Error::other(error)))?;
-            if entry.file_type().is_file() {
-                // Revalidate every discovered path through the same boundary.
-                files.push(
-                    self.workspace
-                        .resolve(&self.workspace.relative(entry.path()))?,
-                );
-            }
-        }
-        files.sort();
-        Ok(files)
-    }
-
     async fn shell(
         &self,
         command: &str,
         cancellation: &Cancellation,
-    ) -> Result<Option<Value>, ToolError> {
+        sender: Option<tokio::sync::mpsc::Sender<ToolOutput>>,
+    ) -> Result<Value, ToolError> {
         let mut process = Command::new("/bin/sh");
         process
             .arg("-c")
@@ -283,51 +207,125 @@ impl Tools {
             .stderr
             .take()
             .ok_or_else(|| io::Error::other("shell stderr missing"))?;
-        // Local futures, not detached reader tasks: dropping them closes pipes.
-        let mut out = Vec::new();
-        let mut err = Vec::new();
-        let outcome = {
-            let wait = async {
-                let (status, _, _) = tokio::try_join!(
-                    child.wait(),
-                    stdout.read_to_end(&mut out),
-                    stderr.read_to_end(&mut err)
-                )?;
-                Ok::<_, io::Error>(status)
-            };
-            tokio::select! { biased;
-                _ = cancellation.cancelled() => None,
-                result = tokio::time::timeout(self.shell_timeout, wait) => Some(result),
+        let mut out = Capture::default();
+        let mut err = Capture::default();
+        let mut out_buffer = [0u8; output::CHUNK_BYTES];
+        let mut err_buffer = [0u8; output::CHUNK_BYTES];
+        let mut out_done = false;
+        let mut err_done = false;
+        let mut status = None;
+        let mut live_stopped = false;
+        let mut cancelled = false;
+        let mut timed_out = false;
+        let deadline = tokio::time::sleep(self.shell_timeout);
+        tokio::pin!(deadline);
+        // No reader tasks or awaited output sends: execution and cleanup remain
+        // polled independently of the runtime's lossless event delivery.
+        let error = loop {
+            if cancellation.is_cancelled() {
+                cancelled = true;
+                break None;
+            }
+            if out_done && err_done && status.is_some() {
+                break None;
+            }
+            tokio::select! {
+                _ = cancellation.cancelled() => { cancelled = true; break None; }
+                _ = &mut deadline => { timed_out = true; break None; }
+                read = stdout.read(&mut out_buffer), if !out_done => match read {
+                    Ok(0) => out_done = true,
+                    Ok(count) => out.observe(&out_buffer[..count], OutputStream::Stdout, sender.as_ref(), &mut live_stopped),
+                    Err(error) => break Some(error),
+                },
+                read = stderr.read(&mut err_buffer), if !err_done => match read {
+                    Ok(0) => err_done = true,
+                    Ok(count) => err.observe(&err_buffer[..count], OutputStream::Stderr, sender.as_ref(), &mut live_stopped),
+                    Err(error) => break Some(error),
+                },
+                waited = child.wait(), if status.is_none() => match waited {
+                    Ok(value) => status = Some(value),
+                    Err(error) => break Some(error),
+                }
             }
         };
-        match outcome {
-            Some(Ok(Ok(status))) => Ok(Some(
-                json!({"stdout":String::from_utf8_lossy(&out),"stderr":String::from_utf8_lossy(&err),"exit_code":status.code(),"timed_out":false}),
-            )),
-            other => {
-                // Cleanup is required for cancellation, timeout, and pipe/wait errors.
-                let killed = unsafe { libc::kill(-(pid as i32), libc::SIGKILL) };
-                if killed != 0 && io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH) {
-                    return Err(ToolError::CleanupFailed(
-                        io::Error::last_os_error().to_string(),
-                    ));
-                }
-                child
-                    .wait()
-                    .await
-                    .map_err(|e| ToolError::CleanupFailed(e.to_string()))?;
-                // The leader is reaped and group termination was requested. Detached
-                // descendants are outside this process-group contract.
-                match other {
-                    None => Ok(None),
-                    Some(Err(_)) => Ok(Some(
-                        json!({"stdout":null,"stderr":null,"exit_code":null,"timed_out":true,"timeout_seconds":self.shell_timeout.as_secs_f64()}),
-                    )),
-                    Some(Ok(Err(e))) => Err(e.into()),
-                    _ => unreachable!(),
-                }
+        if cancelled || timed_out || error.is_some() {
+            let killed = unsafe { libc::kill(-(pid as i32), libc::SIGKILL) };
+            if killed != 0 && io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH) {
+                return Err(ToolError::CleanupFailed(
+                    io::Error::last_os_error().to_string(),
+                ));
+            }
+            if status.is_none() {
+                status = Some(
+                    tokio::time::timeout(Duration::from_secs(5), child.wait())
+                        .await
+                        .map_err(|_| {
+                            ToolError::CleanupFailed("shell leader reap timed out".into())
+                        })?
+                        .map_err(|error| ToolError::CleanupFailed(error.to_string()))?,
+                );
             }
         }
+        if let Some(error) = error {
+            return Err(error.into());
+        }
+        let mut data = output::result(
+            &out,
+            &err,
+            status.and_then(|value| value.code()),
+            timed_out,
+            cancelled,
+            out_done && err_done,
+            sender.is_some(),
+        );
+        if timed_out {
+            data["timeout_seconds"] = json!(self.shell_timeout.as_secs_f64());
+        }
+        Ok(data)
+    }
+
+    async fn run_execute(
+        &self,
+        call: &ToolCall,
+        cancellation: &Cancellation,
+        sender: Option<tokio::sync::mpsc::Sender<ToolOutput>>,
+    ) -> ToolExecution {
+        if cancellation.is_cancelled() {
+            return ToolExecution::Cancelled;
+        }
+        let result = if call.name == "shell" {
+            match parse::<ShellArgs>(call) {
+                Ok(args) if !args.command.trim().is_empty() => {
+                    self.shell(&args.command, cancellation, sender).await
+                }
+                Ok(_) => Err(ToolError::InvalidArguments(
+                    "command must not be empty".into(),
+                )),
+                Err(error) => Err(error),
+            }
+        } else {
+            self.invoke(call, cancellation).await
+        };
+        let outcome = match result {
+            Ok(data) if data["cancelled"] == true => {
+                return ToolExecution::CancelledWithOutput { data };
+            }
+            Ok(data) if data["timed_out"] == true => ToolOutcome::TimedOut { data },
+            Ok(data) => ToolOutcome::Success { data },
+            Err(ToolError::Cancelled) => return ToolExecution::Cancelled,
+            Err(error @ ToolError::CleanupFailed(_)) => {
+                return ToolExecution::CleanupFailed(error.to_string());
+            }
+            Err(error) => ToolOutcome::Error {
+                code: error.code().into(),
+                message: error.to_string(),
+            },
+        };
+        ToolExecution::Finished(ToolResult {
+            call_id: call.call_id.clone(),
+            name: call.name.clone(),
+            outcome,
+        })
     }
 }
 
@@ -352,34 +350,15 @@ impl ToolExecutor for Tools {
         }))
     }
     async fn execute(&self, call: &ToolCall, cancellation: &Cancellation) -> ToolExecution {
-        if cancellation.is_cancelled() {
-            return ToolExecution::Cancelled;
-        }
-        let result = if call.name == "shell" {
-            match parse::<ShellArgs>(call) {
-                Ok(args) => self.shell(&args.command, cancellation).await,
-                Err(e) => Err(e),
-            }
-        } else {
-            self.invoke(call).await.map(Some)
-        };
-        let outcome = match result {
-            Ok(Some(data)) if data["timed_out"] == true => ToolOutcome::TimedOut { data },
-            Ok(Some(data)) => ToolOutcome::Success { data },
-            Ok(None) => return ToolExecution::Cancelled,
-            Err(e @ ToolError::CleanupFailed(_)) => {
-                return ToolExecution::CleanupFailed(e.to_string());
-            }
-            Err(e) => ToolOutcome::Error {
-                code: e.code().into(),
-                message: e.to_string(),
-            },
-        };
-        ToolExecution::Finished(ToolResult {
-            call_id: call.call_id.clone(),
-            name: call.name.clone(),
-            outcome,
-        })
+        self.run_execute(call, cancellation, None).await
+    }
+    async fn execute_stream(
+        &self,
+        call: &ToolCall,
+        cancellation: &Cancellation,
+        output: Option<tokio::sync::mpsc::Sender<ToolOutput>>,
+    ) -> ToolExecution {
+        self.run_execute(call, cancellation, output).await
     }
 }
 
@@ -465,7 +444,7 @@ pub fn definitions() -> Vec<Value> {
         ),
         (
             "shell",
-            "Run a noninteractive /bin/sh command after explicit user confirmation. Fresh workspace cwd; returns stdout, stderr, exit_code, and timeout status.",
+            "Run a noninteractive /bin/sh command subject to the configured execution permission policy (default: ask). Fresh workspace cwd; returns bounded stdout, stderr, exit_code, timeout status, and explicit output coverage.",
             json!({"command":string()}),
         ),
     ];

@@ -28,6 +28,7 @@ fn config(limit: usize) -> RunConfig {
         model: "test-model".into(),
         task: "task".into(),
         max_model_calls: limit,
+        permissions: Default::default(),
     }
 }
 fn tools(root: &std::path::Path) -> Tools {
@@ -118,7 +119,7 @@ fn check_history(result: &RunResult, events: &[ExecutionEvent]) {
             EventKind::ToolCallFailed { .. }
             | EventKind::TurnFailed { .. }
             | EventKind::ModelCallFailed { .. } => Some(Status::Failed),
-            EventKind::ToolCallCancelled
+            EventKind::ToolCallCancelled { .. }
             | EventKind::TurnCancelled
             | EventKind::ModelCallCancelled => Some(Status::Cancelled),
             EventKind::ToolCallDenied { .. } => Some(Status::Denied),
@@ -154,7 +155,7 @@ fn check_history(result: &RunResult, events: &[ExecutionEvent]) {
             | EventKind::ToolCallFailed { .. }
             | EventKind::ToolCallDenied { .. }
             | EventKind::ToolCallTimedOut { .. }
-            | EventKind::ToolCallCancelled
+            | EventKind::ToolCallCancelled { .. }
             | EventKind::ToolCallSkipped { .. } => {
                 *tool_terminal_counts
                     .entry(event.tool_call_id.unwrap())
@@ -818,7 +819,7 @@ async fn illegal_transitions_and_duplicate_terminal_events_leave_state_unchanged
 
 #[tokio::test]
 async fn cancellation_during_backpressured_text_keeps_sequence_lossless() {
-    for prefix in [2, 3] {
+    for stop_after_model_start in [false, true] {
         let root = tempfile::tempdir().unwrap();
         let provider = Streaming {
             entered: Arc::new(Notify::new()),
@@ -838,8 +839,16 @@ async fn cancellation_during_backpressured_text_keeps_sequence_lossless() {
         );
         tokio::pin!(execution);
         let mut history = Vec::new();
-        while history.len() < prefix {
+        loop {
             tokio::select! {result=&mut execution=>panic!("unexpected completion: {result:?}"),event=receiver.recv()=>history.push(event.unwrap())}
+            if matches!(
+                history.last().unwrap().kind,
+                EventKind::ModelCallStarted { .. }
+            ) || (!stop_after_model_start
+                && matches!(history.last().unwrap().kind, EventKind::TurnStarted { .. }))
+            {
+                break;
+            }
         }
         assert!(
             tokio::time::timeout(Duration::from_millis(20), &mut execution)
@@ -984,4 +993,59 @@ async fn wrong_parent_ids_and_second_tool_terminal_are_rejected_atomically() {
             assert_eq!(state, before);
         }
     }
+}
+
+#[tokio::test]
+async fn replay_rejects_tool_start_without_matching_policy_and_approval() {
+    use astrid::permissions::{Capability, PermissionAction};
+    let root = tempfile::tempdir().unwrap();
+    let provider = Script::new(vec![
+        response(vec![call("shell", "shell", json!({"command":"true"}))], ""),
+        response(vec![], "done"),
+    ]);
+    let (result, events) = recorded(
+        &provider,
+        &tools(root.path()),
+        &mut Confirmation::new(true),
+        Cancellation::default(),
+        20,
+    )
+    .await;
+    let mut state = ExecutionState::new(result.session.id, result.state.run_id);
+    let start = events
+        .iter()
+        .find(|event| matches!(event.kind, EventKind::ToolCallStarted))
+        .unwrap();
+    for event in &events {
+        if matches!(
+            event.kind,
+            EventKind::PermissionPolicyEvaluated { .. } | EventKind::PermissionRequested { .. }
+        ) {
+            let before = state.clone();
+            let mut unauthorized = start.clone();
+            unauthorized.sequence = state.sequence + 1;
+            assert!(state.transition(&unauthorized).is_err());
+            assert_eq!(state, before);
+        }
+        if matches!(event.kind, EventKind::PermissionPolicyEvaluated { .. }) {
+            let before = state.clone();
+            let mut forged = event.clone();
+            forged.kind = EventKind::PermissionPolicyEvaluated {
+                capability: Capability::Execute,
+                action: PermissionAction::Allow,
+                reason: "forged allow".into(),
+            };
+            assert!(state.transition(&forged).is_err());
+            assert_eq!(state, before);
+            forged.kind = EventKind::PermissionPolicyEvaluated {
+                capability: Capability::Read,
+                action: PermissionAction::Ask,
+                reason: "forged capability".into(),
+            };
+            assert!(state.transition(&forged).is_err());
+            assert_eq!(state, before);
+        }
+        state.transition(event).unwrap();
+    }
+    assert_eq!(state, result.state);
 }

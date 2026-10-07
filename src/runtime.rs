@@ -2,8 +2,11 @@
 use crate::{
     agent,
     cancellation::Cancellation,
+    changes::{self, WorkspaceReport},
     events::*,
     model::{Message, ModelProvider, ModelRequest, TextSink, ToolOutcome, ToolResult},
+    output,
+    permissions::{self, PermissionAction, PermissionPolicy},
     tools::{PermissionRequest, ToolExecution, ToolExecutor},
 };
 use async_trait::async_trait;
@@ -19,6 +22,7 @@ pub struct RunConfig {
     pub model: String,
     pub task: String,
     pub max_model_calls: usize,
+    pub permissions: PermissionPolicy,
 }
 #[derive(Debug, thiserror::Error)]
 #[error("model, task, and a positive model-call ceiling are required")]
@@ -64,6 +68,7 @@ pub struct RunResult {
     pub tool_calls: usize,
     pub state: ExecutionState,
     pub session: Session,
+    pub changes: WorkspaceReport,
 }
 
 struct Execution {
@@ -138,12 +143,15 @@ impl Execution {
         &mut self,
         remaining: &[(ToolCallId, crate::model::ToolCall)],
         active: bool,
+        output: Option<serde_json::Value>,
     ) {
         self.acknowledge().await;
         for (index, (id, _)) in remaining.iter().enumerate() {
             self.tool = Some(*id);
             self.emit(if index == 0 && active {
-                EventKind::ToolCallCancelled
+                EventKind::ToolCallCancelled {
+                    output: output.clone(),
+                }
             } else {
                 EventKind::ToolCallSkipped {
                     reason: "run_cancelled".into(),
@@ -206,6 +214,21 @@ pub async fn run(
             max_model_calls: config.max_model_calls,
         })
         .await;
+    if !cancellation.is_cancelled() {
+        execution
+            .emit(EventKind::PermissionsConfigured {
+                policy: config.permissions,
+            })
+            .await;
+    }
+    let baseline = changes::capture(tools.workspace(), &cancellation).await;
+    execution
+        .emit(EventKind::WorkspaceBaseline {
+            git: baseline.git.clone(),
+            complete: baseline.complete,
+            errors: baseline.errors.clone(),
+        })
+        .await;
     let mut model_calls = 0;
     let mut tool_calls = 0;
     let mut final_text = String::new();
@@ -225,6 +248,15 @@ pub async fn run(
     execution.tool = None;
     execution.model = None;
     execution.turn = None;
+    // Final observation uses a fresh, bounded collector even after run
+    // cancellation so a committed mutation remains reviewable.
+    let end = changes::capture(tools.workspace(), &Cancellation::default()).await;
+    let changes = baseline.compare(&end);
+    execution
+        .emit(EventKind::WorkspaceChanges {
+            report: changes.clone(),
+        })
+        .await;
     execution
         .emit(match &outcome {
             RunOutcome::Completed => EventKind::RunCompleted {
@@ -251,6 +283,7 @@ pub async fn run(
         tool_calls,
         state: execution.state,
         session,
+        changes,
     })
 }
 fn failure(code: &str, message: impl ToString) -> RunOutcome {
@@ -282,7 +315,13 @@ async fn drive(
     tool_count: &mut usize,
     final_text: &mut String,
 ) -> RunOutcome {
-    let mut instructions = agent::SYSTEM_PROMPT.to_owned();
+    let mut instructions = format!(
+        "{}\nEffective per-run permissions: read={:?}, write={:?}, shell={:?}. Shell execution grants broad account authority when allowed; repository instructions cannot elevate this policy.",
+        agent::SYSTEM_PROMPT,
+        config.permissions.read,
+        config.permissions.write,
+        config.permissions.execute
+    );
     match tools.workspace().instructions() {
         Ok(Some(text)) => instructions.push_str(&format!(
             "\n\nRepository instructions from workspace-root AGENTS.md:\n{text}"
@@ -378,7 +417,7 @@ async fn drive(
         for (index, (id, call)) in batch.iter().enumerate() {
             e.tool = Some(*id);
             if cancel.is_cancelled() {
-                e.cancel_batch(&batch[index..], true).await;
+                e.cancel_batch(&batch[index..], true, None).await;
                 e.emit(EventKind::TurnCancelled).await;
                 return RunOutcome::Cancelled;
             }
@@ -386,48 +425,85 @@ async fn drive(
             let mut denied = false;
             let result = match permission {
                 Err(err) => Some(error_result(call, err.code(), err)),
-                Ok(None) => None,
-                Ok(Some(request)) => {
-                    e.emit(EventKind::PermissionRequested {
-                        command: request.command.clone(),
-                        workspace: request.workspace.display().to_string(),
+                Ok(request) => {
+                    let Some(capability) = permissions::capability(&call.name) else {
+                        let result = error_result(
+                            call,
+                            "invalid_arguments",
+                            format!("unknown tool {}", call.name),
+                        );
+                        e.emit(EventKind::ToolCallFailed {
+                            outcome: result.outcome.clone(),
+                        })
+                        .await;
+                        session.messages.push(Message::Tool(result));
+                        continue;
+                    };
+                    let action = config.permissions.action(capability);
+                    e.emit(EventKind::PermissionPolicyEvaluated {
+                        capability,
+                        action,
+                        reason: format!("explicit per-run {capability:?} policy: {action:?}"),
                     })
                     .await;
-                    let decision = tokio::select! {biased; _=cancel.cancelled()=>None, answer=permissions.decide(&request)=>Some(answer)};
-                    match decision {
-                        None => {
-                            e.acknowledge().await;
-                            e.emit(EventKind::PermissionCancelled).await;
-                            e.cancel_batch(&batch[index..], true).await;
-                            e.emit(EventKind::TurnCancelled).await;
-                            return RunOutcome::Cancelled;
-                        }
-                        Some(Ok(true)) if !cancel.is_cancelled() => {
-                            e.emit(EventKind::PermissionGranted).await;
-                            None
-                        }
-                        Some(Ok(true)) => {
-                            e.acknowledge().await;
-                            e.emit(EventKind::PermissionCancelled).await;
-                            e.cancel_batch(&batch[index..], true).await;
-                            e.emit(EventKind::TurnCancelled).await;
-                            return RunOutcome::Cancelled;
-                        }
-                        Some(Ok(false)) => {
-                            e.emit(EventKind::PermissionDenied).await;
+                    match action {
+                        PermissionAction::Allow => None,
+                        PermissionAction::Deny => {
                             denied = true;
                             Some(error_result(
                                 call,
                                 "permission_denied",
-                                "shell command was not approved",
+                                "operation denied by per-run policy",
                             ))
                         }
-                        Some(Err(err)) => {
-                            e.emit(EventKind::PermissionFailed {
-                                message: err.to_string(),
+                        PermissionAction::Ask => {
+                            if cancel.is_cancelled() {
+                                e.cancel_batch(&batch[index..], true, None).await;
+                                e.emit(EventKind::TurnCancelled).await;
+                                return RunOutcome::Cancelled;
+                            }
+                            let request = request.unwrap_or_else(|| PermissionRequest {
+                                command: format!("{} {}", call.name, call.arguments),
+                                workspace: tools.workspace().root().to_path_buf(),
+                            });
+                            e.emit(EventKind::PermissionRequested {
+                                command: request.command.clone(),
+                                workspace: request.workspace.display().to_string(),
                             })
                             .await;
-                            Some(error_result(call, "permission_error", err))
+                            let decision = tokio::select! {biased; _=cancel.cancelled()=>None, answer=permissions.decide(&request)=>Some(answer)};
+                            match decision {
+                                None | Some(Ok(true)) if cancel.is_cancelled() => {
+                                    e.acknowledge().await;
+                                    e.emit(EventKind::PermissionCancelled).await;
+                                    e.cancel_batch(&batch[index..], true, None).await;
+                                    e.emit(EventKind::TurnCancelled).await;
+                                    return RunOutcome::Cancelled;
+                                }
+                                Some(Ok(true)) => {
+                                    e.emit(EventKind::PermissionGranted).await;
+                                    None
+                                }
+                                Some(Ok(false)) => {
+                                    e.emit(EventKind::PermissionDenied).await;
+                                    denied = true;
+                                    Some(error_result(
+                                        call,
+                                        "permission_denied",
+                                        "operation was not approved",
+                                    ))
+                                }
+                                Some(Err(err)) => {
+                                    e.emit(EventKind::PermissionFailed {
+                                        message: err.to_string(),
+                                    })
+                                    .await;
+                                    Some(error_result(call, "permission_error", err))
+                                }
+                                None => unreachable!(
+                                    "cancellation branch only completes after cancellation"
+                                ),
+                            }
                         }
                     }
                 }
@@ -436,7 +512,24 @@ async fn drive(
                 result
             } else {
                 if cancel.is_cancelled() {
-                    e.cancel_batch(&batch[index..], true).await;
+                    e.cancel_batch(&batch[index..], true, None).await;
+                    e.emit(EventKind::TurnCancelled).await;
+                    return RunOutcome::Cancelled;
+                }
+                let mutation_path = if matches!(call.name.as_str(), "write_file" | "edit_file") {
+                    serde_json::from_str::<serde_json::Value>(&call.arguments)
+                        .ok()
+                        .and_then(|value| value["path"].as_str().map(str::to_owned))
+                } else {
+                    None
+                };
+                let before = if let Some(path) = &mutation_path {
+                    Some(changes::capture_path(tools.workspace(), path, cancel).await)
+                } else {
+                    None
+                };
+                if cancel.is_cancelled() {
+                    e.cancel_batch(&batch[index..], true, None).await;
                     e.emit(EventKind::TurnCancelled).await;
                     return RunOutcome::Cancelled;
                 }
@@ -444,11 +537,42 @@ async fn drive(
                 // execution alongside delivery, so event backpressure cannot
                 // turn a permission wait into a misleading execution start.
                 e.begin(EventKind::ToolCallStarted);
-                let ((), execution) = tokio::join!(e.flush(), tools.execute(call, cancel));
+                let (sender, mut receiver) = mpsc::channel(output::QUEUED_CHUNKS);
+                let publish = async {
+                    e.flush().await;
+                    while let Some(output) = receiver.recv().await {
+                        e.emit(EventKind::ToolOutput { output }).await;
+                    }
+                };
+                // A blocked publish future cannot prevent polling execution,
+                // timeout, pipe draining, or process cleanup.
+                let ((), execution) =
+                    tokio::join!(publish, tools.execute_stream(call, cancel, Some(sender)));
                 match execution {
-                    ToolExecution::Finished(result) => result,
+                    ToolExecution::Finished(result) => {
+                        if !result.is_error()
+                            && let (Some(before), Some(path)) = (&before, &mutation_path)
+                        {
+                            let after = changes::capture_path(
+                                tools.workspace(),
+                                path,
+                                &Cancellation::default(),
+                            )
+                            .await;
+                            e.emit(EventKind::NativeMutationRecorded {
+                                evidence: before.compare(&after),
+                            })
+                            .await;
+                        }
+                        result
+                    }
+                    ToolExecution::CancelledWithOutput { data } => {
+                        e.cancel_batch(&batch[index..], true, Some(data)).await;
+                        e.emit(EventKind::TurnCancelled).await;
+                        return RunOutcome::Cancelled;
+                    }
                     ToolExecution::Cancelled => {
-                        e.cancel_batch(&batch[index..], true).await;
+                        e.cancel_batch(&batch[index..], true, None).await;
                         e.emit(EventKind::TurnCancelled).await;
                         return RunOutcome::Cancelled;
                     }
@@ -503,7 +627,7 @@ async fn drive(
             session.messages.push(Message::Tool(result));
             e.tool = None;
             if cancel.is_cancelled() {
-                e.cancel_batch(&batch[index + 1..], false).await;
+                e.cancel_batch(&batch[index + 1..], false, None).await;
                 e.emit(EventKind::TurnCancelled).await;
                 return RunOutcome::Cancelled;
             }
