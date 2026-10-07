@@ -327,3 +327,18 @@ tests then passed, including color, narrow layout, and absence of screen-clear
 or scroll-margin controls. Formatting, Clippy, and an installed-binary PTY check
 passed. The transcript still uses ordinary terminal scrollback rather than a
 fixed footer that would interfere with scrolling.
+
+P2-10 composer follow-up: the maintainer requested a shaded task input, slash
+command discovery, account model selection, and remembering the last model.
+Startup uses `ASTRID_MODEL`, otherwise `~/.config/astrid/last-model`, otherwise
+the first listed account model. Every explicit run and `/model` choice saves the
+selection atomically. `/` reveals commands as it is typed; `/model` presents a
+filterable account catalog with arrow-key selection and Enter confirmation;
+Esc cancels. The slash-command menu also supports arrow keys. Composer redraws only its own
+four lines, leaving the transcript in scrollback. No runtime or routing policy
+changes. Terminal state is restored on completion, EOF, and Ctrl-C.
+
+Composer validation: all 92 offline tests, formatting, and Clippy passed.
+A live terminal check exercised slash-menu arrow navigation, Enter selection,
+account-catalog loading, model-name filtering, arrow selection, and atomic
+persistence of the chosen model. The installed binary includes these changes.
