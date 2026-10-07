@@ -63,25 +63,20 @@ instruction discovery is deferred.
 
 On an interactive terminal, `astrid run` shows Astrid's existing pixel logo,
 compact model/provider/workspace metadata, and a scrolling execution stream.
-The header and three-line footer stay in place. The footer displays the actual
-run ID, turn, model-call count, and current activity; the bottom prompt accepts
-operation approvals when requested. Tasks still start through `astrid run`; there
-is no interactive conversation composer or mode switch. Ctrl-C cancels the run.
+Output appends to normal terminal scrollback so you can review earlier messages
+with your terminal's scrolling controls. Bare `astrid` opens a model/task prompt;
+`astrid run` remains available for direct invocation. Ctrl-C cancels the run.
 Tool requests show their target, results show a concise summary, and shell
 stdout/stderr stream separately while the command runs. Effective permission
 policy, initial branch/dirty paths, native mutation patches, and final observed
 workspace changes are visible in the execution stream. Completion means
 the run ended normally, not that the task was independently verified.
 
-The logo keeps its blue arches and cyan eyes, with cyan reserved for identity
-and important status. Labels and secondary information use dim terminal text.
-Set `NO_COLOR=1` to disable all styling colors. Narrow/short terminals use a
-compact header, truncate metadata by display width, and wrap execution output;
-the logo is omitted only when it would crowd out the stream. Resize redraws use
-up to 2,000 retained display lines. Resizing during a permission answer is
-applied after the decision to avoid erasing terminal-echoed input. An approval
-that cannot fit in the viewport switches the run to append-only output so the
-complete command remains reviewable in ordinary terminal scrollback.
+Replies are cyan, approvals yellow, successful completion green, and failures
+red. Labels and secondary information use dim terminal text. Set `NO_COLOR=1`
+to disable colors. The former fixed header/footer viewport is opt-in with
+`ASTRID_FIXED_VIEWPORT=1`; the default avoids cursor controls and redraws that
+interfere with scrollback.
 
 When either output stream is redirected, or `TERM=dumb`/terminal sizing is
 unavailable, rendering falls back to ordinary append-only text without cursor
@@ -256,3 +251,20 @@ See [architecture](docs/architecture.md), the
 [Phase 0 contract](docs/adr/0001-phase-0-execution-contract.md), and the frozen
 [Phase 1 runtime contract](docs/adr/0002-phase-1-runtime-and-event-model.md), with
 the [Phase 2 amendments](docs/adr/README.md).
+
+### Interactive startup and scrollback
+
+Run `astrid` without arguments to open the terminal task prompt. Set
+`ASTRID_MODEL` to skip the model prompt, or enter a model from `astrid models`.
+Saved authentication is reused. Each invocation starts one fresh repository
+run; this is not a persistent, multi-turn chat session.
+
+The default display appends output to the terminal, keeping the transcript in
+normal scrollback. Use your terminal's scrollbar, mouse wheel, trackpad, or
+scrollback keyboard shortcuts to review earlier output. Replies are cyan,
+approvals and cancellations yellow, successful completion green, and failures
+red. Set `NO_COLOR=1` for plain text. Redirected output stays plain.
+
+The previous fixed header/footer viewport is available with
+`ASTRID_FIXED_VIEWPORT=1`; its scroll region can prevent normal transcript
+scrollback, so it is no longer the default.
