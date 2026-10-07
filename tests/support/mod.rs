@@ -146,6 +146,7 @@ pub async fn run(
         tools,
         confirmation,
         RunConfig {
+            context_budget: None,
             model: model.into(),
             task: task.into(),
             max_model_calls,
@@ -246,6 +247,7 @@ pub fn reply(calls: &[ToolCall], text: &str) -> Vec<Value> {
 pub struct Server {
     pub provider: OpenAiProvider,
     pub requests: Arc<Mutex<Vec<Value>>>,
+    pub request_bytes: Arc<Mutex<Vec<usize>>>,
     task: JoinHandle<()>,
 }
 impl Server {
@@ -265,6 +267,8 @@ impl Server {
         let endpoint = format!("http://{}/v1/responses", listener.local_addr().unwrap());
         let requests = Arc::new(Mutex::new(Vec::new()));
         let captured = requests.clone();
+        let request_bytes = Arc::new(Mutex::new(Vec::new()));
+        let captured_bytes = request_bytes.clone();
         let task = tokio::spawn(async move {
             for events in replies {
                 let (mut connection, _) = listener.accept().await.unwrap();
@@ -295,6 +299,7 @@ impl Server {
                     assert_ne!(size, 0);
                     request.extend_from_slice(&buffer[..size]);
                 }
+                captured_bytes.lock().unwrap().push(length);
                 captured.lock().unwrap().push(
                     serde_json::from_slice(&request[header_end..header_end + length]).unwrap(),
                 );
@@ -332,6 +337,7 @@ impl Server {
         Self {
             provider: OpenAiProvider::with_endpoint(Arc::new(TestAuth), endpoint).unwrap(),
             requests,
+            request_bytes,
             task,
         }
     }

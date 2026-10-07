@@ -161,6 +161,7 @@ async fn repository_acceptance_preserves_user_edits_streams_tests_denies_and_rec
             &tools,
             &mut approval,
             RunConfig {
+                context_budget: None,
                 model: "test".into(),
                 task: "repair greeting".into(),
                 max_model_calls: 10,

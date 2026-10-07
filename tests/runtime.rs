@@ -25,6 +25,7 @@ use tokio::sync::{Notify, mpsc};
 
 fn config(limit: usize) -> RunConfig {
     RunConfig {
+        context_budget: None,
         model: "test-model".into(),
         task: "task".into(),
         max_model_calls: limit,
@@ -742,6 +743,155 @@ async fn ceiling_executes_final_batch_and_exposes_uninspected_results() {
     assert!(root.path().join("created").exists());
 }
 struct WaitingAuth(Arc<Notify>);
+
+struct FailingAuth(std::sync::atomic::AtomicUsize);
+#[async_trait]
+impl Authentication for FailingAuth {
+    async fn bearer_token(&self) -> Result<BearerToken, AuthError> {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Err(AuthError::Invalid("test authentication failure".into()))
+    }
+}
+
+struct AnnouncePreparation {
+    provider: OpenAiProvider,
+    entered: Arc<Notify>,
+}
+struct PreparationSink<'a> {
+    sink: &'a mut dyn TextSink,
+    entered: Arc<Notify>,
+}
+#[async_trait]
+impl TextSink for PreparationSink<'_> {
+    async fn request_prepared(
+        &mut self,
+        snapshot: astrid::context::ContextSnapshot,
+    ) -> io::Result<()> {
+        self.entered.notify_one();
+        self.sink.request_prepared(snapshot).await
+    }
+    async fn delta(&mut self, text: &str) -> io::Result<()> {
+        self.sink.delta(text).await
+    }
+}
+#[async_trait]
+impl ModelProvider for AnnouncePreparation {
+    async fn generate(
+        &self,
+        request: &ModelRequest<'_>,
+        sink: &mut dyn TextSink,
+    ) -> Result<ModelResponse, ModelError> {
+        self.provider
+            .generate(
+                request,
+                &mut PreparationSink {
+                    sink,
+                    entered: self.entered.clone(),
+                },
+            )
+            .await
+    }
+}
+
+#[tokio::test]
+async fn cancelled_stalled_context_publication_never_enters_authentication() {
+    let root = tempfile::tempdir().unwrap();
+    let auth = Arc::new(FailingAuth(std::sync::atomic::AtomicUsize::new(0)));
+    let entered = Arc::new(Notify::new());
+    let provider = AnnouncePreparation {
+        provider: OpenAiProvider::new(auth.clone()).unwrap(),
+        entered: entered.clone(),
+    };
+    let tools = tools(root.path());
+    let mut permission = Confirmation::new(false);
+    let cancel = Cancellation::default();
+    let (sender, mut receiver) = mpsc::channel(1);
+    let execution = runtime::run(
+        &provider,
+        &tools,
+        &mut permission,
+        config(2),
+        cancel.clone(),
+        Some(sender),
+    );
+    tokio::pin!(execution);
+    let mut history = Vec::new();
+    loop {
+        tokio::select! {
+            result = &mut execution => panic!("unexpected completion: {result:?}"),
+            event = receiver.recv() => history.push(event.unwrap()),
+        }
+        if matches!(history.last().unwrap().kind, EventKind::TurnStarted { .. }) {
+            break;
+        }
+    }
+    // ModelCallStarted fills the single slot; ContextPrepared waits for delivery.
+    tokio::select! {
+        biased;
+        result = &mut execution => panic!("unexpected completion: {result:?}"),
+        () = entered.notified() => {},
+    }
+    assert_eq!(auth.0.load(std::sync::atomic::Ordering::SeqCst), 0);
+    cancel.cancel();
+    let drain = async {
+        while let Some(event) = receiver.recv().await {
+            history.push(event);
+        }
+    };
+    let (result, ()) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(execution, drain)
+    })
+    .await
+    .unwrap();
+    let result = result.unwrap();
+    check_history(&result, &history);
+    assert_eq!(result.outcome, RunOutcome::Cancelled);
+    assert_eq!(auth.0.load(std::sync::atomic::Ordering::SeqCst), 0);
+    let prepared = history
+        .iter()
+        .position(|e| matches!(e.kind, EventKind::ContextPrepared { .. }))
+        .unwrap();
+    let acknowledged = history
+        .iter()
+        .position(|e| matches!(e.kind, EventKind::CancellationRequested))
+        .unwrap();
+    assert!(prepared < acknowledged);
+    assert_eq!(
+        history
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::ModelCallCancelled))
+            .count(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn prepared_context_remains_visible_when_authentication_fails() {
+    let root = tempfile::tempdir().unwrap();
+    let auth = Arc::new(FailingAuth(std::sync::atomic::AtomicUsize::new(0)));
+    let provider = OpenAiProvider::new(auth.clone()).unwrap();
+    let (result, history) = recorded(
+        &provider,
+        &tools(root.path()),
+        &mut Confirmation::new(false),
+        Cancellation::default(),
+        2,
+    )
+    .await;
+    check_history(&result, &history);
+    assert!(matches!(result.outcome, RunOutcome::Failed { .. }));
+    assert_eq!(auth.0.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert!(
+        history
+            .iter()
+            .any(|e| matches!(e.kind, EventKind::ContextPrepared { .. }))
+    );
+    assert!(
+        !history
+            .iter()
+            .any(|e| matches!(e.kind, EventKind::ModelTextDelta { .. }))
+    );
+}
 #[async_trait]
 impl Authentication for WaitingAuth {
     async fn bearer_token(&self) -> Result<BearerToken, AuthError> {

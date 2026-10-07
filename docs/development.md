@@ -7,6 +7,9 @@ advance the active phase.
 
 Start here for the current phase:
 
+- [Phase 3 plan and tickets](plans/phase-3.md): accepted context contracts, implementation, and evidence.
+- [Phase 3 review](reviews/phase-3.md): completed implementation, evidence, and limitations.
+- [Phase 3 adversarial review](reviews/phase-3-adversarial.md): plan critique and first-slice review.
 - [Phase 1 review](reviews/phase-1.md): evidence, lessons, and outstanding questions.
 - [Phase 2 plan and tickets](plans/phase-2.md): accepted scope, completed tickets, and evidence.
 - [Phase 2 review](reviews/phase-2.md): closure assessment and validation results.
