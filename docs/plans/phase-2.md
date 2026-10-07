@@ -342,3 +342,13 @@ Composer validation: all 92 offline tests, formatting, and Clippy passed.
 A live terminal check exercised slash-menu arrow navigation, Enter selection,
 account-catalog loading, model-name filtering, arrow selection, and atomic
 persistence of the chosen model. The installed binary includes these changes.
+
+P2-10 input ownership correction: one Composer instance owns the input region
+across task entry, commands, and model selection. Transitions redraw the owned
+region rather than append another composer. Help remains inside the command
+menu; cancellation returns to the same input; dropping the composer clears
+only its owned lines before runtime output. A terminal check verified entering
+`/model`, account-catalog display, and Esc returning to the same anchor, with
+cursor-up redraws across the transition. The 92-test suite passed, followed by
+all 11 binary tests including the new owned-region cleanup regression.
+Formatting and Clippy passed; installed CLI updated.
