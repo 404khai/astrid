@@ -317,3 +317,13 @@ and the updated CLI was installed. A controlling-terminal PTY check verified
 model/task prompts, blank task rejection, and no login or screen clearing. Solo
 diff review found no runtime/permission changes. Scrollback navigation uses the
 terminal emulator's own controls and retention limit.
+
+P2-10 design follow-up: restore the original blue/cyan pixel logo and
+side-by-side runtime metadata on both bare startup and direct runs. The bare
+startup task composer sits below this shared header; the run does not print
+another copy. Maintainer requested retaining the earlier design. The full
+91-test suite passed before adding a header regression test; all 10 binary
+tests then passed, including color, narrow layout, and absence of screen-clear
+or scroll-margin controls. Formatting, Clippy, and an installed-binary PTY check
+passed. The transcript still uses ordinary terminal scrollback rather than a
+fixed footer that would interfere with scrolling.

@@ -132,6 +132,72 @@ fn tool_list(tools: &[String], width: usize) -> String {
     truncate(&format!("{} tools", tools.len()), width)
 }
 
+fn identity(model: &str, workspace: &Workspace) -> Identity {
+    Identity {
+        model: single_line(model),
+        cwd: short_path(workspace.root()),
+        instructions: workspace
+            .instructions()
+            .ok()
+            .flatten()
+            .map(|_| "AGENTS.md".into()),
+        tools: tools::definitions()
+            .iter()
+            .filter_map(|tool| tool["name"].as_str().map(str::to_owned))
+            .collect(),
+    }
+}
+
+fn append_header(
+    out: &mut impl Write,
+    identity: &Identity,
+    width: usize,
+    color: bool,
+) -> io::Result<()> {
+    let mut metadata = vec![
+        format!("astrid  {}", env!("CARGO_PKG_VERSION")),
+        String::new(),
+    ];
+    metadata.extend(identity.rows(width.saturating_sub(34).max(20)));
+    writeln!(out)?;
+    if width >= 78 {
+        for (row, logo) in LOGO.lines().enumerate() {
+            let text = metadata.get(row).map(String::as_str).unwrap_or("");
+            let ink = if row == 0 { Ink::Accent } else { Ink::Normal };
+            writeln!(
+                out,
+                "{}{}{}",
+                paint_logo(logo, row, color),
+                " ".repeat(34 - logo.width()),
+                ink.paint(text, color)
+            )?;
+        }
+    } else {
+        for (row, logo) in LOGO.lines().enumerate() {
+            writeln!(out, "{}", paint_logo(&truncate(logo, width), row, color))?;
+        }
+        writeln!(out)?;
+        writeln!(out, "{}", Ink::Accent.paint(&metadata[0], color))?;
+        for row in identity.rows(width) {
+            writeln!(out, "{row}")?;
+        }
+    }
+    writeln!(out)?;
+    out.flush()
+}
+
+pub fn welcome(model: &str, workspace: &Workspace) -> io::Result<()> {
+    let color = io::stderr().is_terminal()
+        && std::env::var_os("NO_COLOR").is_none()
+        && std::env::var("TERM").is_ok_and(|term| term != "dumb");
+    append_header(
+        &mut io::stderr().lock(),
+        &identity(model, workspace),
+        terminal_size().map_or(80, |(w, _)| w),
+        color,
+    )
+}
+
 /// A small terminal-native viewport, without raw mode or an alternate screen.
 /// Only the stream scrolls; header and footer are outside the scroll margins.
 /// Canonical terminal input and Ctrl-C retain their existing OS behavior.
@@ -417,25 +483,12 @@ pub struct Console {
     decoders: BTreeMap<(ToolCallId, OutputStream), TextDecoder>,
 }
 impl Console {
-    pub fn new(model: &str, workspace: &Workspace) -> io::Result<Self> {
+    pub fn new(model: &str, workspace: &Workspace, show_header: bool) -> io::Result<Self> {
         let terminal = io::stdout().is_terminal() && io::stderr().is_terminal();
         let capable = std::env::var_os("ASTRID_FIXED_VIEWPORT").is_some()
             && terminal
             && std::env::var("TERM").is_ok_and(|term| term != "dumb");
-        let identity = Identity {
-            model: single_line(model),
-            cwd: short_path(workspace.root()),
-            // Presentation inspects availability; runtime still loads/validates instructions.
-            instructions: workspace
-                .instructions()
-                .ok()
-                .flatten()
-                .map(|_| "AGENTS.md".into()),
-            tools: tools::definitions()
-                .iter()
-                .filter_map(|tool| tool["name"].as_str().map(str::to_owned))
-                .collect(),
-        };
+        let identity = identity(model, workspace);
         let mut console = Self {
             identity,
             color: terminal
@@ -461,13 +514,13 @@ impl Console {
         };
         if console.screen.is_some() {
             console.redraw()?;
-        } else if terminal {
-            let mut out = io::stderr().lock();
-            writeln!(out, "\n{}\n\nastrid  {}", LOGO, env!("CARGO_PKG_VERSION"))?;
-            for row in console.identity.rows(78) {
-                writeln!(out, " {row}")?;
-            }
-            writeln!(out)?;
+        } else if terminal && show_header {
+            append_header(
+                &mut io::stderr().lock(),
+                &console.identity,
+                terminal_size().map_or(80, |(w, _)| w),
+                console.color,
+            )?;
         }
         Ok(console)
     }
@@ -977,6 +1030,24 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
+    fn designed_header_preserves_logo_metadata_and_scrollback() {
+        for width in [40, 80, 120] {
+            let mut bytes = Vec::new();
+            append_header(&mut bytes, &identity(), width, true).unwrap();
+            let output = String::from_utf8(bytes).unwrap();
+            assert!(output.contains("astrid"));
+            assert!(output.contains("model"));
+            assert!(output.contains("cwd"));
+            assert!(output.contains("38;2;68;89;249"));
+            assert!(output.contains("38;2;0;247;213"));
+            assert!(!output.contains("\x1b[2J"));
+            assert!(!output.contains("\x1b[r"));
+        }
+        let mut bytes = Vec::new();
+        append_header(&mut bytes, &identity(), 80, false).unwrap();
+        assert!(!bytes.contains(&0x1b));
+    }
     fn identity() -> Identity {
         Identity {
             model: "gpt-5.6-sol".into(),

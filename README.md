@@ -254,7 +254,9 @@ the [Phase 2 amendments](docs/adr/README.md).
 
 ### Interactive startup and scrollback
 
-Run `astrid` without arguments to open the terminal task prompt. Set
+Run `astrid` without arguments to open the designed terminal welcome screen:
+blue pixel logo with cyan eyes, model/provider/workspace metadata, and a task
+input directly beneath it. Set
 `ASTRID_MODEL` to skip the model prompt, or enter a model from `astrid models`.
 Saved authentication is reused. Each invocation starts one fresh repository
 run; this is not a persistent, multi-turn chat session.

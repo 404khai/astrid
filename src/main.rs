@@ -159,18 +159,17 @@ fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
                 .into(),
         );
     }
-    eprintln!(
-        "\n{LOGO}\n\nastrid  {}\nStart a repository task. Output stays in terminal scrollback.\n",
-        env!("CARGO_PKG_VERSION")
-    );
-    let model = match std::env::var("ASTRID_MODEL")
+    let selected = std::env::var("ASTRID_MODEL")
         .ok()
-        .filter(|v| !v.trim().is_empty())
-    {
+        .filter(|v| !v.trim().is_empty());
+    let workspace = Workspace::new(std::env::current_dir()?)?;
+    console::welcome(selected.as_deref().unwrap_or("choose below"), &workspace)?;
+    let model = match selected {
         Some(model) => model,
         None => prompt_line("Model (see astrid models): ")?,
     };
-    let task = prompt_line("› Task: ")?;
+    eprintln!("Type your task below. Ctrl-C exits.\n");
+    let task = prompt_line("› ")?;
     if model.trim().is_empty() || task.is_empty() {
         return Err("model and task must not be empty".into());
     }
@@ -181,6 +180,7 @@ fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
 
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let directory = auth::default_directory()?;
+    let interactive = cli.command.is_none();
     let command = match cli.command {
         Some(command) => command,
         None => interactive_command()?,
@@ -236,7 +236,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             let tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
             let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
-            let mut console = Console::new(&model, tools.workspace())?;
+            let mut console = Console::new(&model, tools.workspace(), !interactive)?;
             let cancel = Cancellation::default();
             let (sender, mut receiver) = tokio::sync::mpsc::channel(64);
             let (permission_sender, mut permission_receiver) =
