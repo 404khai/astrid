@@ -1,4 +1,4 @@
-# Phase 1 architecture
+# Phase 2 architecture
 
 One Cargo package contains a library and CLI binary. Sessions remain ephemeral;
 tools remain sequential; OpenAI remains the only provider.
@@ -10,7 +10,9 @@ CLI: config, event rendering, Ctrl-C, cancellable terminal permission input
      -> agent policy: instructions and normal termination policy
      -> OpenAI adapter: request, streaming, completion validation, replay
         -> authentication: app-owned ChatGPT OAuth credentials and renewal
-     -> tool executor: permission declarations, structured execution outcomes
+     -> permission policy: typed read/write/execute allow/ask/deny
+     -> workspace evidence: bounded Git/file baselines and before/after patches
+     -> tool executor: bounded native inspections, streaming shell, structured outcomes
         -> workspace: invocation-root path validation and AGENTS.md loading
 ```
 
@@ -62,15 +64,36 @@ before creating a replacement. Symlinks and traversal are rejected; hard-linked
 file mutations are rejected. These checks assume a disposable workspace
 without hostile concurrent path swaps, not a complete process sandbox.
 
-The runtime coordinates shell authorization through PermissionHandler before
-ToolCallStarted and spawning `/bin/sh`. Tools declare required permissions but
-never read terminal input. Each invocation gets a
-fresh process group, workspace cwd, null stdin, and separate stdout/stderr
-pipes. A timeout covers execution and pipe draining and kills that process
-group. Cancellation interrupts the process group and waits for leader cleanup.
-Detached descendants remain outside this process-group contract.
-Captured output is unavailable when a timeout interrupts draining; that is
-reported explicitly instead of inventing output or an exit status.
+The runtime evaluates typed per-run read/write/execute policies before dispatch,
+including automatic allow/deny events. Defaults preserve automatic native tools
+and per-shell confirmation. Ask uses PermissionHandler; tools never read terminal
+input. Explicit shell allow grants account-level authority, not filesystem or
+network containment. Repository content does not provide policy configuration.
+
+Each shell invocation gets a fresh process group, workspace cwd, null stdin, and
+separate pipes. Local reader futures use fixed 8 KiB buffers and bounded captures;
+try_send admits only bounded raw output into a tool/runtime channel. Admission
+stops on overload, subsequent bytes are drained, and omissions are counted. The
+runtime owns event sequencing and polls publication concurrently with execution,
+so backpressure cannot prevent timeout/cancellation cleanup. Public lifecycle
+notification may still wait for an attached observer. Cancellation terminals carry
+partial output without fabricated conversation results. Native inspections run
+cooperatively in joined blocking jobs with source/result bounds.
+
+Workspace observation captures Git identity/status plus bounded file contents
+before dispatch and at termination. Git commands are read-only with bounded
+runtime/output, process-group cleanup, fsmonitor/filter suppression, and optional
+locks disabled. Path identities use UTF-8/hex labels; NUL protocol parsing preserves
+unusual names. A bounded presence inventory distinguishes missing content coverage
+from actual file absence. Staged state is reported independently; content patches
+use the initial working tree rather than HEAD. Per-call native mutation evidence
+also covers ignored paths. A final reporting failure leaves tool/run outcomes
+intact and reports unavailable evidence. No attribution of arbitrary shell or
+external edits is promised.
+
+See [ADR 0003](adr/0003-bounded-tool-output.md),
+[ADR 0004](adr/0004-execution-authority.md), and
+[ADR 0005](adr/0005-workspace-change-evidence.md) for limits and contracts.
 
 ## Authentication
 
@@ -130,14 +153,16 @@ state transition validation rejects illegal or repeated terminal transitions
 without changing state; runtime events are descriptive, not event sourcing.
 
 The maintained contracts are [ADR 0001](adr/0001-phase-0-execution-contract.md)
-and [ADR 0002](adr/0002-phase-1-runtime-and-event-model.md).
+and [ADR 0002](adr/0002-phase-1-runtime-and-event-model.md), with the Phase 2
+amendments in [the ADR index](adr/README.md).
 
 ## CLI presentation
 
 `src/console.rs` consumes owned runtime events and keeps only presentation state:
 short IDs, visible turn/model-call counters, requested tool names, and display
 lines. It neither validates execution transitions nor decides when to invoke
-a model/tool. The runtime API and permission/cancellation policies are unchanged.
+a model/tool. Permission/output/change rendering consumes the Phase 2 public
+events and does not own their execution semantics.
 
 There is no full-screen terminal framework or raw-mode event loop. The supported
 macOS terminal exposes its dimensions through `TIOCGWINSZ`; ANSI scroll margins
@@ -150,4 +175,4 @@ an approval answer is being echoed. An approval larger than the output viewport
 switches to append-only rendering so its command remains reviewable. A drop guard restores normal scroll margins
 and cursor visibility on completion and error paths. Redirected/dumb terminals
 use append-only output. This is a reversible CLI presentation choice, not a
-new runtime abstraction or a change to the Phase 1 execution contract.
+new runtime abstraction.

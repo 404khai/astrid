@@ -2,6 +2,7 @@
 use astrid::{
     events::{EventKind, ExecutionEvent, ToolCallId},
     model::{ToolCall, ToolOutcome},
+    output::{OutputStream, TextDecoder},
     tools,
     workspace::Workspace,
 };
@@ -402,6 +403,9 @@ pub struct Console {
     waiting: bool,
     done: bool,
     text_open: bool,
+    tool_output_open: bool,
+    active_stream: Option<(ToolCallId, OutputStream)>,
+    decoders: BTreeMap<(ToolCallId, OutputStream), TextDecoder>,
 }
 impl Console {
     pub fn new(model: &str, workspace: &Workspace) -> io::Result<Self> {
@@ -437,6 +441,9 @@ impl Console {
             waiting: false,
             done: false,
             text_open: false,
+            tool_output_open: false,
+            active_stream: None,
+            decoders: BTreeMap::new(),
         };
         if console.screen.is_some() {
             console.redraw()?;
@@ -509,6 +516,11 @@ impl Console {
         }
     }
     fn line(&mut self, text: &str, ink: Ink) -> io::Result<()> {
+        if self.tool_output_open {
+            self.emit("\n", Ink::Normal, false)?;
+            self.tool_output_open = false;
+            self.active_stream = None;
+        }
         if self.text_open {
             self.emit("\n", Ink::Normal, true)?;
             self.text_open = false;
@@ -554,10 +566,154 @@ impl Console {
                     Ink::Normal,
                 )?;
             }
+            EventKind::PermissionsConfigured { policy } => {
+                self.line(
+                    &format!(
+                        "  policy       read={:?} write={:?} shell={:?}",
+                        policy.read, policy.write, policy.execute
+                    ),
+                    Ink::Dim,
+                )?;
+            }
+            EventKind::WorkspaceBaseline { git, complete, .. } => {
+                self.line(
+                    &format!(
+                        "  workspace    branch={} · {} initial dirty paths · evidence {}",
+                        git.branch.as_deref().unwrap_or(if git.detached {
+                            "detached HEAD"
+                        } else {
+                            "unavailable"
+                        }),
+                        git.dirty.len(),
+                        if *complete {
+                            "complete within scope"
+                        } else {
+                            "incomplete"
+                        }
+                    ),
+                    Ink::Dim,
+                )?;
+                for path in git.dirty.iter().take(20) {
+                    self.line(
+                        &format!(
+                            "    {} · staged={} unstaged={} untracked={}",
+                            path.path, path.staged, path.unstaged, path.untracked
+                        ),
+                        Ink::Dim,
+                    )?;
+                }
+                if git.dirty.len() > 20 {
+                    self.line(
+                        "    additional dirty paths retained in runtime evidence",
+                        Ink::Dim,
+                    )?;
+                }
+                for error in &git.errors {
+                    self.line(&format!("    Git: {error}"), Ink::Dim)?;
+                }
+            }
+            EventKind::WorkspaceChanges { report } => {
+                self.line(
+                    &format!(
+                        "  changes      {} observed paths · evidence {}",
+                        report.changes.len(),
+                        if report.complete {
+                            "complete within scope"
+                        } else {
+                            "incomplete"
+                        }
+                    ),
+                    Ink::Dim,
+                )?;
+                self.line(&report.attribution, Ink::Dim)?;
+                for change in &report.changes {
+                    self.line(
+                        &format!("    {} · {}", change.path, change.kind),
+                        Ink::Normal,
+                    )?;
+                    if let Some(patch) = &change.patch {
+                        self.emit(patch, Ink::Normal, false)?;
+                    }
+                    if let Some(reason) = &change.unavailable {
+                        self.line(&format!("    evidence unavailable: {reason}"), Ink::Dim)?;
+                    }
+                }
+                for error in &report.errors {
+                    self.line(&format!("    evidence: {error}"), Ink::Dim)?;
+                }
+            }
+            EventKind::NativeMutationRecorded { evidence } => {
+                self.line(
+                    &format!(
+                        "  mutation     {} · {}",
+                        evidence.path,
+                        if evidence.complete {
+                            "before/after recorded"
+                        } else {
+                            "evidence incomplete"
+                        }
+                    ),
+                    Ink::Dim,
+                )?;
+                if let Some(change) = &evidence.change {
+                    if let Some(patch) = &change.patch {
+                        self.emit(patch, Ink::Normal, false)?;
+                    }
+                    if let Some(reason) = &change.unavailable {
+                        self.line(&format!("    evidence unavailable: {reason}"), Ink::Dim)?;
+                    }
+                }
+                for error in &evidence.errors {
+                    self.line(&format!("    evidence: {error}"), Ink::Dim)?;
+                }
+            }
+            EventKind::PermissionPolicyEvaluated {
+                capability,
+                action,
+                reason,
+            } => {
+                self.line(
+                    &format!("  permission   {capability:?} {action:?} · {reason}"),
+                    Ink::Dim,
+                )?;
+            }
+            EventKind::ToolOutput { output } => {
+                if let Some(id) = event.tool_call_id {
+                    let key = (id, output.stream);
+                    let text = self.decoders.entry(key).or_default().push(&output.bytes);
+                    if !text.is_empty() {
+                        if self.active_stream != Some(key) {
+                            self.line(
+                                &format!(
+                                    "  {}",
+                                    if output.stream == OutputStream::Stdout {
+                                        "stdout"
+                                    } else {
+                                        "stderr"
+                                    }
+                                ),
+                                Ink::Dim,
+                            )?;
+                        }
+                        self.emit(&text, Ink::Normal, false)?;
+                        self.tool_output_open = true;
+                        self.active_stream = Some(key);
+                    }
+                }
+            }
             EventKind::ToolCallStarted => self.state = "tool",
             EventKind::PermissionRequested { command, workspace } => {
+                let shell = event
+                    .tool_call_id
+                    .and_then(|id| self.calls.get(&id))
+                    .is_some_and(|name| name == "shell");
+                let authority = if shell {
+                    "Runs with your account's permissions."
+                } else {
+                    "Workspace operation subject to validated paths."
+                };
                 let approval = format!(
-                    "? permission   shell approval required\n  cwd: {}\n  command: {}\n  Runs with your account's permissions.\n",
+                    "? permission   operation approval required\n  cwd: {}\n  command: {}\n  {authority}\n",
                     single_line(workspace),
                     printable(command)
                 );
@@ -572,11 +728,11 @@ impl Console {
                     // Oversized approvals use the terminal's ordinary scrollback.
                     self.restore()?;
                 }
-                self.line("? permission   shell approval required", Ink::Accent)?;
+                self.line("? permission   operation approval required", Ink::Accent)?;
                 // Show the complete command, not a truncated permission target.
                 self.emit(
                     &format!(
-                        "  cwd: {}\n  command: {}\n  Runs with your account's permissions.\n",
+                        "  cwd: {}\n  command: {}\n  {authority}\n",
                         single_line(workspace),
                         printable(command)
                     ),
@@ -590,7 +746,7 @@ impl Console {
                     if let Ok(mut tty) = std::fs::OpenOptions::new().write(true).open("/dev/tty") {
                         write!(
                             tty,
-                            "\nShell command in {}:\n{}\nRuns with your account's permissions.\n› type yes to approve: ",
+                            "\nOperation in {}:\n{}\n{authority}\n› type yes to approve: ",
                             single_line(workspace),
                             printable(command)
                         )?;
@@ -643,7 +799,7 @@ impl Console {
                     self.command_output(outcome)?;
                 }
             }
-            EventKind::ToolCallCancelled | EventKind::ToolCallSkipped { .. } => {
+            EventKind::ToolCallCancelled { .. } | EventKind::ToolCallSkipped { .. } => {
                 let name = event
                     .tool_call_id
                     .and_then(|id| self.calls.remove(&id))
@@ -653,6 +809,9 @@ impl Console {
                     _ => "cancelled".into(),
                 };
                 self.line(&format!("! {name:13} {detail}"), Ink::Normal)?;
+                if let EventKind::ToolCallCancelled { output: Some(data) } = &event.kind {
+                    self.command_output(&ToolOutcome::Success { data: data.clone() })?;
+                }
             }
             EventKind::CancellationRequested => {
                 self.state = "cancelling";
@@ -696,7 +855,11 @@ impl Console {
     fn command_output(&mut self, outcome: &ToolOutcome) -> io::Result<()> {
         if let ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } = outcome {
             for stream in ["stdout", "stderr"] {
-                if let Some(text) = data[stream].as_str().filter(|text| !text.is_empty()) {
+                let metadata = &data["output"][stream];
+                let queued = metadata["live_queued_bytes"].as_u64().unwrap_or(0);
+                if queued == 0
+                    && let Some(text) = data[stream].as_str().filter(|text| !text.is_empty())
+                {
                     self.line(&format!("  {stream}"), Ink::Dim)?;
                     self.emit(
                         &format!("{}\n", printable(text).trim_end()),
@@ -704,8 +867,19 @@ impl Console {
                         false,
                     )?;
                 }
+                if metadata["truncated"] == true
+                    || metadata["text_unavailable_suffix_bytes"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        > 0
+                    || metadata["live_omitted_bytes"].as_u64().unwrap_or(0) > 0
+                {
+                    self.line(&format!("  {stream}: observed={} captured={} capture omitted={} live omitted={} text suffix unavailable={} complete={}",
+                        metadata["observed_bytes"], metadata["captured_bytes"], metadata["capture_omitted_bytes"], metadata["live_omitted_bytes"], metadata["text_unavailable_suffix_bytes"], metadata["complete"]), Ink::Dim)?;
+                }
             }
         }
+        self.decoders.clear();
         Ok(())
     }
     pub fn finish(&mut self, model_calls: usize, tool_calls: usize) -> io::Result<()> {
@@ -750,7 +924,11 @@ fn summary(outcome: &ToolOutcome) -> String {
         ToolOutcome::Error { code, message } => format!("{code}: {message}"),
         ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } => {
             if data["timed_out"] == true {
-                return "output unavailable after timeout".into();
+                return if data["stdout"].is_null() && data["stderr"].is_null() {
+                    "output unavailable after timeout".into()
+                } else {
+                    "partial output retained; unread output unavailable".into()
+                };
             }
             if let Some(text) = data["content"].as_str() {
                 return format!("{} lines", text.lines().count());
@@ -903,7 +1081,7 @@ mod tests {
                     Ink::Normal,
                 )
                 .unwrap();
-            screen.append(&mut bytes, "● read_file     src/lib.rs\n✓ completed     read_file · 214 lines\n\n● shell         cargo test\n? permission    shell approval required\n  cwd: ~/Developer/astrid\n  command: cargo test\n  Runs with your account's permissions.\n", Ink::Normal).unwrap();
+            screen.append(&mut bytes, "● read_file     src/lib.rs\n✓ completed     read_file · 214 lines\n\n● shell         cargo test\n? permission    shell approval required\n  cwd: ~/Developer/astrid\n  command: cargo test\n  {authority}\n", Ink::Normal).unwrap();
             screen
                 .footer(
                     &mut bytes,

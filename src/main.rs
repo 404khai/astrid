@@ -3,6 +3,7 @@ use astrid::{
     cancellation::Cancellation,
     events::EventKind,
     openai::OpenAiProvider,
+    permissions::{PermissionAction, PermissionPolicy},
     runtime::{self, PermissionHandler, RunConfig, RunOutcome},
     tools::{PermissionRequest, Tools},
     workspace::Workspace,
@@ -45,6 +46,17 @@ enum Commands {
         max_model_calls: usize,
         #[arg(long,env="ASTRID_SHELL_TIMEOUT",default_value="30",value_parser=positive,help="Command timeout in seconds")]
         shell_timeout: usize,
+        #[arg(long, value_enum, default_value = "allow")]
+        read_policy: PermissionAction,
+        #[arg(long, value_enum, default_value = "allow")]
+        write_policy: PermissionAction,
+        #[arg(
+            long,
+            value_enum,
+            default_value = "ask",
+            help = "Shell authority: allow grants broad account-level execution"
+        )]
+        shell_policy: PermissionAction,
     },
 }
 
@@ -169,6 +181,9 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             model,
             max_model_calls,
             shell_timeout,
+            read_policy,
+            write_policy,
+            shell_policy,
         } => {
             let workspace = Workspace::new(std::env::current_dir()?)?;
             if directory.starts_with(workspace.root()) {
@@ -205,6 +220,11 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     model,
                     task,
                     max_model_calls,
+                    permissions: PermissionPolicy {
+                        read: read_policy,
+                        write: write_policy,
+                        execute: shell_policy,
+                    },
                 },
                 cancel.clone(),
                 Some(sender),
@@ -276,6 +296,56 @@ mod tests {
         io::Write,
         os::{fd::OwnedFd, unix::net::UnixStream},
     };
+    #[test]
+    fn cli_permission_policies_are_explicit_and_reject_unenforceable_options() {
+        let parsed = Cli::try_parse_from([
+            "astrid",
+            "run",
+            "task",
+            "--model",
+            "test",
+            "--read-policy",
+            "deny",
+            "--write-policy",
+            "ask",
+            "--shell-policy",
+            "allow",
+        ])
+        .unwrap();
+        assert!(matches!(
+            parsed.command,
+            Commands::Run {
+                read_policy: PermissionAction::Deny,
+                write_policy: PermissionAction::Ask,
+                shell_policy: PermissionAction::Allow,
+                ..
+            }
+        ));
+        assert!(
+            Cli::try_parse_from([
+                "astrid",
+                "run",
+                "task",
+                "--model",
+                "test",
+                "--network-policy",
+                "deny"
+            ])
+            .is_err()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "astrid",
+                "run",
+                "task",
+                "--model",
+                "test",
+                "--shell-policy",
+                "readonly"
+            ])
+            .is_err()
+        );
+    }
     fn input() -> (File, UnixStream) {
         let (reader, writer) = UnixStream::pair().unwrap();
         reader.set_nonblocking(true).unwrap();

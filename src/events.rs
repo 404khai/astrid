@@ -1,6 +1,12 @@
 //! Owned public events. Provider continuation and credentials never appear here.
-use crate::model::{ToolCall, ToolOutcome};
+use crate::{
+    changes::{GitState, MutationEvidence, WorkspaceReport},
+    model::{ToolCall, ToolOutcome},
+    output::ToolOutput,
+    permissions::{self, Capability, PermissionAction, PermissionPolicy},
+};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::BTreeMap;
 
 macro_rules! identity {
@@ -52,6 +58,17 @@ pub enum EventKind {
         workspace: String,
         max_model_calls: usize,
     },
+    WorkspaceBaseline {
+        git: GitState,
+        complete: bool,
+        errors: Vec<String>,
+    },
+    WorkspaceChanges {
+        report: WorkspaceReport,
+    },
+    PermissionsConfigured {
+        policy: PermissionPolicy,
+    },
     CancellationRequested,
     TurnStarted {
         number: usize,
@@ -83,7 +100,18 @@ pub enum EventKind {
     PermissionFailed {
         message: String,
     },
+    PermissionPolicyEvaluated {
+        capability: Capability,
+        action: PermissionAction,
+        reason: String,
+    },
+    NativeMutationRecorded {
+        evidence: MutationEvidence,
+    },
     ToolCallStarted,
+    ToolOutput {
+        output: ToolOutput,
+    },
     ToolCallCompleted {
         outcome: ToolOutcome,
     },
@@ -96,7 +124,9 @@ pub enum EventKind {
     ToolCallTimedOut {
         outcome: ToolOutcome,
     },
-    ToolCallCancelled,
+    ToolCallCancelled {
+        output: Option<Value>,
+    },
     ToolCallSkipped {
         reason: String,
     },
@@ -146,6 +176,9 @@ pub struct ToolState {
     pub turn_id: TurnId,
     pub model_call_id: ModelCallId,
     pub call: ToolCall,
+    pub permission: Option<PermissionAction>,
+    pub cancelled_output: Option<Value>,
+    pub mutation: Option<MutationEvidence>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExecutionState {
@@ -158,6 +191,9 @@ pub struct ExecutionState {
     pub models: BTreeMap<ModelCallId, ModelState>,
     pub tools: BTreeMap<ToolCallId, ToolState>,
     pub committed_assistant_text: Vec<String>,
+    pub permission_policy: Option<PermissionPolicy>,
+    pub workspace_baseline: Option<GitState>,
+    pub workspace_changes: Option<WorkspaceReport>,
 }
 /// Internal transition request; runtime state changes before an event envelope
 /// is constructed. Event replay is only a consumer/validation facility.
@@ -186,6 +222,9 @@ impl ExecutionState {
             models: BTreeMap::new(),
             tools: BTreeMap::new(),
             committed_assistant_text: Vec::new(),
+            permission_policy: None,
+            workspace_baseline: None,
+            workspace_changes: None,
         }
     }
     /// Validate on a copy so rejected transitions cannot partially change state.
@@ -248,6 +287,9 @@ impl ExecutionState {
         }
         match &e.kind {
             EventKind::RunStarted { .. }
+            | EventKind::PermissionsConfigured { .. }
+            | EventKind::WorkspaceBaseline { .. }
+            | EventKind::WorkspaceChanges { .. }
             | EventKind::RunCompleted { .. }
             | EventKind::RunFailed { .. }
             | EventKind::RunCancelled
@@ -293,6 +335,25 @@ impl ExecutionState {
                 require(self.status == Status::Pending && e.turn_id.is_none())?;
                 self.status = Status::Running;
             }
+            EventKind::WorkspaceBaseline { git, .. } => {
+                require(self.turns.is_empty() && self.workspace_baseline.is_none())?;
+                self.workspace_baseline = Some(git.clone());
+            }
+            EventKind::WorkspaceChanges { report } => {
+                require(
+                    self.workspace_changes.is_none()
+                        && self.turns.values().all(|turn| turn.status.terminal()),
+                )?;
+                self.workspace_changes = Some(report.clone());
+            }
+            EventKind::PermissionsConfigured { policy } => {
+                require(
+                    self.turns.is_empty()
+                        && self.permission_policy.is_none()
+                        && !self.cancellation_acknowledged,
+                )?;
+                self.permission_policy = Some(*policy);
+            }
             EventKind::CancellationRequested => {
                 require(!self.cancellation_acknowledged)?;
                 self.cancellation_acknowledged = true;
@@ -300,6 +361,7 @@ impl ExecutionState {
             EventKind::TurnStarted { number } => {
                 require(
                     self.status == Status::Running
+                        && self.permission_policy.is_some()
                         && !self.cancellation_acknowledged
                         && self.turns.values().all(|t| t.status.terminal())
                         && !self.turns.contains_key(&turn()?),
@@ -373,10 +435,16 @@ impl ExecutionState {
                         turn_id: turn()?,
                         model_call_id: model()?,
                         call: call.clone(),
+                        permission: None,
+                        cancelled_output: None,
+                        mutation: None,
                     },
                 );
             }
-            EventKind::PermissionRequested { .. }
+            EventKind::PermissionPolicyEvaluated { .. }
+            | EventKind::ToolOutput { .. }
+            | EventKind::NativeMutationRecorded { .. }
+            | EventKind::PermissionRequested { .. }
             | EventKind::PermissionGranted
             | EventKind::PermissionDenied
             | EventKind::PermissionCancelled
@@ -386,7 +454,7 @@ impl ExecutionState {
             | EventKind::ToolCallFailed { .. }
             | EventKind::ToolCallDenied { .. }
             | EventKind::ToolCallTimedOut { .. }
-            | EventKind::ToolCallCancelled
+            | EventKind::ToolCallCancelled { .. }
             | EventKind::ToolCallSkipped { .. } => {
                 let id = tool()?;
                 if matches!(e.kind, EventKind::ToolCallStarted) {
@@ -404,8 +472,42 @@ impl ExecutionState {
                     .ok_or_else(|| TransitionError("unknown tool".into()))?;
                 require(!t.status.terminal())?;
                 t.status = match &e.kind {
+                    EventKind::PermissionPolicyEvaluated {
+                        capability, action, ..
+                    } => {
+                        require(
+                            t.status == Status::Pending
+                                && t.permission.is_none()
+                                && !self.cancellation_acknowledged,
+                        )?;
+                        require(
+                            permissions::capability(&t.call.name) == Some(*capability)
+                                && self
+                                    .permission_policy
+                                    .is_some_and(|policy| policy.action(*capability) == *action),
+                        )?;
+                        t.permission = Some(*action);
+                        if *action == PermissionAction::Deny {
+                            Status::PermissionDenied
+                        } else {
+                            Status::Pending
+                        }
+                    }
+                    EventKind::NativeMutationRecorded { evidence } => {
+                        require(t.status == Status::Running && t.mutation.is_none())?;
+                        t.mutation = Some(evidence.clone());
+                        Status::Running
+                    }
+                    EventKind::ToolOutput { .. } => {
+                        require(t.status == Status::Running)?;
+                        Status::Running
+                    }
                     EventKind::PermissionRequested { .. } => {
-                        require(t.status == Status::Pending && !self.cancellation_acknowledged)?;
+                        require(
+                            t.status == Status::Pending
+                                && t.permission == Some(PermissionAction::Ask)
+                                && !self.cancellation_acknowledged,
+                        )?;
                         Status::WaitingPermission
                     }
                     EventKind::PermissionGranted => {
@@ -424,7 +526,12 @@ impl ExecutionState {
                         Status::Pending
                     }
                     EventKind::ToolCallStarted => {
-                        require(matches!(t.status, Status::Pending | Status::Granted))?;
+                        require(
+                            (t.status == Status::Pending
+                                && t.permission == Some(PermissionAction::Allow))
+                                || (t.status == Status::Granted
+                                    && t.permission == Some(PermissionAction::Ask)),
+                        )?;
                         Status::Running
                     }
                     EventKind::ToolCallCompleted { .. } => {
@@ -443,8 +550,9 @@ impl ExecutionState {
                         require(t.status == Status::PermissionDenied)?;
                         Status::Denied
                     }
-                    EventKind::ToolCallCancelled => {
+                    EventKind::ToolCallCancelled { output } => {
                         require(self.cancellation_acknowledged)?;
+                        t.cancelled_output = output.clone();
                         Status::Cancelled
                     }
                     EventKind::ToolCallSkipped { reason } => {

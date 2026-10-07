@@ -168,3 +168,13 @@ two failing tests, edited the existing function, created GREETING.txt, and
 observed two passing tests. Each cargo command received explicit confirmation.
 The offline suite also covers both compatibility cases and interrupted
 streams with completed items, ensuring those items alone cannot mutate files.
+
+## Phase 2 amendments (2026-10-07)
+
+The historical phase contract above is preserved. Accepted
+[ADR 0003](0003-bounded-tool-output.md) extends tool-output admission and
+cancellation payloads; [ADR 0004](0004-execution-authority.md) extends fixed
+permissions to explicit per-run policies with the same defaults;
+[ADR 0005](0005-workspace-change-evidence.md) adds bounded workspace evidence
+without changing invocation-directory scope. Final bounded observation after
+cancellation is bookkeeping, not permission to dispatch new task work.

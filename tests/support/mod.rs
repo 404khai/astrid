@@ -149,6 +149,7 @@ pub async fn run(
             model: model.into(),
             task: task.into(),
             max_model_calls,
+            permissions: Default::default(),
         },
         Cancellation::default(),
         Some(sender),

@@ -28,6 +28,54 @@ fn data(outcome: &ToolOutcome) -> &Value {
 }
 
 #[tokio::test]
+async fn nested_workspace_cannot_read_search_or_mutate_parent_repository() {
+    let repository = tempfile::tempdir().unwrap();
+    let nested = repository.path().join("nested");
+    fs::create_dir(&nested).unwrap();
+    let nested = fs::canonicalize(nested).unwrap();
+    fs::write(repository.path().join("user.txt"), "existing user work").unwrap();
+    fs::write(nested.join("local.txt"), "local").unwrap();
+    let executor = tools(&nested);
+    let mut confirmation = Confirmation::new(false);
+    for (name, arguments) in [
+        ("read_file", json!({"path":"../user.txt"})),
+        ("grep", json!({"path":"..","pattern":"user"})),
+        ("list_directory", json!({"path":".."})),
+        ("glob", json!({"pattern":"../**"})),
+        (
+            "edit_file",
+            json!({"path":"../user.txt","old_text":"existing","new_text":"changed"}),
+        ),
+        (
+            "write_file",
+            json!({"path":"../new.txt","content":"changed","overwrite":false}),
+        ),
+    ] {
+        let result = executor
+            .execute(&call(name, name, arguments), &mut confirmation)
+            .await;
+        assert_eq!(code(&result.outcome), "path_denied", "{name}");
+    }
+    let result = executor
+        .execute(
+            &call(
+                "read-local",
+                "read_file",
+                json!({"path": nested.join("local.txt").display().to_string()}),
+            ),
+            &mut confirmation,
+        )
+        .await;
+    assert_eq!(data(&result.outcome)["content"], "local");
+    assert_eq!(
+        fs::read_to_string(repository.path().join("user.txt")).unwrap(),
+        "existing user work"
+    );
+    assert!(!repository.path().join("new.txt").exists());
+    assert!(confirmation.commands.is_empty());
+}
+
+#[tokio::test]
 async fn exact_edits_fail_without_mutation_for_zero_multiple_and_overlapping_matches() {
     let root = tempfile::tempdir().unwrap();
     let tools = tools(root.path());
@@ -249,10 +297,14 @@ async fn shell_captures_streams_status_and_uses_fresh_workspace_state() {
             &mut confirm,
         )
         .await;
-    assert_eq!(
-        data(&result.outcome),
-        &json!({"stdout":"out","stderr":"err","exit_code":7,"timed_out":false})
-    );
+    let captured = data(&result.outcome);
+    assert_eq!(captured["stdout"], "out");
+    assert_eq!(captured["stderr"], "err");
+    assert_eq!(captured["exit_code"], 7);
+    assert_eq!(captured["timed_out"], false);
+    assert_eq!(captured["output"]["stdout"]["observed_bytes"], 3);
+    assert_eq!(captured["output"]["stderr"]["captured_bytes"], 3);
+    assert_eq!(captured["output"]["stdout"]["complete"], true);
     tools
         .execute(
             &call(
