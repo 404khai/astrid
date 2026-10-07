@@ -11,8 +11,8 @@ use astrid::{
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use std::{
-    fs::OpenOptions, io, os::fd::AsRawFd, os::unix::fs::OpenOptionsExt, process::ExitCode,
-    sync::Arc, time::Duration,
+    fs::OpenOptions, io, io::Write, os::fd::AsRawFd, os::unix::fs::OpenOptionsExt,
+    process::ExitCode, sync::Arc, time::Duration,
 };
 
 mod console;
@@ -24,7 +24,7 @@ use logo::LOGO;
 #[command(name="astrid", version, about="One repository task, one observable model/tool loop", after_help=LOGO)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -141,9 +141,51 @@ async fn main() -> ExitCode {
     }
 }
 
+fn prompt_line(label: &str) -> io::Result<String> {
+    eprint!("{label}");
+    io::stderr().flush()?;
+    let mut value = String::new();
+    if io::stdin().read_line(&mut value)? == 0 {
+        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "input closed"));
+    }
+    Ok(value.trim().to_owned())
+}
+
+fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
+    use std::io::IsTerminal;
+    if !io::stdin().is_terminal() {
+        return Err(
+            "interactive startup requires a terminal; use astrid run \"task\" --model <model>"
+                .into(),
+        );
+    }
+    eprintln!(
+        "\n{LOGO}\n\nastrid  {}\nStart a repository task. Output stays in terminal scrollback.\n",
+        env!("CARGO_PKG_VERSION")
+    );
+    let model = match std::env::var("ASTRID_MODEL")
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+    {
+        Some(model) => model,
+        None => prompt_line("Model (see astrid models): ")?,
+    };
+    let task = prompt_line("› Task: ")?;
+    if model.trim().is_empty() || task.is_empty() {
+        return Err("model and task must not be empty".into());
+    }
+    Cli::try_parse_from(["astrid", "run", &task, "--model", &model])?
+        .command
+        .ok_or_else(|| "missing run command".into())
+}
+
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let directory = auth::default_directory()?;
-    match cli.command {
+    let command = match cli.command {
+        Some(command) => command,
+        None => interactive_command()?,
+    };
+    match command {
         Commands::Login => {
             auth::login(&directory,|url| {
                 eprintln!("Continue with ChatGPT: open this URL in your browser (expires in 5 minutes):\n{url}"); Ok(())
@@ -297,6 +339,15 @@ mod tests {
         os::{fd::OwnedFd, unix::net::UnixStream},
     };
     #[test]
+    fn bare_cli_enters_prompt_but_explicit_run_requires_a_model() {
+        assert!(Cli::try_parse_from(["astrid"]).unwrap().command.is_none());
+        assert!(Cli::try_parse_from(["astrid", "run"]).is_err());
+        assert!(matches!(
+            Cli::try_parse_from(["astrid", "models"]).unwrap().command,
+            Some(Commands::Models)
+        ));
+    }
+    #[test]
     fn cli_permission_policies_are_explicit_and_reject_unenforceable_options() {
         let parsed = Cli::try_parse_from([
             "astrid",
@@ -314,12 +365,12 @@ mod tests {
         .unwrap();
         assert!(matches!(
             parsed.command,
-            Commands::Run {
+            Some(Commands::Run {
                 read_policy: PermissionAction::Deny,
                 write_policy: PermissionAction::Ask,
                 shell_policy: PermissionAction::Allow,
                 ..
-            }
+            })
         ));
         assert!(
             Cli::try_parse_from([

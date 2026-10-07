@@ -62,6 +62,10 @@ enum Ink {
     Normal,
     Dim,
     Accent,
+    Success,
+    Warning,
+    Error,
+    Reply,
 }
 impl Ink {
     fn paint(self, text: &str, color: bool) -> String {
@@ -72,6 +76,10 @@ impl Ink {
             Self::Normal => "0",
             Self::Dim => "2",
             Self::Accent => "38;2;0;247;213",
+            Self::Success => "32",
+            Self::Warning => "33",
+            Self::Error => "31",
+            Self::Reply => "36",
         };
         format!("\x1b[{code}m{text}\x1b[0m")
     }
@@ -395,6 +403,7 @@ fn terminal_size() -> Option<(usize, usize)> {
 pub struct Console {
     identity: Identity,
     screen: Option<Screen>,
+    color: bool,
     calls: BTreeMap<ToolCallId, String>,
     run: String,
     turn: usize,
@@ -410,7 +419,9 @@ pub struct Console {
 impl Console {
     pub fn new(model: &str, workspace: &Workspace) -> io::Result<Self> {
         let terminal = io::stdout().is_terminal() && io::stderr().is_terminal();
-        let capable = terminal && std::env::var("TERM").is_ok_and(|term| term != "dumb");
+        let capable = std::env::var_os("ASTRID_FIXED_VIEWPORT").is_some()
+            && terminal
+            && std::env::var("TERM").is_ok_and(|term| term != "dumb");
         let identity = Identity {
             model: single_line(model),
             cwd: short_path(workspace.root()),
@@ -427,6 +438,9 @@ impl Console {
         };
         let mut console = Self {
             identity,
+            color: terminal
+                && std::env::var_os("NO_COLOR").is_none()
+                && std::env::var("TERM").is_ok_and(|term| term != "dumb"),
             screen: if capable {
                 terminal_size()
                     .map(|(w, h)| Screen::new(w, h, std::env::var_os("NO_COLOR").is_none()))
@@ -509,10 +523,12 @@ impl Console {
             screen.append(&mut io::stderr().lock(), text, ink)
         } else if model {
             let mut out = io::stdout().lock();
-            write!(out, "{}", printable(text))?;
+            write!(out, "{}", ink.paint(&printable(text), self.color))?;
             out.flush()
         } else {
-            write!(io::stderr().lock(), "{}", printable(text))
+            let mut out = io::stderr().lock();
+            write!(out, "{}", ink.paint(&printable(text), self.color))?;
+            out.flush()
         }
     }
     fn line(&mut self, text: &str, ink: Ink) -> io::Result<()> {
@@ -531,7 +547,7 @@ impl Console {
         match &event.kind {
             EventKind::RunStarted { task, .. } => {
                 self.run = event.run_id.to_string()[..5].into();
-                self.line(&format!("› {}", single_line(task)), Ink::Dim)?;
+                self.line(&format!("› {}", single_line(task)), Ink::Accent)?;
                 self.line("", Ink::Normal)?;
                 self.state = "running";
             }
@@ -541,7 +557,7 @@ impl Console {
                 self.state = "model";
             }
             EventKind::ModelTextDelta { text } => {
-                self.emit(text, Ink::Normal, true)?;
+                self.emit(text, Ink::Reply, true)?;
                 self.text_open = true;
             }
             EventKind::ModelCallCompleted { .. } => {
@@ -728,7 +744,7 @@ impl Console {
                     // Oversized approvals use the terminal's ordinary scrollback.
                     self.restore()?;
                 }
-                self.line("? permission   operation approval required", Ink::Accent)?;
+                self.line("? permission   operation approval required", Ink::Warning)?;
                 // Show the complete command, not a truncated permission target.
                 self.emit(
                     &format!(
@@ -762,10 +778,10 @@ impl Console {
                 self.state = "running";
                 match &event.kind {
                     EventKind::PermissionGranted => {
-                        self.line("✓ permission   granted", Ink::Dim)?
+                        self.line("✓ permission   granted", Ink::Success)?
                     }
                     EventKind::PermissionDenied => {
-                        self.line("! permission   denied", Ink::Normal)?
+                        self.line("! permission   denied", Ink::Warning)?
                     }
                     EventKind::PermissionFailed { message } => {
                         self.line(&format!("× permission   {message}"), Ink::Normal)?
@@ -790,9 +806,9 @@ impl Console {
                 self.line(
                     &format!("{symbol} {state:13} {name} · {}", summary(outcome)),
                     if symbol == "✓" {
-                        Ink::Dim
+                        Ink::Success
                     } else {
-                        Ink::Normal
+                        Ink::Error
                     },
                 )?;
                 if name == "shell" {
@@ -808,7 +824,7 @@ impl Console {
                     EventKind::ToolCallSkipped { reason } => format!("skipped · {reason}"),
                     _ => "cancelled".into(),
                 };
-                self.line(&format!("! {name:13} {detail}"), Ink::Normal)?;
+                self.line(&format!("! {name:13} {detail}"), Ink::Error)?;
                 if let EventKind::ToolCallCancelled { output: Some(data) } = &event.kind {
                     self.command_output(&ToolOutcome::Success { data: data.clone() })?;
                 }
@@ -820,18 +836,18 @@ impl Console {
             EventKind::RunCompleted { .. } => {
                 self.state = "completed";
                 self.done = true;
-                self.line("✓ run          completed", Ink::Accent)?;
+                self.line("✓ run          completed", Ink::Success)?;
             }
             EventKind::RunCancelled => {
                 self.state = "cancelled";
                 self.done = true;
                 self.waiting = false;
-                self.line("! run          cancelled", Ink::Normal)?;
+                self.line("! run          cancelled", Ink::Warning)?;
             }
             EventKind::RunFailed { code, message } => {
                 self.state = "failed";
                 self.done = true;
-                self.line(&format!("× run          {code}: {message}"), Ink::Normal)?;
+                self.line(&format!("× run          {code}: {message}"), Ink::Error)?;
             }
             EventKind::ModelCallLimitReached { limit, .. } => {
                 self.state = "limit reached";

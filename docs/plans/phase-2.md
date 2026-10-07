@@ -296,3 +296,24 @@ The table above is the local status source. Each ticket inherits the owner and
 phase from this plan until individually assigned, and records review/validation
 evidence under its own section when completed. If external issues are later
 created, add links here and choose which system owns status.
+
+## P2-10 — Terminal startup and transcript visibility
+
+Status: Done. Owner: Codex. Authorized by the maintainer's request to make bare
+`astrid` open the CLI, support vertical transcript scrolling, and color text.
+
+Bare invocation now prompts for a model (unless `ASTRID_MODEL` is set) and a
+task, then uses the existing one-run runtime and saved authentication. Default
+rendering appends to terminal scrollback, with semantic colors and `NO_COLOR`
+support. The existing fixed viewport remains opt-in. This is a presentation
+follow-up; it does not introduce persistent conversations or advance the phase.
+
+Acceptance: bare startup without login; existing explicit commands preserved;
+scrollback preserved without default screen clearing or scroll margins; colored
+replies, approvals, completion, and failures; plain redirected output.
+
+Validation (2026-10-07): 91 offline tests passed, formatting and Clippy passed,
+and the updated CLI was installed. A controlling-terminal PTY check verified
+model/task prompts, blank task rejection, and no login or screen clearing. Solo
+diff review found no runtime/permission changes. Scrollback navigation uses the
+terminal emulator's own controls and retention limit.
