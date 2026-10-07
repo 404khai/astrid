@@ -186,6 +186,241 @@ fn append_header(
     out.flush()
 }
 
+pub fn compose(model: &str) -> io::Result<String> {
+    composer(model, None).map(|s| s.unwrap_or_default())
+}
+
+pub fn select_model(models: &[String], current: &str) -> io::Result<Option<String>> {
+    composer(current, Some(models))
+}
+
+fn read_key() -> io::Result<u8> {
+    let mut byte = 0u8;
+    let count = unsafe { libc::read(0, (&mut byte as *mut u8).cast(), 1) };
+    if count < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    if count == 0 {
+        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "input closed"));
+    }
+    Ok(byte)
+}
+
+fn composer(model: &str, models: Option<&[String]>) -> io::Result<Option<String>> {
+    struct Restore(libc::termios);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            unsafe {
+                libc::tcsetattr(0, libc::TCSANOW, &self.0);
+            }
+        }
+    }
+    let mut original = std::mem::MaybeUninit::<libc::termios>::uninit();
+    if unsafe { libc::tcgetattr(0, original.as_mut_ptr()) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let original = unsafe { original.assume_init() };
+    let mut raw = original;
+    raw.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG);
+    raw.c_cc[libc::VMIN] = 1;
+    raw.c_cc[libc::VTIME] = 0;
+    if unsafe { libc::tcsetattr(0, libc::TCSANOW, &raw) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let _restore = Restore(original);
+    let color =
+        std::env::var_os("NO_COLOR").is_none() && std::env::var("TERM").is_ok_and(|t| t != "dumb");
+    let width = terminal_size()
+        .map_or(80, |(w, _)| w)
+        .saturating_sub(2)
+        .max(8);
+    let commands = ["/model", "/help", "/quit"];
+    let descriptions = [
+        "Switch the active model",
+        "Show available commands",
+        "Exit Astrid",
+    ];
+    let mut input = String::new();
+    let mut selected = models
+        .and_then(|m| m.iter().position(|v| v == model))
+        .unwrap_or(0);
+    let mut height = 0;
+    let mut out = io::stderr().lock();
+    loop {
+        let menu = models.is_some() || input.starts_with('/');
+        let options: Vec<String> = if let Some(models) = models {
+            models
+                .iter()
+                .filter(|m| m.to_lowercase().contains(&input.to_lowercase()))
+                .cloned()
+                .collect()
+        } else if menu {
+            commands
+                .iter()
+                .filter(|c| c.starts_with(&input))
+                .map(|c| c.to_string())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        selected = selected.min(options.len().saturating_sub(1));
+        let mut rows = vec!["─".repeat(width)];
+        if menu {
+            rows.push(if models.is_some() {
+                "  Switch model — type to filter".into()
+            } else {
+                "  Commands".into()
+            });
+            let start = selected.saturating_sub(5);
+            for (index, value) in options.iter().enumerate().skip(start).take(6) {
+                let detail = if models.is_none() {
+                    commands
+                        .iter()
+                        .position(|c| c == value)
+                        .map(|i| descriptions[i])
+                        .unwrap_or("")
+                } else {
+                    ""
+                };
+                rows.push(format!(
+                    "{} {value}  {detail}",
+                    if index == selected { "▸" } else { " " }
+                ));
+            }
+            if options.is_empty() {
+                rows.push("  No matches".into());
+            }
+            rows.push(String::new());
+        }
+        let input_row = rows.len();
+        rows.push(format!(
+            "❯ {}",
+            if input.is_empty() {
+                if models.is_some() {
+                    "Search models…"
+                } else {
+                    "Message Astrid… (/ for commands)"
+                }
+            } else {
+                &input
+            }
+        ));
+        rows.push("─".repeat(width));
+        rows.push(format!(
+            "  {model} · {}",
+            if menu {
+                "↑/↓ select · Enter confirm · Esc cancel"
+            } else {
+                "Enter sends · / commands"
+            }
+        ));
+        if height > 0 {
+            write!(out, "\x1b[{height}A\r")?;
+        }
+        height = height.max(rows.len());
+        let background = if color { "\x1b[48;5;235m" } else { "" };
+        for index in 0..height {
+            let row = rows.get(index).map(String::as_str).unwrap_or("");
+            let accent = if color && row.starts_with('▸') {
+                "\x1b[38;5;208m"
+            } else {
+                ""
+            };
+            writeln!(
+                out,
+                "\x1b[2K{background}{accent}{:<width$}\x1b[0m",
+                truncate(row, width)
+            )?;
+        }
+        let up = height - input_row;
+        write!(out, "\x1b[{up}A\r\x1b[{}C", (2 + input.width()).min(width))?;
+        out.flush()?;
+        let key = read_key();
+        write!(out, "\x1b[{up}B\r")?;
+        match key? {
+            b'\r' | b'\n' => {
+                out.flush()?;
+                if menu {
+                    if let Some(value) = options.get(selected) {
+                        return Ok(Some(value.clone()));
+                    }
+                } else {
+                    return Ok(Some(input));
+                }
+            }
+            3 => return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled")),
+            4 if input.is_empty() => {
+                return Ok(if models.is_some() {
+                    None
+                } else {
+                    Some("/quit".into())
+                });
+            }
+            127 | 8 => {
+                input.pop();
+                selected = 0;
+            }
+            9 if menu => {
+                if let Some(value) = options.get(selected)
+                    && models.is_none()
+                {
+                    input = value.clone();
+                }
+            }
+            27 => {
+                let mut ready = libc::pollfd {
+                    fd: 0,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                if unsafe { libc::poll(&mut ready, 1, 40) } > 0 {
+                    if read_key()? == b'[' {
+                        match read_key()? {
+                            b'A' if !options.is_empty() => {
+                                selected = if selected == 0 {
+                                    options.len() - 1
+                                } else {
+                                    selected - 1
+                                }
+                            }
+                            b'B' if !options.is_empty() => {
+                                selected = (selected + 1) % options.len()
+                            }
+                            _ => {}
+                        }
+                    }
+                } else if models.is_some() {
+                    out.flush()?;
+                    return Ok(None);
+                } else {
+                    input.clear();
+                    selected = 0;
+                }
+            }
+            n if n >= 32 => {
+                let count = if n < 128 {
+                    1
+                } else if n < 224 {
+                    2
+                } else if n < 240 {
+                    3
+                } else {
+                    4
+                };
+                let mut bytes = vec![n];
+                for _ in 1..count {
+                    bytes.push(read_key()?);
+                }
+                if let Ok(text) = std::str::from_utf8(&bytes) {
+                    input.push_str(text);
+                    selected = 0;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 pub fn welcome(model: &str, workspace: &Workspace) -> io::Result<()> {
     let color = io::stderr().is_terminal()
         && std::env::var_os("NO_COLOR").is_none()

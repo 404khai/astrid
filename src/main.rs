@@ -29,6 +29,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Exit interactive startup.
+    #[command(hide = true)]
+    Exit,
     /// Sign in with ChatGPT using Astrid's own registration and credentials.
     Login,
     /// List models available to the signed-in ChatGPT account.
@@ -141,17 +144,45 @@ async fn main() -> ExitCode {
     }
 }
 
-fn prompt_line(label: &str) -> io::Result<String> {
-    eprint!("{label}");
-    io::stderr().flush()?;
-    let mut value = String::new();
-    if io::stdin().read_line(&mut value)? == 0 {
-        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "input closed"));
-    }
-    Ok(value.trim().to_owned())
+fn remember_model(model: &str) -> io::Result<()> {
+    let directory = auth::default_directory().map_err(io::Error::other)?;
+    std::fs::create_dir_all(&directory)?;
+    let mut file = tempfile::NamedTempFile::new_in(&directory)?;
+    writeln!(file, "{model}")?;
+    file.persist(directory.join("last-model"))
+        .map_err(|e| e.error)?;
+    Ok(())
 }
 
-fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
+async fn model_catalog() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let auth = ChatGptAuth::new(auth::default_directory()?)?;
+    let token = auth.bearer_token().await?;
+    let catalog: serde_json::Value = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?
+        .get("https://api.openai.com/v1/models")
+        .bearer_auth(token.as_str())
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let entries = catalog["models"]
+        .as_array()
+        .ok_or("invalid model catalog")?;
+    let models: Vec<String> = entries
+        .iter()
+        .filter(|v| v["visibility"] == "list")
+        .filter_map(|v| v["slug"].as_str().map(str::to_owned))
+        .collect();
+    if models.is_empty() {
+        return Err("no models available to this account".into());
+    }
+    Ok(models)
+}
+
+async fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
     use std::io::IsTerminal;
     if !io::stdin().is_terminal() {
         return Err(
@@ -159,23 +190,44 @@ fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
                 .into(),
         );
     }
-    let selected = std::env::var("ASTRID_MODEL")
+    let saved = std::fs::read_to_string(auth::default_directory()?.join("last-model")).ok();
+    let mut model = std::env::var("ASTRID_MODEL")
         .ok()
-        .filter(|v| !v.trim().is_empty());
-    let workspace = Workspace::new(std::env::current_dir()?)?;
-    console::welcome(selected.as_deref().unwrap_or("choose below"), &workspace)?;
-    let model = match selected {
-        Some(model) => model,
-        None => prompt_line("Model (see astrid models): ")?,
-    };
-    eprintln!("Type your task below. Ctrl-C exits.\n");
-    let task = prompt_line("› ")?;
-    if model.trim().is_empty() || task.is_empty() {
-        return Err("model and task must not be empty".into());
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| saved.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()));
+    if model.is_none() {
+        model = Some(model_catalog().await?.remove(0));
     }
-    Cli::try_parse_from(["astrid", "run", &task, "--model", &model])?
-        .command
-        .ok_or_else(|| "missing run command".into())
+    let mut model = model.ok_or("no model selected")?;
+    let workspace = Workspace::new(std::env::current_dir()?)?;
+    console::welcome(&model, &workspace)?;
+    loop {
+        let task = console::compose(&model)?;
+        match task.trim() {
+            "" => continue,
+            "/" | "/help" => {
+                eprintln!("/model  change model   /help  commands   /quit  exit");
+                continue;
+            }
+            "/quit" | "/exit" => return Ok(Commands::Exit),
+            "/model" => {
+                let models = model_catalog().await?;
+                if let Some(next) = console::select_model(&models, &model)? {
+                    model = next;
+                    remember_model(&model)?;
+                }
+                continue;
+            }
+            command if command.starts_with('/') => {
+                eprintln!("Unknown command. Type / for commands.");
+                continue;
+            }
+            _ => {}
+        }
+        return Cli::try_parse_from(["astrid", "run", &task, "--model", &model])?
+            .command
+            .ok_or_else(|| "missing run command".into());
+    }
 }
 
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
@@ -183,9 +235,10 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let interactive = cli.command.is_none();
     let command = match cli.command {
         Some(command) => command,
-        None => interactive_command()?,
+        None => interactive_command().await?,
     };
     match command {
+        Commands::Exit => return Ok(()),
         Commands::Login => {
             auth::login(&directory,|url| {
                 eprintln!("Continue with ChatGPT: open this URL in your browser (expires in 5 minutes):\n{url}"); Ok(())
@@ -234,6 +287,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                         .into(),
                 );
             }
+            remember_model(&model)?;
             let tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
             let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
             let mut console = Console::new(&model, tools.workspace(), !interactive)?;

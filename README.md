@@ -256,8 +256,11 @@ the [Phase 2 amendments](docs/adr/README.md).
 
 Run `astrid` without arguments to open the designed terminal welcome screen:
 blue pixel logo with cyan eyes, model/provider/workspace metadata, and a task
-input directly beneath it. Set
-`ASTRID_MODEL` to skip the model prompt, or enter a model from `astrid models`.
+input directly beneath it. Astrid reuses your last-selected model; `ASTRID_MODEL` can override it.
+On first use with no saved choice, it selects the first model from your account
+catalog. Type `/` in the input box for commands, then `/model` to see available
+models. Use ↑/↓ and Enter to select; type to filter and Esc to cancel.
+The slash-command menu also supports ↑/↓ and Enter.
 Saved authentication is reused. Each invocation starts one fresh repository
 run; this is not a persistent, multi-turn chat session.
 
