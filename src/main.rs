@@ -201,25 +201,26 @@ async fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
     let mut model = model.ok_or("no model selected")?;
     let workspace = Workspace::new(std::env::current_dir()?)?;
     console::welcome(&model, &workspace)?;
+    let mut composer = console::Composer::default();
     loop {
-        let task = console::compose(&model)?;
+        let task = composer.compose(&model)?;
         match task.trim() {
             "" => continue,
             "/" | "/help" => {
-                eprintln!("/model  change model   /help  commands   /quit  exit");
+                composer.notice = "/model change model · /help commands · /quit exit".into();
                 continue;
             }
             "/quit" | "/exit" => return Ok(Commands::Exit),
             "/model" => {
                 let models = model_catalog().await?;
-                if let Some(next) = console::select_model(&models, &model)? {
+                if let Some(next) = composer.select_model(&models, &model)? {
                     model = next;
                     remember_model(&model)?;
                 }
                 continue;
             }
             command if command.starts_with('/') => {
-                eprintln!("Unknown command. Type / for commands.");
+                composer.notice = "Unknown command. Type / for commands.".into();
                 continue;
             }
             _ => {}

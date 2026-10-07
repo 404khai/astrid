@@ -186,12 +186,35 @@ fn append_header(
     out.flush()
 }
 
-pub fn compose(model: &str) -> io::Result<String> {
-    composer(model, None).map(|s| s.unwrap_or_default())
+#[derive(Default)]
+pub struct Composer {
+    height: usize,
+    pub notice: String,
 }
-
-pub fn select_model(models: &[String], current: &str) -> io::Result<Option<String>> {
-    composer(current, Some(models))
+impl Composer {
+    pub fn compose(&mut self, model: &str) -> io::Result<String> {
+        composer(self, model, None).map(|s| s.unwrap_or_default())
+    }
+    pub fn select_model(&mut self, models: &[String], current: &str) -> io::Result<Option<String>> {
+        composer(self, current, Some(models))
+    }
+    fn clear(&mut self, out: &mut impl Write) -> io::Result<()> {
+        if self.height > 0 {
+            write!(out, "\x1b[{}A\r", self.height)?;
+            for _ in 0..self.height {
+                writeln!(out, "\x1b[2K")?;
+            }
+            write!(out, "\x1b[{}A\r", self.height)?;
+            self.height = 0;
+            out.flush()?;
+        }
+        Ok(())
+    }
+}
+impl Drop for Composer {
+    fn drop(&mut self) {
+        let _ = self.clear(&mut io::stderr().lock());
+    }
 }
 
 fn read_key() -> io::Result<u8> {
@@ -206,7 +229,11 @@ fn read_key() -> io::Result<u8> {
     Ok(byte)
 }
 
-fn composer(model: &str, models: Option<&[String]>) -> io::Result<Option<String>> {
+fn composer(
+    state: &mut Composer,
+    model: &str,
+    models: Option<&[String]>,
+) -> io::Result<Option<String>> {
     struct Restore(libc::termios);
     impl Drop for Restore {
         fn drop(&mut self) {
@@ -244,7 +271,7 @@ fn composer(model: &str, models: Option<&[String]>) -> io::Result<Option<String>
     let mut selected = models
         .and_then(|m| m.iter().position(|v| v == model))
         .unwrap_or(0);
-    let mut height = 0;
+    let mut height = state.height;
     let mut out = io::stderr().lock();
     loop {
         let menu = models.is_some() || input.starts_with('/');
@@ -314,10 +341,16 @@ fn composer(model: &str, models: Option<&[String]>) -> io::Result<Option<String>
                 "Enter sends · / commands"
             }
         ));
+        if !state.notice.is_empty()
+            && let Some(footer) = rows.last_mut()
+        {
+            *footer = state.notice.clone();
+        }
         if height > 0 {
             write!(out, "\x1b[{height}A\r")?;
         }
         height = height.max(rows.len());
+        state.height = height;
         let background = if color { "\x1b[48;5;235m" } else { "" };
         for index in 0..height {
             let row = rows.get(index).map(String::as_str).unwrap_or("");
@@ -342,6 +375,11 @@ fn composer(model: &str, models: Option<&[String]>) -> io::Result<Option<String>
                 out.flush()?;
                 if menu {
                     if let Some(value) = options.get(selected) {
+                        if models.is_none() && value == "/help" {
+                            input = "/".into();
+                            selected = 0;
+                            continue;
+                        }
                         return Ok(Some(value.clone()));
                     }
                 } else {
@@ -1265,6 +1303,22 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
+    fn composer_clears_only_its_owned_region_and_resets_once() {
+        let mut composer = Composer {
+            height: 12,
+            notice: String::new(),
+        };
+        let mut bytes = Vec::new();
+        composer.clear(&mut bytes).unwrap();
+        let output = String::from_utf8(bytes.clone()).unwrap();
+        assert!(output.starts_with("\x1b[12A\r"));
+        assert_eq!(output.matches("\x1b[2K").count(), 12);
+        assert!(!output.contains("\x1b[2J"));
+        assert_eq!(composer.height, 0);
+        composer.clear(&mut bytes).unwrap();
+        assert_eq!(bytes.len(), output.len());
+    }
     #[test]
     fn designed_header_preserves_logo_metadata_and_scrollback() {
         for width in [40, 80, 120] {

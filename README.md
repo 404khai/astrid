@@ -260,7 +260,8 @@ input directly beneath it. Astrid reuses your last-selected model; `ASTRID_MODEL
 On first use with no saved choice, it selects the first model from your account
 catalog. Type `/` in the input box for commands, then `/model` to see available
 models. Use ↑/↓ and Enter to select; type to filter and Esc to cancel.
-The slash-command menu also supports ↑/↓ and Enter.
+The slash-command menu also supports ↑/↓ and Enter. All popups replace the
+same input area; Esc returns to task entry without creating another box.
 Saved authentication is reused. Each invocation starts one fresh repository
 run; this is not a persistent, multi-turn chat session.
 
