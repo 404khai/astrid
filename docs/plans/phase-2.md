@@ -296,3 +296,59 @@ The table above is the local status source. Each ticket inherits the owner and
 phase from this plan until individually assigned, and records review/validation
 evidence under its own section when completed. If external issues are later
 created, add links here and choose which system owns status.
+
+## P2-10 — Terminal startup and transcript visibility
+
+Status: Done. Owner: Codex. Authorized by the maintainer's request to make bare
+`astrid` open the CLI, support vertical transcript scrolling, and color text.
+
+Bare invocation now prompts for a model (unless `ASTRID_MODEL` is set) and a
+task, then uses the existing one-run runtime and saved authentication. Default
+rendering appends to terminal scrollback, with semantic colors and `NO_COLOR`
+support. The existing fixed viewport remains opt-in. This is a presentation
+follow-up; it does not introduce persistent conversations or advance the phase.
+
+Acceptance: bare startup without login; existing explicit commands preserved;
+scrollback preserved without default screen clearing or scroll margins; colored
+replies, approvals, completion, and failures; plain redirected output.
+
+Validation (2026-10-07): 91 offline tests passed, formatting and Clippy passed,
+and the updated CLI was installed. A controlling-terminal PTY check verified
+model/task prompts, blank task rejection, and no login or screen clearing. Solo
+diff review found no runtime/permission changes. Scrollback navigation uses the
+terminal emulator's own controls and retention limit.
+
+P2-10 design follow-up: restore the original blue/cyan pixel logo and
+side-by-side runtime metadata on both bare startup and direct runs. The bare
+startup task composer sits below this shared header; the run does not print
+another copy. Maintainer requested retaining the earlier design. The full
+91-test suite passed before adding a header regression test; all 10 binary
+tests then passed, including color, narrow layout, and absence of screen-clear
+or scroll-margin controls. Formatting, Clippy, and an installed-binary PTY check
+passed. The transcript still uses ordinary terminal scrollback rather than a
+fixed footer that would interfere with scrolling.
+
+P2-10 composer follow-up: the maintainer requested a shaded task input, slash
+command discovery, account model selection, and remembering the last model.
+Startup uses `ASTRID_MODEL`, otherwise `~/.config/astrid/last-model`, otherwise
+the first listed account model. Every explicit run and `/model` choice saves the
+selection atomically. `/` reveals commands as it is typed; `/model` presents a
+filterable account catalog with arrow-key selection and Enter confirmation;
+Esc cancels. The slash-command menu also supports arrow keys. Composer redraws only its own
+four lines, leaving the transcript in scrollback. No runtime or routing policy
+changes. Terminal state is restored on completion, EOF, and Ctrl-C.
+
+Composer validation: all 92 offline tests, formatting, and Clippy passed.
+A live terminal check exercised slash-menu arrow navigation, Enter selection,
+account-catalog loading, model-name filtering, arrow selection, and atomic
+persistence of the chosen model. The installed binary includes these changes.
+
+P2-10 input ownership correction: one Composer instance owns the input region
+across task entry, commands, and model selection. Transitions redraw the owned
+region rather than append another composer. Help remains inside the command
+menu; cancellation returns to the same input; dropping the composer clears
+only its owned lines before runtime output. A terminal check verified entering
+`/model`, account-catalog display, and Esc returning to the same anchor, with
+cursor-up redraws across the transition. The 92-test suite passed, followed by
+all 11 binary tests including the new owned-region cleanup regression.
+Formatting and Clippy passed; installed CLI updated.

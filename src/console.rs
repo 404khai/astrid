@@ -62,6 +62,10 @@ enum Ink {
     Normal,
     Dim,
     Accent,
+    Success,
+    Warning,
+    Error,
+    Reply,
 }
 impl Ink {
     fn paint(self, text: &str, color: bool) -> String {
@@ -72,6 +76,10 @@ impl Ink {
             Self::Normal => "0",
             Self::Dim => "2",
             Self::Accent => "38;2;0;247;213",
+            Self::Success => "32",
+            Self::Warning => "33",
+            Self::Error => "31",
+            Self::Reply => "36",
         };
         format!("\x1b[{code}m{text}\x1b[0m")
     }
@@ -122,6 +130,345 @@ fn tool_list(tools: &[String], width: usize) -> String {
         }
     }
     truncate(&format!("{} tools", tools.len()), width)
+}
+
+fn identity(model: &str, workspace: &Workspace) -> Identity {
+    Identity {
+        model: single_line(model),
+        cwd: short_path(workspace.root()),
+        instructions: workspace
+            .instructions()
+            .ok()
+            .flatten()
+            .map(|_| "AGENTS.md".into()),
+        tools: tools::definitions()
+            .iter()
+            .filter_map(|tool| tool["name"].as_str().map(str::to_owned))
+            .collect(),
+    }
+}
+
+fn append_header(
+    out: &mut impl Write,
+    identity: &Identity,
+    width: usize,
+    color: bool,
+) -> io::Result<()> {
+    let mut metadata = vec![
+        format!("astrid  {}", env!("CARGO_PKG_VERSION")),
+        String::new(),
+    ];
+    metadata.extend(identity.rows(width.saturating_sub(34).max(20)));
+    writeln!(out)?;
+    if width >= 78 {
+        for (row, logo) in LOGO.lines().enumerate() {
+            let text = metadata.get(row).map(String::as_str).unwrap_or("");
+            let ink = if row == 0 { Ink::Accent } else { Ink::Normal };
+            writeln!(
+                out,
+                "{}{}{}",
+                paint_logo(logo, row, color),
+                " ".repeat(34 - logo.width()),
+                ink.paint(text, color)
+            )?;
+        }
+    } else {
+        for (row, logo) in LOGO.lines().enumerate() {
+            writeln!(out, "{}", paint_logo(&truncate(logo, width), row, color))?;
+        }
+        writeln!(out)?;
+        writeln!(out, "{}", Ink::Accent.paint(&metadata[0], color))?;
+        for row in identity.rows(width) {
+            writeln!(out, "{row}")?;
+        }
+    }
+    writeln!(out)?;
+    out.flush()
+}
+
+#[derive(Default)]
+pub struct Composer {
+    height: usize,
+    pub notice: String,
+}
+impl Composer {
+    pub fn compose(&mut self, model: &str) -> io::Result<String> {
+        composer(self, model, None).map(|s| s.unwrap_or_default())
+    }
+    pub fn select_model(&mut self, models: &[String], current: &str) -> io::Result<Option<String>> {
+        composer(self, current, Some(models))
+    }
+    fn clear(&mut self, out: &mut impl Write) -> io::Result<()> {
+        if self.height > 0 {
+            write!(out, "\x1b[{}A\r", self.height)?;
+            for _ in 0..self.height {
+                writeln!(out, "\x1b[2K")?;
+            }
+            write!(out, "\x1b[{}A\r", self.height)?;
+            self.height = 0;
+            out.flush()?;
+        }
+        Ok(())
+    }
+}
+impl Drop for Composer {
+    fn drop(&mut self) {
+        let _ = self.clear(&mut io::stderr().lock());
+    }
+}
+
+fn read_key() -> io::Result<u8> {
+    let mut byte = 0u8;
+    let count = unsafe { libc::read(0, (&mut byte as *mut u8).cast(), 1) };
+    if count < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    if count == 0 {
+        return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "input closed"));
+    }
+    Ok(byte)
+}
+
+fn composer(
+    state: &mut Composer,
+    model: &str,
+    models: Option<&[String]>,
+) -> io::Result<Option<String>> {
+    struct Restore(libc::termios);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            unsafe {
+                libc::tcsetattr(0, libc::TCSANOW, &self.0);
+            }
+        }
+    }
+    let mut original = std::mem::MaybeUninit::<libc::termios>::uninit();
+    if unsafe { libc::tcgetattr(0, original.as_mut_ptr()) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let original = unsafe { original.assume_init() };
+    let mut raw = original;
+    raw.c_lflag &= !(libc::ICANON | libc::ECHO | libc::ISIG);
+    raw.c_cc[libc::VMIN] = 1;
+    raw.c_cc[libc::VTIME] = 0;
+    if unsafe { libc::tcsetattr(0, libc::TCSANOW, &raw) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let _restore = Restore(original);
+    let color =
+        std::env::var_os("NO_COLOR").is_none() && std::env::var("TERM").is_ok_and(|t| t != "dumb");
+    let width = terminal_size()
+        .map_or(80, |(w, _)| w)
+        .saturating_sub(2)
+        .max(8);
+    let commands = ["/model", "/help", "/quit"];
+    let descriptions = [
+        "Switch the active model",
+        "Show available commands",
+        "Exit Astrid",
+    ];
+    let mut input = String::new();
+    let mut selected = models
+        .and_then(|m| m.iter().position(|v| v == model))
+        .unwrap_or(0);
+    let mut height = state.height;
+    let mut out = io::stderr().lock();
+    loop {
+        let menu = models.is_some() || input.starts_with('/');
+        let options: Vec<String> = if let Some(models) = models {
+            models
+                .iter()
+                .filter(|m| m.to_lowercase().contains(&input.to_lowercase()))
+                .cloned()
+                .collect()
+        } else if menu {
+            commands
+                .iter()
+                .filter(|c| c.starts_with(&input))
+                .map(|c| c.to_string())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        selected = selected.min(options.len().saturating_sub(1));
+        let mut rows = vec!["─".repeat(width)];
+        if menu {
+            rows.push(if models.is_some() {
+                "  Switch model — type to filter".into()
+            } else {
+                "  Commands".into()
+            });
+            let start = selected.saturating_sub(5);
+            for (index, value) in options.iter().enumerate().skip(start).take(6) {
+                let detail = if models.is_none() {
+                    commands
+                        .iter()
+                        .position(|c| c == value)
+                        .map(|i| descriptions[i])
+                        .unwrap_or("")
+                } else {
+                    ""
+                };
+                rows.push(format!(
+                    "{} {value}  {detail}",
+                    if index == selected { "▸" } else { " " }
+                ));
+            }
+            if options.is_empty() {
+                rows.push("  No matches".into());
+            }
+            rows.push(String::new());
+        }
+        let input_row = rows.len();
+        rows.push(format!(
+            "❯ {}",
+            if input.is_empty() {
+                if models.is_some() {
+                    "Search models…"
+                } else {
+                    "Message Astrid… (/ for commands)"
+                }
+            } else {
+                &input
+            }
+        ));
+        rows.push("─".repeat(width));
+        rows.push(format!(
+            "  {model} · {}",
+            if menu {
+                "↑/↓ select · Enter confirm · Esc cancel"
+            } else {
+                "Enter sends · / commands"
+            }
+        ));
+        if !state.notice.is_empty()
+            && let Some(footer) = rows.last_mut()
+        {
+            *footer = state.notice.clone();
+        }
+        if height > 0 {
+            write!(out, "\x1b[{height}A\r")?;
+        }
+        height = height.max(rows.len());
+        state.height = height;
+        let background = if color { "\x1b[48;5;235m" } else { "" };
+        for index in 0..height {
+            let row = rows.get(index).map(String::as_str).unwrap_or("");
+            let accent = if color && row.starts_with('▸') {
+                "\x1b[38;5;208m"
+            } else {
+                ""
+            };
+            writeln!(
+                out,
+                "\x1b[2K{background}{accent}{:<width$}\x1b[0m",
+                truncate(row, width)
+            )?;
+        }
+        let up = height - input_row;
+        write!(out, "\x1b[{up}A\r\x1b[{}C", (2 + input.width()).min(width))?;
+        out.flush()?;
+        let key = read_key();
+        write!(out, "\x1b[{up}B\r")?;
+        match key? {
+            b'\r' | b'\n' => {
+                out.flush()?;
+                if menu {
+                    if let Some(value) = options.get(selected) {
+                        if models.is_none() && value == "/help" {
+                            input = "/".into();
+                            selected = 0;
+                            continue;
+                        }
+                        return Ok(Some(value.clone()));
+                    }
+                } else {
+                    return Ok(Some(input));
+                }
+            }
+            3 => return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled")),
+            4 if input.is_empty() => {
+                return Ok(if models.is_some() {
+                    None
+                } else {
+                    Some("/quit".into())
+                });
+            }
+            127 | 8 => {
+                input.pop();
+                selected = 0;
+            }
+            9 if menu => {
+                if let Some(value) = options.get(selected)
+                    && models.is_none()
+                {
+                    input = value.clone();
+                }
+            }
+            27 => {
+                let mut ready = libc::pollfd {
+                    fd: 0,
+                    events: libc::POLLIN,
+                    revents: 0,
+                };
+                if unsafe { libc::poll(&mut ready, 1, 40) } > 0 {
+                    if read_key()? == b'[' {
+                        match read_key()? {
+                            b'A' if !options.is_empty() => {
+                                selected = if selected == 0 {
+                                    options.len() - 1
+                                } else {
+                                    selected - 1
+                                }
+                            }
+                            b'B' if !options.is_empty() => {
+                                selected = (selected + 1) % options.len()
+                            }
+                            _ => {}
+                        }
+                    }
+                } else if models.is_some() {
+                    out.flush()?;
+                    return Ok(None);
+                } else {
+                    input.clear();
+                    selected = 0;
+                }
+            }
+            n if n >= 32 => {
+                let count = if n < 128 {
+                    1
+                } else if n < 224 {
+                    2
+                } else if n < 240 {
+                    3
+                } else {
+                    4
+                };
+                let mut bytes = vec![n];
+                for _ in 1..count {
+                    bytes.push(read_key()?);
+                }
+                if let Ok(text) = std::str::from_utf8(&bytes) {
+                    input.push_str(text);
+                    selected = 0;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+pub fn welcome(model: &str, workspace: &Workspace) -> io::Result<()> {
+    let color = io::stderr().is_terminal()
+        && std::env::var_os("NO_COLOR").is_none()
+        && std::env::var("TERM").is_ok_and(|term| term != "dumb");
+    append_header(
+        &mut io::stderr().lock(),
+        &identity(model, workspace),
+        terminal_size().map_or(80, |(w, _)| w),
+        color,
+    )
 }
 
 /// A small terminal-native viewport, without raw mode or an alternate screen.
@@ -395,6 +742,7 @@ fn terminal_size() -> Option<(usize, usize)> {
 pub struct Console {
     identity: Identity,
     screen: Option<Screen>,
+    color: bool,
     calls: BTreeMap<ToolCallId, String>,
     run: String,
     turn: usize,
@@ -408,25 +756,17 @@ pub struct Console {
     decoders: BTreeMap<(ToolCallId, OutputStream), TextDecoder>,
 }
 impl Console {
-    pub fn new(model: &str, workspace: &Workspace) -> io::Result<Self> {
+    pub fn new(model: &str, workspace: &Workspace, show_header: bool) -> io::Result<Self> {
         let terminal = io::stdout().is_terminal() && io::stderr().is_terminal();
-        let capable = terminal && std::env::var("TERM").is_ok_and(|term| term != "dumb");
-        let identity = Identity {
-            model: single_line(model),
-            cwd: short_path(workspace.root()),
-            // Presentation inspects availability; runtime still loads/validates instructions.
-            instructions: workspace
-                .instructions()
-                .ok()
-                .flatten()
-                .map(|_| "AGENTS.md".into()),
-            tools: tools::definitions()
-                .iter()
-                .filter_map(|tool| tool["name"].as_str().map(str::to_owned))
-                .collect(),
-        };
+        let capable = std::env::var_os("ASTRID_FIXED_VIEWPORT").is_some()
+            && terminal
+            && std::env::var("TERM").is_ok_and(|term| term != "dumb");
+        let identity = identity(model, workspace);
         let mut console = Self {
             identity,
+            color: terminal
+                && std::env::var_os("NO_COLOR").is_none()
+                && std::env::var("TERM").is_ok_and(|term| term != "dumb"),
             screen: if capable {
                 terminal_size()
                     .map(|(w, h)| Screen::new(w, h, std::env::var_os("NO_COLOR").is_none()))
@@ -447,13 +787,13 @@ impl Console {
         };
         if console.screen.is_some() {
             console.redraw()?;
-        } else if terminal {
-            let mut out = io::stderr().lock();
-            writeln!(out, "\n{}\n\nastrid  {}", LOGO, env!("CARGO_PKG_VERSION"))?;
-            for row in console.identity.rows(78) {
-                writeln!(out, " {row}")?;
-            }
-            writeln!(out)?;
+        } else if terminal && show_header {
+            append_header(
+                &mut io::stderr().lock(),
+                &console.identity,
+                terminal_size().map_or(80, |(w, _)| w),
+                console.color,
+            )?;
         }
         Ok(console)
     }
@@ -509,10 +849,12 @@ impl Console {
             screen.append(&mut io::stderr().lock(), text, ink)
         } else if model {
             let mut out = io::stdout().lock();
-            write!(out, "{}", printable(text))?;
+            write!(out, "{}", ink.paint(&printable(text), self.color))?;
             out.flush()
         } else {
-            write!(io::stderr().lock(), "{}", printable(text))
+            let mut out = io::stderr().lock();
+            write!(out, "{}", ink.paint(&printable(text), self.color))?;
+            out.flush()
         }
     }
     fn line(&mut self, text: &str, ink: Ink) -> io::Result<()> {
@@ -531,7 +873,7 @@ impl Console {
         match &event.kind {
             EventKind::RunStarted { task, .. } => {
                 self.run = event.run_id.to_string()[..5].into();
-                self.line(&format!("› {}", single_line(task)), Ink::Dim)?;
+                self.line(&format!("› {}", single_line(task)), Ink::Accent)?;
                 self.line("", Ink::Normal)?;
                 self.state = "running";
             }
@@ -541,7 +883,7 @@ impl Console {
                 self.state = "model";
             }
             EventKind::ModelTextDelta { text } => {
-                self.emit(text, Ink::Normal, true)?;
+                self.emit(text, Ink::Reply, true)?;
                 self.text_open = true;
             }
             EventKind::ModelCallCompleted { .. } => {
@@ -728,7 +1070,7 @@ impl Console {
                     // Oversized approvals use the terminal's ordinary scrollback.
                     self.restore()?;
                 }
-                self.line("? permission   operation approval required", Ink::Accent)?;
+                self.line("? permission   operation approval required", Ink::Warning)?;
                 // Show the complete command, not a truncated permission target.
                 self.emit(
                     &format!(
@@ -762,10 +1104,10 @@ impl Console {
                 self.state = "running";
                 match &event.kind {
                     EventKind::PermissionGranted => {
-                        self.line("✓ permission   granted", Ink::Dim)?
+                        self.line("✓ permission   granted", Ink::Success)?
                     }
                     EventKind::PermissionDenied => {
-                        self.line("! permission   denied", Ink::Normal)?
+                        self.line("! permission   denied", Ink::Warning)?
                     }
                     EventKind::PermissionFailed { message } => {
                         self.line(&format!("× permission   {message}"), Ink::Normal)?
@@ -790,9 +1132,9 @@ impl Console {
                 self.line(
                     &format!("{symbol} {state:13} {name} · {}", summary(outcome)),
                     if symbol == "✓" {
-                        Ink::Dim
+                        Ink::Success
                     } else {
-                        Ink::Normal
+                        Ink::Error
                     },
                 )?;
                 if name == "shell" {
@@ -808,7 +1150,7 @@ impl Console {
                     EventKind::ToolCallSkipped { reason } => format!("skipped · {reason}"),
                     _ => "cancelled".into(),
                 };
-                self.line(&format!("! {name:13} {detail}"), Ink::Normal)?;
+                self.line(&format!("! {name:13} {detail}"), Ink::Error)?;
                 if let EventKind::ToolCallCancelled { output: Some(data) } = &event.kind {
                     self.command_output(&ToolOutcome::Success { data: data.clone() })?;
                 }
@@ -820,18 +1162,18 @@ impl Console {
             EventKind::RunCompleted { .. } => {
                 self.state = "completed";
                 self.done = true;
-                self.line("✓ run          completed", Ink::Accent)?;
+                self.line("✓ run          completed", Ink::Success)?;
             }
             EventKind::RunCancelled => {
                 self.state = "cancelled";
                 self.done = true;
                 self.waiting = false;
-                self.line("! run          cancelled", Ink::Normal)?;
+                self.line("! run          cancelled", Ink::Warning)?;
             }
             EventKind::RunFailed { code, message } => {
                 self.state = "failed";
                 self.done = true;
-                self.line(&format!("× run          {code}: {message}"), Ink::Normal)?;
+                self.line(&format!("× run          {code}: {message}"), Ink::Error)?;
             }
             EventKind::ModelCallLimitReached { limit, .. } => {
                 self.state = "limit reached";
@@ -961,6 +1303,40 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[test]
+    fn composer_clears_only_its_owned_region_and_resets_once() {
+        let mut composer = Composer {
+            height: 12,
+            notice: String::new(),
+        };
+        let mut bytes = Vec::new();
+        composer.clear(&mut bytes).unwrap();
+        let output = String::from_utf8(bytes.clone()).unwrap();
+        assert!(output.starts_with("\x1b[12A\r"));
+        assert_eq!(output.matches("\x1b[2K").count(), 12);
+        assert!(!output.contains("\x1b[2J"));
+        assert_eq!(composer.height, 0);
+        composer.clear(&mut bytes).unwrap();
+        assert_eq!(bytes.len(), output.len());
+    }
+    #[test]
+    fn designed_header_preserves_logo_metadata_and_scrollback() {
+        for width in [40, 80, 120] {
+            let mut bytes = Vec::new();
+            append_header(&mut bytes, &identity(), width, true).unwrap();
+            let output = String::from_utf8(bytes).unwrap();
+            assert!(output.contains("astrid"));
+            assert!(output.contains("model"));
+            assert!(output.contains("cwd"));
+            assert!(output.contains("38;2;68;89;249"));
+            assert!(output.contains("38;2;0;247;213"));
+            assert!(!output.contains("\x1b[2J"));
+            assert!(!output.contains("\x1b[r"));
+        }
+        let mut bytes = Vec::new();
+        append_header(&mut bytes, &identity(), 80, false).unwrap();
+        assert!(!bytes.contains(&0x1b));
+    }
     fn identity() -> Identity {
         Identity {
             model: "gpt-5.6-sol".into(),

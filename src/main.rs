@@ -11,8 +11,8 @@ use astrid::{
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use std::{
-    fs::OpenOptions, io, os::fd::AsRawFd, os::unix::fs::OpenOptionsExt, process::ExitCode,
-    sync::Arc, time::Duration,
+    fs::OpenOptions, io, io::Write, os::fd::AsRawFd, os::unix::fs::OpenOptionsExt,
+    process::ExitCode, sync::Arc, time::Duration,
 };
 
 mod console;
@@ -24,11 +24,14 @@ use logo::LOGO;
 #[command(name="astrid", version, about="One repository task, one observable model/tool loop", after_help=LOGO)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Exit interactive startup.
+    #[command(hide = true)]
+    Exit,
     /// Sign in with ChatGPT using Astrid's own registration and credentials.
     Login,
     /// List models available to the signed-in ChatGPT account.
@@ -141,9 +144,102 @@ async fn main() -> ExitCode {
     }
 }
 
+fn remember_model(model: &str) -> io::Result<()> {
+    let directory = auth::default_directory().map_err(io::Error::other)?;
+    std::fs::create_dir_all(&directory)?;
+    let mut file = tempfile::NamedTempFile::new_in(&directory)?;
+    writeln!(file, "{model}")?;
+    file.persist(directory.join("last-model"))
+        .map_err(|e| e.error)?;
+    Ok(())
+}
+
+async fn model_catalog() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let auth = ChatGptAuth::new(auth::default_directory()?)?;
+    let token = auth.bearer_token().await?;
+    let catalog: serde_json::Value = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?
+        .get("https://api.openai.com/v1/models")
+        .bearer_auth(token.as_str())
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    let entries = catalog["models"]
+        .as_array()
+        .ok_or("invalid model catalog")?;
+    let models: Vec<String> = entries
+        .iter()
+        .filter(|v| v["visibility"] == "list")
+        .filter_map(|v| v["slug"].as_str().map(str::to_owned))
+        .collect();
+    if models.is_empty() {
+        return Err("no models available to this account".into());
+    }
+    Ok(models)
+}
+
+async fn interactive_command() -> Result<Commands, Box<dyn std::error::Error>> {
+    use std::io::IsTerminal;
+    if !io::stdin().is_terminal() {
+        return Err(
+            "interactive startup requires a terminal; use astrid run \"task\" --model <model>"
+                .into(),
+        );
+    }
+    let saved = std::fs::read_to_string(auth::default_directory()?.join("last-model")).ok();
+    let mut model = std::env::var("ASTRID_MODEL")
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| saved.map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()));
+    if model.is_none() {
+        model = Some(model_catalog().await?.remove(0));
+    }
+    let mut model = model.ok_or("no model selected")?;
+    let workspace = Workspace::new(std::env::current_dir()?)?;
+    console::welcome(&model, &workspace)?;
+    let mut composer = console::Composer::default();
+    loop {
+        let task = composer.compose(&model)?;
+        match task.trim() {
+            "" => continue,
+            "/" | "/help" => {
+                composer.notice = "/model change model · /help commands · /quit exit".into();
+                continue;
+            }
+            "/quit" | "/exit" => return Ok(Commands::Exit),
+            "/model" => {
+                let models = model_catalog().await?;
+                if let Some(next) = composer.select_model(&models, &model)? {
+                    model = next;
+                    remember_model(&model)?;
+                }
+                continue;
+            }
+            command if command.starts_with('/') => {
+                composer.notice = "Unknown command. Type / for commands.".into();
+                continue;
+            }
+            _ => {}
+        }
+        return Cli::try_parse_from(["astrid", "run", &task, "--model", &model])?
+            .command
+            .ok_or_else(|| "missing run command".into());
+    }
+}
+
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let directory = auth::default_directory()?;
-    match cli.command {
+    let interactive = cli.command.is_none();
+    let command = match cli.command {
+        Some(command) => command,
+        None => interactive_command().await?,
+    };
+    match command {
+        Commands::Exit => return Ok(()),
         Commands::Login => {
             auth::login(&directory,|url| {
                 eprintln!("Continue with ChatGPT: open this URL in your browser (expires in 5 minutes):\n{url}"); Ok(())
@@ -192,9 +288,10 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                         .into(),
                 );
             }
+            remember_model(&model)?;
             let tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
             let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
-            let mut console = Console::new(&model, tools.workspace())?;
+            let mut console = Console::new(&model, tools.workspace(), !interactive)?;
             let cancel = Cancellation::default();
             let (sender, mut receiver) = tokio::sync::mpsc::channel(64);
             let (permission_sender, mut permission_receiver) =
@@ -297,6 +394,15 @@ mod tests {
         os::{fd::OwnedFd, unix::net::UnixStream},
     };
     #[test]
+    fn bare_cli_enters_prompt_but_explicit_run_requires_a_model() {
+        assert!(Cli::try_parse_from(["astrid"]).unwrap().command.is_none());
+        assert!(Cli::try_parse_from(["astrid", "run"]).is_err());
+        assert!(matches!(
+            Cli::try_parse_from(["astrid", "models"]).unwrap().command,
+            Some(Commands::Models)
+        ));
+    }
+    #[test]
     fn cli_permission_policies_are_explicit_and_reject_unenforceable_options() {
         let parsed = Cli::try_parse_from([
             "astrid",
@@ -314,12 +420,12 @@ mod tests {
         .unwrap();
         assert!(matches!(
             parsed.command,
-            Commands::Run {
+            Some(Commands::Run {
                 read_policy: PermissionAction::Deny,
                 write_policy: PermissionAction::Ask,
                 shell_policy: PermissionAction::Allow,
                 ..
-            }
+            })
         ));
         assert!(
             Cli::try_parse_from([
