@@ -24,3 +24,10 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "ti
 walkdir = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 unicode-width = "0.2"
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+crossterm = "0.29.0"
+ratatui-textarea = "0.9.3"
+unicode-segmentation = "1"
+
+[dev-dependencies]
+vt100 = "0.16.2"

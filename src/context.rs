@@ -296,7 +296,7 @@ pub enum ContextError {
 }
 
 /// Validate closure independently of policy; every multi-tool batch stays whole.
-fn exchange_ranges(
+pub(crate) fn exchange_ranges(
     messages: &[crate::model::Message],
 ) -> Result<Vec<std::ops::Range<usize>>, ContextError> {
     use crate::model::Message;
@@ -304,8 +304,17 @@ fn exchange_ranges(
         return Err(ContextError::InvalidHistory("missing original task".into()));
     }
     let mut ranges = Vec::new();
+    let current_task = messages
+        .iter()
+        .rposition(|m| matches!(m, Message::User(_)))
+        .unwrap_or(0);
     let mut start = 1;
     while start < messages.len() {
+        if matches!(&messages[start], Message::User(_)) {
+            ranges.push(start..start + 1);
+            start += 1;
+            continue;
+        }
         let Message::Assistant(response) = &messages[start] else {
             return Err(ContextError::InvalidHistory(
                 "exchange must start with an assistant".into(),
@@ -323,7 +332,16 @@ fn exchange_ranges(
                 ));
             }
         }
-        ranges.push(start..end);
+        // Historical submissions stay together with their assistant/tool exchanges.
+        if start < current_task {
+            if let Some(previous) = ranges.last_mut() {
+                previous.end = end;
+            } else {
+                ranges.push(start..end);
+            }
+        } else {
+            ranges.push(start..end);
+        }
         start = end;
     }
     Ok(ranges)
@@ -399,13 +417,16 @@ fn summary_text(
                     clipped(&response.text, 160)
                 ),
                 Message::Tool(result) => {
-                    let call = match &messages[range.start] {
-                        Message::Assistant(response) => response
-                            .tool_calls
-                            .iter()
-                            .find(|call| call.call_id == result.call_id),
-                        _ => None,
-                    };
+                    let call = messages[..range.start + index]
+                        .iter()
+                        .rev()
+                        .find_map(|message| match message {
+                            Message::Assistant(response) => response
+                                .tool_calls
+                                .iter()
+                                .find(|call| call.call_id == result.call_id),
+                            _ => None,
+                        });
                     let (path, path_truncated) = call.map_or((None, false), requested_path);
                     let path_label = path.as_deref().map(|path| clipped(path, 128));
                     let label_truncated =
@@ -439,6 +460,11 @@ fn summary_text(
                         clipped(&detail, 256)
                     )
                 }
+                Message::User(text) => format!(
+                    "message {} user excerpt: {}\n",
+                    range.start + index,
+                    clipped(text, 160)
+                ),
                 _ => continue,
             };
             if text.len() + line.len() > limit {
@@ -479,9 +505,24 @@ pub(crate) async fn select(
         }
         measured?.ok_or(ContextError::AccountingUnavailable)
     };
+    let current_task = history
+        .iter()
+        .rposition(|m| matches!(m, Message::User(_)))
+        .unwrap_or(0);
+    let task_group = groups
+        .iter()
+        .position(|range| range.contains(&current_task));
     let mut selected = vec![false; groups.len()];
-    if let Some(last) = selected.last_mut() {
-        *last = true;
+    if let Some(index) = task_group {
+        selected[index] = true;
+    }
+    let latest_exchange = groups.iter().rposition(|range| {
+        history[range.clone()]
+            .iter()
+            .any(|m| matches!(m, Message::Assistant(_)))
+    });
+    if let Some(index) = latest_exchange {
+        selected[index] = true;
     }
     let assemble = |chosen: &[bool], summary: Option<&str>| {
         let mut messages = vec![history[0].clone()];
@@ -506,7 +547,7 @@ pub(crate) async fn select(
                 relevance(
                     &groups[*index],
                     ledger,
-                    match &history[0] {
+                    match &history[current_task] {
                         Message::User(text) => text,
                         _ => "",
                     },
@@ -519,6 +560,9 @@ pub(crate) async fn select(
     });
     for index in candidates {
         tokio::task::yield_now().await;
+        if Some(index) == task_group || Some(index) == latest_exchange {
+            continue;
+        }
         selected[index] = true;
         if !budget.admits(&measure(&assemble(&selected, None))?) {
             selected[index] = false;
@@ -567,7 +611,7 @@ pub(crate) async fn select(
             let group = item
                 .message_index
                 .and_then(|index| groups.iter().position(|range| range.contains(&index)));
-            let protected = group.is_none() || group == groups.len().checked_sub(1);
+            let protected = group.is_none() || group == task_group || group == latest_exchange;
             let retained = protected || group.is_some_and(|index| selected[index]);
             ContextDecision {
                 item_id: item.id,
@@ -954,5 +998,80 @@ mod tests {
             .await,
             Err(ContextError::ProtectedOverflow)
         ));
+    }
+    #[tokio::test]
+    async fn followup_selection_keeps_current_task_and_historical_questions_with_answers() {
+        let mut history = vec![Message::User("original task".into())];
+        add_exchange(&mut history, "old.rs", &"old data ".repeat(4000), false);
+        history.push(Message::User("obsolete question ".repeat(4000)));
+        add_exchange(
+            &mut history,
+            "middle.rs",
+            &"middle data ".repeat(4000),
+            false,
+        );
+        history.push(Message::User("recent question".into()));
+        add_exchange(&mut history, "recent.rs", "small latest result", false);
+        history.push(Message::User("current question".into()));
+        let budget = ContextBudget {
+            max_request_bytes: 14_000,
+            ..Default::default()
+        };
+        let selected = select(
+            &provider(),
+            "test",
+            "instructions",
+            &history,
+            &ledger(&history),
+            &budget,
+            &Cancellation::default(),
+        )
+        .await
+        .unwrap();
+        let user_messages = selected
+            .messages
+            .iter()
+            .filter_map(|m| match m {
+                Message::User(text) => Some(text.as_str()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            user_messages,
+            vec!["original task", "recent question", "current question"]
+        );
+        let decision = |index| {
+            selected
+                .metadata
+                .decisions
+                .iter()
+                .zip(ledger(&history).items)
+                .find_map(|(decision, item)| {
+                    (item.message_index == Some(index)).then_some(decision.retained)
+                })
+                .unwrap()
+        };
+        assert!(!decision(3)); // obsolete question
+        assert!(!decision(4)); // its assistant/tool exchange
+        assert!(!decision(5));
+        assert!(decision(6)); // recent question and latest complete exchange
+        assert!(decision(7));
+        assert!(decision(8));
+        assert!(decision(9)); // current submission
+        assert!(
+            selected
+                .metadata
+                .summary
+                .as_ref()
+                .unwrap()
+                .text
+                .contains("user excerpt")
+        );
+        let messages = selected
+            .messages
+            .into_iter()
+            .filter(|m| !matches!(m, Message::Summary(_)))
+            .collect::<Vec<_>>();
+        assert!(exchange_ranges(&messages).is_ok());
     }
 }

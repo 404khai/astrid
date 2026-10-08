@@ -249,3 +249,12 @@ checked event stream. Private provider continuation remains internal. Rejected
 preflight does not start/count a model call; deterministic summaries add no model
 invocations. Permissions, terminal outcomes, cancellation acknowledgement, and
 global tool-call-ID validation are preserved.
+
+
+## Subsequent scoped extension
+
+[ADR 0010](0010-interactive-sessions.md), authorized on 2026-10-08, extends the
+single-run ephemeral-session restriction and follow-up exclusion for the
+interactive client. The existing fresh-session API remains compatible; sessions
+still have no disk persistence. Follow-up run reconstruction includes inherited
+context provenance, with the original lifecycle and completion barriers retained.

@@ -83,3 +83,12 @@ history. `context::tests`, `tests/context.rs`, and `tests/context_budget.rs` cov
 wire accounting, privacy, protection, summary coverage, failure, cancellation,
 replay, and retained evidence. The [Phase 3 review](../reviews/phase-3.md) owns
 final validation results and limits.
+
+
+## Follow-up session extension
+
+[ADR 0010](0010-interactive-sessions.md) extends selection for multiple user
+submissions: protect original/current tasks and the latest exchange; keep each
+older follow-up submission with its entire response history. Current-submission
+exchanges remain indivisible assistant/tool units. Request accounting and
+admission semantics are unchanged.

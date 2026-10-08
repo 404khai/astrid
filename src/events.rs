@@ -52,6 +52,10 @@ impl Status {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventKind {
+    /// Prior session provenance, not newly added items or replayed model/tool calls.
+    ContextInherited {
+        items: Vec<crate::context::ContextItem>,
+    },
     ContextSelected {
         selection: crate::context::ContextSelection,
     },
@@ -317,12 +321,10 @@ impl ExecutionState {
                     .filter(|item| item.message_index.is_some())
                     .count();
                 require(item.message_index == is_message.then_some(next_message))?;
-                require(
-                    !self
-                        .context_items
-                        .iter()
-                        .any(|existing| existing.origin == item.origin),
-                )?;
+                require(!self.context_items.iter().any(|existing| {
+                    existing.origin == item.origin
+                        && !matches!(item.origin, ContextOrigin::UserTask)
+                }))?;
                 match &item.origin {
                     ContextOrigin::OperatingInstructions
                     | ContextOrigin::RepositoryInstructions { .. }
@@ -361,7 +363,8 @@ impl ExecutionState {
                     }
                 }
             }
-            EventKind::RunStarted { .. }
+            EventKind::ContextInherited { .. }
+            | EventKind::RunStarted { .. }
             | EventKind::PermissionsConfigured { .. }
             | EventKind::WorkspaceBaseline { .. }
             | EventKind::WorkspaceChanges { .. }
@@ -407,6 +410,24 @@ impl ExecutionState {
                 .ok_or_else(|| TransitionError("missing tool ID".into()))
         };
         match &e.kind {
+            EventKind::ContextInherited { items } => {
+                require(
+                    self.turns.is_empty() && self.context_items.is_empty() && !items.is_empty(),
+                )?;
+                let mut next_message = 0;
+                for (index, item) in items.iter().enumerate() {
+                    require(item.id.0 == index && !item.added_reason.is_empty())?;
+                    let is_message = matches!(
+                        item.origin,
+                        crate::context::ContextOrigin::UserTask
+                            | crate::context::ContextOrigin::Assistant { .. }
+                            | crate::context::ContextOrigin::ToolResult { .. }
+                    );
+                    require(item.message_index == is_message.then_some(next_message))?;
+                    next_message += usize::from(is_message);
+                }
+                self.context_items = items.clone();
+            }
             EventKind::ContextSelected { selection } => {
                 require(!self.turns[&turn()?].context_selected)?;
                 require(
@@ -449,12 +470,42 @@ impl ExecutionState {
                         None
                     }
                 });
+                let latest_task = self.context_items.iter().rev().find_map(|item| {
+                    matches!(item.origin, crate::context::ContextOrigin::UserTask)
+                        .then_some(item.message_index)
+                        .flatten()
+                });
+                // Earlier user submissions are selected with their whole response history.
+                let mut submission_retention = BTreeMap::new();
+                for (decision, item) in selection.decisions.iter().zip(&self.context_items) {
+                    if let Some(index) = item
+                        .message_index
+                        .filter(|index| *index > 0 && Some(*index) < latest_task)
+                    {
+                        let submission = self
+                            .context_items
+                            .iter()
+                            .filter(|candidate| {
+                                matches!(candidate.origin, crate::context::ContextOrigin::UserTask)
+                            })
+                            .filter_map(|candidate| candidate.message_index)
+                            .filter(|task| *task <= index)
+                            .max();
+                        require(
+                            submission_retention
+                                .insert(submission, decision.retained)
+                                .is_none_or(|previous| previous == decision.retained),
+                        )?;
+                    }
+                }
                 require(selection.decisions.iter().zip(&self.context_items).all(
                     |(decision, item)| {
                         let protected = match item.origin {
                             crate::context::ContextOrigin::OperatingInstructions
-                            | crate::context::ContextOrigin::RepositoryInstructions { .. }
-                            | crate::context::ContextOrigin::UserTask => true,
+                            | crate::context::ContextOrigin::RepositoryInstructions { .. } => true,
+                            crate::context::ContextOrigin::UserTask => {
+                                item.message_index == Some(0) || item.message_index == latest_task
+                            }
                             crate::context::ContextOrigin::Assistant { model_call_id }
                             | crate::context::ContextOrigin::ToolResult { model_call_id, .. } => {
                                 Some(model_call_id) == latest
