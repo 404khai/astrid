@@ -13,3 +13,5 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0005](0005-workspace-change-evidence.md) | Git baseline and workspace change evidence | Accepted | Implemented |
 | [0006](0006-context-admission-and-selection.md) | Estimated context admission and whole-exchange selection | Accepted | Implemented |
 | [0007](0007-context-compaction.md) | Deterministic compaction before model summaries | Accepted | Implemented |
+| [0010](0010-interactive-sessions.md) | Interactive in-memory sessions | Accepted | Implemented |
+| [0011](0011-permission-modes.md) | Permission modes and client display | Accepted | Implemented |

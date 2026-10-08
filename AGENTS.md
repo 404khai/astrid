@@ -1342,3 +1342,457 @@ evaluation
 ```
 
 A smaller system whose behavior is deeply understood is preferable to a larger system assembled from abstractions the maintainer cannot explain.
+
+# Maintainer Autonomy Protocol
+
+Astrid is primarily developed through an AI coding agent.
+
+The maintainer should not be required to answer routine implementation
+questions or repeatedly restate architectural context.
+
+The agent is expected to inspect the repository, existing ADRs, tests,
+Git history where useful, and the current roadmap before asking the
+maintainer for a decision.
+
+## Default decision policy
+
+Resolve a decision independently when it is:
+
+- local to one module,
+- easily reversible,
+- covered by an existing ADR or project principle,
+- an implementation detail rather than a product decision,
+- naturally implied by existing types/tests,
+- or unlikely to constrain a later phase.
+
+For these decisions:
+
+1. choose the simplest defensible option,
+2. implement it,
+3. test it,
+4. briefly document it when useful.
+
+Do not interrupt the maintainer.
+
+## Escalation policy
+
+Ask the maintainer only when a decision:
+
+- materially changes Astrid's product direction,
+- creates a difficult-to-reverse public contract,
+- changes security/permission semantics,
+- changes the meaning of persisted state,
+- changes cross-device trust semantics,
+- introduces a major external dependency,
+- conflicts with an existing ADR,
+- invalidates a frozen phase decision,
+- substantially expands the active phase,
+- or has multiple reasonable options with different long-term consequences.
+
+When escalation is necessary, present exactly:
+
+Context:
+Why this decision exists.
+
+Existing constraints:
+Relevant ADRs, code, tests, or project principles.
+
+Options:
+Only materially different options.
+
+Recommendation:
+One recommended answer.
+
+Why:
+Concrete reasoning.
+
+Cost of changing later:
+Low / Medium / High.
+
+Decision required:
+One precise question.
+
+Do not ask open-ended questions when a concrete decision can be proposed.
+
+---
+
+# Architectural North Star
+
+Astrid is not ultimately a CLI coding agent.
+
+Astrid is a personal agent runtime capable of coordinating:
+
+- models,
+- tools,
+- context,
+- devices,
+- applications,
+- local compute,
+- remote compute,
+- background tasks,
+- and user interaction surfaces.
+
+The CLI is the first client of the runtime.
+
+Future clients are expected to include:
+
+- terminal UI,
+- Telegram or similar messaging bridges,
+- native mobile applications,
+- native desktop applications,
+- background/daemon processes,
+- compact overlay/assistant interfaces,
+- and potentially other remote interfaces.
+
+Therefore:
+
+> No core runtime capability should depend on the terminal being present.
+
+The runtime should be usable headlessly.
+
+UI-specific behavior belongs in clients/adapters.
+
+---
+
+# Client / Runtime Boundary
+
+Treat every user interface as a client of Astrid.
+
+Conceptually:
+
+                    ┌── CLI
+                    ├── TUI
+                    ├── Telegram
+                    ├── Mobile
+
+Astrid Runtime ─────┼── Desktop
+├── Overlay
+└── Remote API
+
+The runtime owns:
+
+- runs,
+- sessions,
+- turns,
+- model execution,
+- tool execution,
+- context,
+- permissions,
+- task state,
+- cancellation,
+- events,
+- device capability routing.
+
+Clients own:
+
+- presentation,
+- input,
+- notifications,
+- local interaction conventions,
+- rendering permission prompts.
+
+Do not allow terminal concepts such as stdin, ANSI output, terminal
+dimensions, or Ctrl-C to leak into core runtime abstractions.
+
+---
+
+# Interaction Abstraction
+
+User interaction should eventually be representable independently of UI.
+
+Examples include:
+
+- text input,
+- permission requests,
+- choices,
+- confirmations,
+- notifications,
+- progress updates,
+- task completion,
+- cancellation.
+
+Do not prematurely build a universal UI framework.
+
+However, avoid APIs that assume an interaction must happen through stdin.
+
+For example, prefer a runtime-facing permission interface over:
+
+    read_line_from_terminal()
+
+because permission may later come from:
+
+- CLI,
+- phone notification,
+- desktop overlay,
+- Telegram,
+- web client.
+
+---
+
+# Long-Running Task Principle
+
+Astrid's long-term runtime must support:
+
+    submit task
+        ↓
+    client disconnects
+        ↓
+    Astrid continues working
+        ↓
+    result becomes available later
+
+Do not equate client lifetime with run lifetime.
+
+Foreground CLI behavior may choose to cancel when appropriate, but that is
+a client policy rather than a core runtime invariant.
+
+---
+
+# Thin Client Principle
+
+Astrid should remain useful on low-resource devices.
+
+Mobile clients must not require frontier-model inference locally.
+
+Expensive work should be delegatable to:
+
+- another user device,
+- local desktop compute,
+- a remote Astrid node,
+- hosted inference,
+- or another available execution backend.
+
+Prefer:
+
+- small request payloads,
+- streaming,
+- resumable sessions,
+- background execution,
+- capability delegation,
+- incremental rendering.
+
+Do not design the core runtime around high-end mobile hardware.
+
+---
+
+# Device Model Direction
+
+Future Astrid nodes may advertise capabilities.
+
+Conceptually:
+
+Device
+
+- id
+- type
+- connectivity
+- capabilities
+
+Example capabilities might eventually include:
+
+    filesystem.read
+    filesystem.write
+    shell.execute
+    git
+    browser
+    notifications
+    camera
+    microphone
+    clipboard
+    android.intent
+    gui.observe
+    gui.act
+    inference.local
+
+Do not implement this model until the active phase requires it.
+
+When introducing it, capabilities should describe what a device can do
+rather than hard-coding device classes throughout the runtime.
+
+---
+
+# External Project Evaluation
+
+Astrid may learn from or integrate existing open-source projects.
+
+Do not copy a project wholesale merely because it solves a related problem.
+
+When evaluating an external project, produce:
+
+1. What problem it solves.
+2. Which subsystem overlaps Astrid.
+3. Which concepts are reusable.
+4. Which code could be reused legally.
+5. Runtime/language/dependency implications.
+6. Whether integration should be:
+   - inspiration only,
+   - adapted code,
+   - library dependency,
+   - subprocess,
+   - service/RPC backend,
+   - protocol adapter,
+   - or no integration.
+7. What coupling it introduces.
+8. Whether building the capability ourselves provides important learning value.
+
+Prefer clean capability boundaries over embedding unrelated frameworks
+inside Astrid's core.
+
+Record a formal ADR only when Astrid actually commits to a significant
+integration.
+
+---
+
+# Phase Execution Workflow
+
+For every phase:
+
+1. Read AGENTS.md.
+2. Read the current phase state.
+3. Read relevant ADRs.
+4. Inspect the actual implementation.
+5. Compare implementation with the phase contract.
+6. Identify unresolved blockers.
+7. Resolve reversible blockers autonomously.
+8. Escalate only qualifying architectural decisions.
+9. Implement the smallest coherent vertical slices.
+10. Add deterministic tests.
+11. Run validation.
+12. Update documentation.
+13. Perform a phase audit.
+14. Do not advance phases until exit criteria are met.
+
+When the phase is complete:
+
+- summarize what actually exists,
+- list deviations from the original roadmap,
+- list technical debt relevant to the next phase,
+- record lessons learned,
+- update the current-phase marker,
+- then begin the next phase only when instructed or when the repository's
+  workflow explicitly permits automatic advancement.
+
+---
+
+# ADR Policy
+
+Create an ADR when a decision is:
+
+- architecturally significant,
+- difficult to reverse,
+- cross-cutting,
+- likely to be questioned later,
+- or establishes semantics other components will depend on.
+
+Do not create ADRs for ordinary implementation choices.
+
+Before creating an ADR, search existing ADRs for overlap.
+
+Never create two ADRs describing the same decision.
+
+ADRs should contain:
+
+- Status
+- Context
+- Decision
+- Alternatives considered
+- Consequences
+- Compatibility/migration implications when relevant
+
+If implementation proves an ADR wrong, supersede it explicitly rather
+than silently violating it.
+
+---
+
+# External Research Policy
+
+When evaluating a protocol, framework, SDK, runtime, or open-source
+project whose behavior may have changed:
+
+- inspect the current upstream documentation/repository,
+- distinguish documented behavior from assumptions,
+- record relevant version/commit information where important,
+- avoid designing around undocumented behavior.
+
+Research should answer a concrete architectural question.
+
+Do not spend time collecting technologies without an immediate reason.
+
+---
+
+# Learning Constraint
+
+Astrid is also a learning project.
+
+Do not outsource important core concepts to dependencies merely to reduce
+implementation work.
+
+Before adding a dependency that implements a major Astrid subsystem,
+consider:
+
+> Is understanding or implementing this subsystem part of the project's
+> learning objective?
+
+Infrastructure commodities may be reused.
+
+Astrid-defining runtime behavior should generally remain understandable
+and owned by this repository.
+
+---
+
+# Scope Discipline
+
+Future requirements should influence interface boundaries, not cause
+premature implementation.
+
+Knowing that Astrid will eventually have:
+
+- mobile,
+- Telegram,
+- desktop,
+- GUI automation,
+- multiple devices,
+
+does NOT mean those systems should be implemented during the current
+phase.
+
+Design today's boundary so tomorrow remains possible.
+
+Do not build tomorrow today.
+
+
+# Authorized Interactive Session and Permission Extension
+
+On 2026-10-08, the maintainer requested `/sessions`, switchable `ask`, `auto`,
+and `unbound` modes, visible active mode, and continued conversation after each
+run. This is a scoped extension within Phase 3, not authorization to advance
+phases. ADR 0010 extends the earlier single-run session restriction; ADR 0011
+records permission presets over ADR 0004's existing boundary.
+
+Required behavior:
+
+- Bare `astrid` returns to input after completed, failed, or cancelled runs.
+  Each message is a new run in the selected session, retaining committed history.
+- `/new` creates a fresh session; `/sessions` lists and switches sessions in the
+  current process. Sessions are ephemeral and workspace-bound. Initial client
+  limit: 32 sessions. Request budgets do not bound total retained session memory.
+- `astrid run` remains a one-shot interface.
+- `/mode` selects a mode; `/mode ask`, `/mode auto`, and `/mode unbound` select it
+  directly. The active mode is shown in input and execution status.
+- `ask`: reads allowed, writes and shell execution ask.
+- `auto` (default): workspace reads/writes allowed, shell execution asks.
+- `unbound`: read/write/execute allowed without permission prompts, including
+  broad account-level shell authority. Path validation, timeouts, cancellation,
+  and output limits still apply. Do not invent shell containment guarantees.
+- Mode changes apply to subsequent runs, are client-controlled, and are not
+  persisted or reset/elevated by session switching or repository instructions.
+- In `unbound`, upper/middle/lower logo arch bands use `#F94447`, `#EC1A1D`,
+  `#F94447`; eyes use `#F7C600`. Plain output and `NO_COLOR` remain supported.
+- Session-aware execution is a headless runtime API. UI selection, menus,
+  styling, and foreground cancellation remain client behavior.
+- A cancelled run with unmatched tool requests cannot be continued. Preserve its
+  committed state, reject the follow-up explicitly, and direct the user to
+  `/new`; never silently replay side effects or manufacture tool results.
+
+Session restoration after process exit, persisted transcripts, background
+workers, and checkpoint recovery remain outside this extension.

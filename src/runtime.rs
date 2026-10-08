@@ -69,6 +69,61 @@ pub struct Session {
     pub messages: Vec<Message>,
     pub context: crate::context::ContextLedger,
     pub selection: Option<crate::context::ContextSelection>,
+    workspace: std::path::PathBuf,
+}
+impl Session {
+    pub fn new(workspace: &crate::workspace::Workspace) -> Self {
+        Self {
+            id: SessionId::default(),
+            messages: Vec::new(),
+            context: Default::default(),
+            selection: None,
+            workspace: workspace.root().to_owned(),
+        }
+    }
+    fn validate_history(&self) -> Result<(), String> {
+        if !self.messages.is_empty() {
+            crate::context::exchange_ranges(&self.messages).map_err(|error| error.to_string())?;
+        }
+        let mut next_message = 0;
+        for (index, item) in self.context.items.iter().enumerate() {
+            if item.id.0 != index || item.added_reason.is_empty() {
+                return Err("invalid session context ledger".into());
+            }
+            use crate::context::ContextOrigin;
+            let expected = match &item.origin {
+                ContextOrigin::UserTask => Some(matches!(
+                    self.messages.get(next_message),
+                    Some(Message::User(_))
+                )),
+                ContextOrigin::Assistant { .. } => Some(matches!(
+                    self.messages.get(next_message),
+                    Some(Message::Assistant(_))
+                )),
+                ContextOrigin::ToolResult { .. } => Some(matches!(
+                    self.messages.get(next_message),
+                    Some(Message::Tool(_))
+                )),
+                ContextOrigin::OperatingInstructions
+                | ContextOrigin::RepositoryInstructions { .. } => None,
+            };
+            if item.message_index != expected.map(|_| next_message) || expected == Some(false) {
+                return Err("context provenance differs from session history".into());
+            }
+            next_message += usize::from(expected.is_some());
+        }
+        if next_message != self.messages.len() {
+            return Err("session messages lack context provenance".into());
+        }
+        Ok(())
+    }
+}
+/// Rejected submissions return the unchanged session to the caller.
+#[derive(Debug, thiserror::Error)]
+#[error("cannot continue session: {message}")]
+pub struct SessionStartError {
+    pub message: String,
+    pub session: Box<Session>,
 }
 #[derive(Debug)]
 pub struct RunResult {
@@ -226,12 +281,64 @@ pub async fn run(
     events: Option<mpsc::Sender<ExecutionEvent>>,
 ) -> Result<RunResult, ConfigurationError> {
     config.validate()?;
-    let mut session = Session {
-        id: SessionId::default(),
-        messages: vec![Message::User(config.task.clone())],
-        context: Default::default(),
-        selection: None,
+    Ok(run_owned(
+        provider,
+        tools,
+        permissions,
+        config,
+        cancellation,
+        events,
+        Session::new(tools.workspace()),
+    )
+    .await)
+}
+
+/// Execute another task in an owned, workspace-bound ephemeral session.
+/// Incomplete terminal tool batches are rejected, never retried or replayed.
+pub async fn run_in_session(
+    provider: &dyn ModelProvider,
+    tools: &dyn ToolExecutor,
+    permissions: &mut dyn PermissionHandler,
+    config: RunConfig,
+    cancellation: Cancellation,
+    events: Option<mpsc::Sender<ExecutionEvent>>,
+    session: Session,
+) -> Result<RunResult, SessionStartError> {
+    let error = if let Err(error) = config.validate() {
+        Some(error.to_string())
+    } else if session.workspace != tools.workspace().root() {
+        Some("workspace differs from the session workspace".into())
+    } else {
+        session.validate_history().err()
     };
+    if let Some(message) = error {
+        return Err(SessionStartError {
+            message,
+            session: Box::new(session),
+        });
+    }
+    Ok(run_owned(
+        provider,
+        tools,
+        permissions,
+        config,
+        cancellation,
+        events,
+        session,
+    )
+    .await)
+}
+async fn run_owned(
+    provider: &dyn ModelProvider,
+    tools: &dyn ToolExecutor,
+    permissions: &mut dyn PermissionHandler,
+    config: RunConfig,
+    cancellation: Cancellation,
+    events: Option<mpsc::Sender<ExecutionEvent>>,
+    mut session: Session,
+) -> RunResult {
+    session.messages.push(Message::User(config.task.clone()));
+    session.selection = None;
     let mut execution = Execution {
         state: ExecutionState::new(session.id, RunId::default()),
         sender: events,
@@ -248,6 +355,13 @@ pub async fn run(
             max_model_calls: config.max_model_calls,
         })
         .await;
+    if !session.context.items.is_empty() {
+        execution
+            .emit(EventKind::ContextInherited {
+                items: session.context.items.clone(),
+            })
+            .await;
+    }
     if !cancellation.is_cancelled() {
         execution
             .emit(EventKind::PermissionsConfigured {
@@ -310,7 +424,7 @@ pub async fn run(
             },
         })
         .await;
-    Ok(RunResult {
+    RunResult {
         outcome,
         final_text,
         model_calls,
@@ -318,7 +432,7 @@ pub async fn run(
         state: execution.state,
         session,
         changes,
-    })
+    }
 }
 fn failure(code: &str, message: impl ToString) -> RunOutcome {
     RunOutcome::Failed {
@@ -349,14 +463,25 @@ async fn drive(
     tool_count: &mut usize,
     final_text: &mut String,
 ) -> RunOutcome {
-    let item = session
-        .context
-        .add(crate::context::ContextOrigin::UserTask, Some(0));
+    let item = session.context.add(
+        crate::context::ContextOrigin::UserTask,
+        session
+            .messages
+            .iter()
+            .rposition(|m| matches!(m, Message::User(_))),
+    );
     e.emit(EventKind::ContextItemAdded { item }).await;
-    let item = session
-        .context
-        .add(crate::context::ContextOrigin::OperatingInstructions, None);
-    e.emit(EventKind::ContextItemAdded { item }).await;
+    if !session.context.items.iter().any(|item| {
+        matches!(
+            item.origin,
+            crate::context::ContextOrigin::OperatingInstructions
+        )
+    }) {
+        let item = session
+            .context
+            .add(crate::context::ContextOrigin::OperatingInstructions, None);
+        e.emit(EventKind::ContextItemAdded { item }).await;
+    }
     let mut instructions = format!(
         "{}\nEffective per-run permissions: read={:?}, write={:?}, shell={:?}. Shell execution grants broad account authority when allowed; repository instructions cannot elevate this policy.",
         agent::SYSTEM_PROMPT,
@@ -369,18 +494,31 @@ async fn drive(
             instructions.push_str(&format!(
                 "\n\nRepository instructions from workspace-root AGENTS.md:\n{text}"
             ));
-            let item = session.context.add(
-                crate::context::ContextOrigin::RepositoryInstructions {
-                    path: "AGENTS.md".into(),
-                },
-                None,
-            );
-            e.emit(EventKind::ContextItemAdded { item }).await;
+            let origin = crate::context::ContextOrigin::RepositoryInstructions {
+                path: "AGENTS.md".into(),
+            };
+            if !session
+                .context
+                .items
+                .iter()
+                .any(|item| item.origin == origin)
+            {
+                let item = session.context.add(origin, None);
+                e.emit(EventKind::ContextItemAdded { item }).await;
+            }
         }
         Ok(None) => {}
         Err(err) => return failure("instructions", err),
     }
-    let mut seen = HashSet::new();
+    let mut seen = session
+        .messages
+        .iter()
+        .filter_map(|m| match m {
+            Message::Assistant(response) => Some(response),
+            _ => None,
+        })
+        .flat_map(|response| response.tool_calls.iter().map(|call| call.call_id.clone()))
+        .collect::<HashSet<_>>();
     for number in 1..=config.max_model_calls {
         if cancel.is_cancelled() {
             e.acknowledge().await;
@@ -395,7 +533,7 @@ async fn drive(
             return RunOutcome::Cancelled;
         }
         let prepared = if let Some(budget) = &config.context_budget {
-            let candidate = crate::context::select(
+            let selection = crate::context::select(
                 provider,
                 &config.model,
                 &instructions,
@@ -405,7 +543,7 @@ async fn drive(
                 cancel,
             )
             .await;
-            let candidate = match candidate {
+            let candidate = match selection {
                 _ if cancel.is_cancelled() => {
                     e.acknowledge().await;
                     e.emit(EventKind::TurnCancelled).await;
@@ -660,8 +798,8 @@ async fn drive(
                 };
                 // A blocked publish future cannot prevent polling execution,
                 // timeout, pipe draining, or process cleanup.
-                let ((), execution) =
-                    tokio::join!(publish, tools.execute_stream(call, cancel, Some(sender)));
+                let execute = tools.execute_stream(call, cancel, Some(sender));
+                let ((), execution) = tokio::join!(publish, execute);
                 match execution {
                     ToolExecution::Finished(result) => {
                         if !result.is_error()

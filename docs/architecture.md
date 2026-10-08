@@ -15,7 +15,10 @@ serialized-byte ceiling. Unknown provider input tokens stay unavailable; reasoni
 causes the whole assistant category to be excluded from the heuristic while all
 its bytes remain in the exact ceiling. No guaranteed provider fit is claimed.
 
-ContextSelection protects instructions, task, and the latest complete exchange.
+ContextSelection protects instructions, the original task, current submission,
+and latest complete exchange. Earlier follow-up submissions are selected with
+all their response exchanges, while current-submission exchanges remain individual
+selection units.
 Older assistant/continuation/tool-outcome exchanges are indivisible. The configured
 policy ranks them by recency or file-reference/lexical signals then recency. Omitted
 history can contribute one bounded deterministic summary of visible task data,
@@ -46,7 +49,16 @@ or immediate interruption of synchronous serialization is introduced. See
 and [ADR 0007](adr/0007-context-compaction.md).
 
 One Cargo package contains a library and CLI binary. Sessions remain ephemeral;
-tools remain sequential; OpenAI remains the only provider.
+tools remain sequential; OpenAI remains the only provider. `run` creates a fresh
+session; `run_in_session` transfers an existing workspace-bound session through
+another run with a fresh RunId. Rejected submissions return unchanged session
+ownership. Follow-up runs emit `ContextInherited` to seed prior context provenance
+for independent event reconstruction. Incomplete terminal tool batches reject
+continuation before new work. The interactive CLI owns active selection and a
+32-session list; it returns to input after each terminal run outcome. Permission
+modes are presets over the existing policy, not a new executor or path bypass.
+See [ADR 0010](adr/0010-interactive-sessions.md) and
+[ADR 0011](adr/0011-permission-modes.md).
 
 ```text
 CLI: config, event rendering, Ctrl-C, cancellable terminal permission input
@@ -203,21 +215,39 @@ amendments in [the ADR index](adr/README.md).
 
 ## CLI presentation
 
-`src/console.rs` consumes owned runtime events and keeps only presentation state:
+`src/console.rs` and its CLI-only modules consume owned runtime events and keep only presentation state:
 short IDs, visible turn/model-call counters, requested tool names, and display
 lines. It neither validates execution transitions nor decides when to invoke
 a model/tool. Permission/output/change rendering consumes the Phase 2 public
 events and does not own their execution semantics.
 
-There is no full-screen terminal framework or raw-mode event loop. The supported
-macOS terminal exposes its dimensions through `TIOCGWINSZ`; ANSI scroll margins
-reserve the header and footer on the primary screen. Stream text is sanitized,
-wrapped by Unicode display width, and retained in a bounded redraw buffer.
-A CLI timer checks dimensions between runtime events. Canonical `/dev/tty`
-input and OS Ctrl-C remain in use; the renderer places the approval prompt
-before the existing cancellable input task reads it. Resize is deferred while
-an approval answer is being echoed. An approval larger than the output viewport
-switches to append-only rendering so its command remains reviewable. A drop guard restores normal scroll margins
-and cursor visibility on completion and error paths. Redirected/dumb terminals
-use append-only output. This is a reversible CLI presentation choice, not a
-new runtime abstraction.
+Ratatui + Crossterm render an inline viewport on the primary screen. Startup
+identity is supplied by the CLI as a DTO; rendering does not query providers or
+tool implementations. `state.rs` projects events into output pieces and status;
+`input.rs` maps keys into application actions; `layout.rs`, `widgets.rs`, and
+`theme.rs` handle presentation. `append.rs` preserves stdout/model and
+stderr/diagnostic separation for redirected or unsupported terminals.
+
+Completed display rows are inserted into scrollback once. The live tail retains
+logical text for resize and output without trailing newlines. Pending work is
+flushed at 16 KiB of completed lines, 256 lines, or an 8 KiB tail; insertion cell
+buffers are batched. Exceptionally large single graphemes are flushed in
+character-boundary prefixes rather than retained without a limit. Existing
+runtime output limits and omission metadata remain authoritative.
+
+One CLI select loop consumes runtime events, OS signals, 10 ms nonblocking input
+polls, and 33 ms render ticks. Permission/terminal events flush immediately. Raw
+Ctrl-C maps to the existing cancellation handle; input and rendering never alter
+execution outcomes. Inline permission input is armed only after the complete
+command/cwd/authority are rendered and queued typeahead is discarded. Paste
+cannot approve. Redirected output still uses cancellable canonical `/dev/tty`
+reads, denying approval when no tty is available. An abort-on-drop guard owns the
+permission relay task.
+
+Terminal guards restore raw mode, bracketed paste, and cursor visibility on
+normal exits, errors, and panics. Cleanup clears only the owned inline region,
+leaving the transcript above it. No alternate screen or mouse capture is enabled.
+The previous ANSI fixed viewport remains opt-in via `ASTRID_FIXED_VIEWPORT`;
+it retains canonical approval input and its oversized-approval fallback. Full-screen
+inspection is deferred; event projection and frame-relative widgets can be reused
+by a future adapter without modifying core execution.

@@ -28,7 +28,8 @@ For hands-on checks, see [Try Phase 2](docs/testing-phase-2.md).
 
 An experimental Rust agent harness. Phase 2 provides a typed execution runtime
 with ordered events, cancellation, bounded tool output, configurable permissions,
-and workspace change evidence for one fresh repository task per process.
+and workspace change evidence. Interactive conversations retain multiple runs;
+`astrid run` executes one fresh repository task.
 It streams OpenAI output and executes native tools sequentially.
 macOS is the supported platform.
 
@@ -73,6 +74,7 @@ not merely a model appearing in a catalog. ChatGPT plan limits still apply.
 | Model                  | `--model`           | `ASTRID_MODEL`           | Required |
 | Model-call ceiling     | `--max-model-calls` | `ASTRID_MAX_MODEL_CALLS` | 20       |
 | Shell timeout, seconds | `--shell-timeout`   | `ASTRID_SHELL_TIMEOUT`   | 30       |
+| Permission preset      | `--mode`            | —                        | auto     |
 | Native read policy     | `--read-policy`     | —                        | allow    |
 | Native write policy    | `--write-policy`    | —                        | allow    |
 | Shell policy           | `--shell-policy`    | —                        | ask      |
@@ -83,9 +85,12 @@ instruction discovery is deferred.
 
 On an interactive terminal, `astrid run` shows Astrid's existing pixel logo,
 compact model/provider/workspace metadata, and a scrolling execution stream.
-Output appends to normal terminal scrollback so you can review earlier messages
-with your terminal's scrolling controls. Bare `astrid` opens a model/task prompt;
-`astrid run` remains available for direct invocation. Ctrl-C cancels the run.
+Completed output appends to normal terminal scrollback; a small Ratatui inline
+region shows unfinished streamed text, status, and permission input. Astrid does
+not enter an alternate screen. Bare `astrid` opens a model/task prompt;
+`astrid run` remains available for one-shot invocation. Bare `astrid` returns to
+the prompt after each run, retaining the selected conversation. Ctrl-C cancels an
+active run; at the idle prompt it exits.
 Tool requests show their target, results show a concise summary, and shell
 stdout/stderr stream separately while the command runs. Effective permission
 policy, initial branch/dirty paths, native mutation patches, and final observed
@@ -94,9 +99,9 @@ the run ended normally, not that the task was independently verified.
 
 Replies are cyan, approvals yellow, successful completion green, and failures
 red. Labels and secondary information use dim terminal text. Set `NO_COLOR=1`
-to disable colors. The former fixed header/footer viewport is opt-in with
-`ASTRID_FIXED_VIEWPORT=1`; the default avoids cursor controls and redraws that
-interfere with scrollback.
+to disable colors. The former fixed header/footer viewport remains opt-in with
+`ASTRID_FIXED_VIEWPORT=1`. The default inline renderer keeps the logo and startup
+metadata in scrollback, without pinning a header above the execution stream.
 
 When either output stream is redirected, or `TERM=dumb`/terminal sizing is
 unavailable, rendering falls back to ordinary append-only text without cursor
@@ -106,9 +111,39 @@ activity, command output, and failures go to stderr. Operation approvals use
 redirected output. Context source/selection details are shown with `--show-context`.
 
 Every successful response without tool calls ends the task. Recoverable tool
-failures return to the model. Provider/protocol errors and an exhausted
-model-call ceiling exit nonzero. Astrid does not automatically retry mutations
+failures return to the model. In one-shot mode, provider/protocol errors and an
+exhausted model-call ceiling exit nonzero. Interactive mode displays the outcome
+and returns to input. Astrid does not automatically retry mutations
 or provider requests. Its final answer is a model claim, not proof of success.
+
+## Interactive sessions and modes
+
+`/new` starts a fresh conversation. `/sessions` opens a searchable list showing
+session ID, first-task label, active marker, run count, and latest outcome; use
+arrow keys and Enter to switch. Up to 32 sessions live in the current Astrid
+process and disappear on exit. Follow-ups retain committed messages and context;
+they do not rerun old tools. An interrupted, incomplete tool batch is preserved
+but cannot accept follow-ups; use `/new` in that case.
+
+`/mode` opens the permission selector. Direct commands are:
+
+| Command | Reads | Workspace edits | Shell |
+| --- | --- | --- | --- |
+| `/mode ask` | allow | ask | ask |
+| `/mode auto` (default) | allow | allow | ask |
+| `/mode unbound` | allow | allow | allow |
+
+The mode is visible in startup metadata, composer, and execution status. It
+applies to subsequent runs and remains unchanged when switching sessions.
+`unbound` grants full tool access, including broad account-level shell execution.
+Native path validation, shell timeouts, cancellation, and output limits remain.
+Its logo arches are red (`#F94447`, `#EC1A1D`, `#F94447`) and eyes yellow
+(`#F7C600`); `NO_COLOR` disables the palette.
+
+One-shot runs accept `--mode ask|auto|unbound`. Explicit `--read-policy`,
+`--write-policy`, or `--shell-policy` overrides the corresponding preset action;
+the display uses `custom` when the effective policy matches no named mode.
+Modes are not remembered after exit or read from repository settings.
 
 ## Native tools
 
@@ -281,11 +316,18 @@ catalog. Type `/` in the input box for commands, then `/model` to see available
 models. Use ↑/↓ and Enter to select; type to filter and Esc to cancel.
 The slash-command menu also supports ↑/↓ and Enter. All popups replace the
 same input area; Esc returns to task entry without creating another box.
-Saved authentication is reused. Each invocation starts one fresh repository
-run; this is not a persistent, multi-turn chat session.
+Enter sends a task; Ctrl-J inserts a newline. The composer supports multiline
+paste, wrapping, cursor movement, and Unicode editing. Ctrl-C cancels; empty
+Ctrl-D exits (or cancels model selection). Tab completes a slash command.
+Input is capped at 64 KiB with a visible notice when a paste exceeds that limit.
+During a run, approvals require typing `yes` and pressing Enter after the full
+command is displayed. Pasted text and pre-prompt typeahead cannot grant an
+inline approval. Redirected output retains canonical `/dev/tty` approval input.
+Saved authentication is reused. Bare `astrid` keeps in-memory conversations
+available for follow-ups; `astrid run` starts one fresh repository task.
 
-The default display appends output to the terminal, keeping the transcript in
-normal scrollback. Use your terminal's scrollbar, mouse wheel, trackpad, or
+The default inline display inserts completed rows above its live region, keeping
+the transcript in normal scrollback. Use your terminal's scrollbar, mouse wheel, trackpad, or
 scrollback keyboard shortcuts to review earlier output. Replies are cyan,
 approvals and cancellations yellow, successful completion green, and failures
 red. Set `NO_COLOR=1` for plain text. Redirected output stays plain.

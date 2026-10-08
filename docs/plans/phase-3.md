@@ -186,3 +186,42 @@ metadata, model output, and provider assembly remain outside total-memory bounds
 Preserve one package/provider, sequential tools, ephemeral sessions, permissions,
 workspace boundaries, and existing lifecycle semantics. No persistence, vector
 search, embeddings, routing, workers, worktrees, MCP, or new dashboard.
+
+
+## Authorized interactive extension (2026-10-08)
+
+The maintainer requested continued conversation, `/sessions`, and visible
+switchable permission modes. This scoped extension does not close Phase 3 or
+advance a phase. [ADR 0010](../adr/0010-interactive-sessions.md) extends single-run
+session lifecycle and context selection for follow-ups;
+[ADR 0011](../adr/0011-permission-modes.md) defines permission presets.
+
+### P3-09: Continue and switch ephemeral sessions
+
+Status: Done. Owner: coding agent. Dependencies: accepted ADR 0010, existing
+context/runtime contracts. Runtime transfers workspace-bound sessions through
+follow-up runs, returns unchanged ownership on rejected submissions, and emits
+inherited provenance for independent reconstruction. Client supports `/new`,
+`/sessions`, and continued input after terminal outcomes. Incomplete batches are
+explicitly rejected without replay. One-shot execution remains supported.
+
+Acceptance evidence: `tests/sessions.rs`, follow-up selection fixtures in
+`src/context.rs`, and the continuous-conversation PTY scenario. Historical user
+submissions remain paired with their answers during pruning. Limitations: memory
+only, 32-session client limit, no global retained-history memory bound, no
+restoration or incomplete-batch recovery.
+
+### P3-10: Expose permission modes
+
+Status: Done. Owner: coding agent. Dependencies: ADR 0004 and accepted ADR 0011.
+`/mode` and direct named commands configure future runs; mode is visible in input,
+execution status, and metadata. One-shot presets and explicit capability overrides
+are supported. Unbound uses the requested red/yellow logo palette while retaining
+native path validation and execution bounds.
+
+Acceptance evidence: real write/shell approval tests in `tests/sessions.rs`,
+header/color/input fixtures in `src/console/tests.rs`, and mode/session-switching
+PTY coverage. Session selection starts no work and does not alter authority.
+
+Validation and solo review are recorded in
+[the implementation review](../reviews/interactive-sessions.md).
