@@ -146,6 +146,7 @@ pub async fn run(
         tools,
         confirmation,
         RunConfig {
+            observability: None,
             context_budget: None,
             model: model.into(),
             task: task.into(),

@@ -2,6 +2,7 @@ use astrid::{
     auth::{self, Authentication, ChatGptAuth},
     cancellation::Cancellation,
     events::EventKind,
+    observability::{self, Switch},
     openai::OpenAiProvider,
     permissions::{PermissionAction, PermissionMode, PermissionPolicy},
     runtime::{self, PermissionHandler, RunConfig, RunOutcome},
@@ -29,7 +30,26 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+enum SettingsCommand {
+    /// Persist the default for subsequent runs.
+    Set {
+        #[arg(value_parser=["observability"])]
+        key: String,
+        #[arg(value_enum)]
+        value: Switch,
+    },
+}
+#[derive(Subcommand)]
 enum Commands {
+    /// Show or update optional observability settings.
+    Settings {
+        #[command(subcommand)]
+        command: Option<SettingsCommand>,
+    },
+    /// List retained traces or inspect a run's metadata.
+    Trace { run_id: Option<String> },
+    /// Aggregate known usage across retained traces (unknown values remain unknown).
+    Stats,
     /// Exit interactive startup.
     #[command(hide = true)]
     Exit,
@@ -39,6 +59,12 @@ enum Commands {
     Models,
     /// Execute one fresh repository task in the invocation directory.
     Run {
+        #[arg(
+            long,
+            value_enum,
+            help = "Override optional telemetry and metadata trace recording"
+        )]
+        observability: Option<Switch>,
         task: String,
         #[arg(
             long,
@@ -246,6 +272,41 @@ fn startup_identity(
     }
 }
 
+fn observability_options(
+    override_value: Option<Switch>,
+) -> Result<Option<observability::Options>, Box<dyn std::error::Error>> {
+    observability_options_at(&auth::default_directory()?, override_value)
+}
+fn observability_options_at(
+    directory: &std::path::Path,
+    override_value: Option<Switch>,
+) -> Result<Option<observability::Options>, Box<dyn std::error::Error>> {
+    let path = directory.join("settings.json");
+    let (settings, exists) = observability::Settings::load_with_source(&path)?;
+    let (value, source) = settings.resolve(override_value, exists);
+    eprintln!("Observability: {value} ({source})");
+    Ok((value == Switch::On).then(|| observability::Options::new(directory.join("traces"))))
+}
+fn recording_notice(result: &runtime::RunResult) {
+    match result.recording.status {
+        observability::RecordingStatus::Off => {}
+        observability::RecordingStatus::Complete => {
+            eprintln!("Trace: {} (metadata only)", result.recording.run_id)
+        }
+        _ => eprintln!(
+            "Trace: {} ({:?}: {}; run outcome unchanged)",
+            result.recording.run_id,
+            result.recording.status,
+            printable(
+                result
+                    .recording
+                    .diagnostic
+                    .as_deref()
+                    .unwrap_or("recording incomplete")
+            )
+        ),
+    }
+}
 async fn interactive_loop() -> Result<(), Box<dyn std::error::Error>> {
     if !console::interactive_available() {
         return Err(
@@ -384,6 +445,7 @@ async fn conversation_loop(
         let mut permissions = TerminalPermission {
             requests: permission_sender,
         };
+        let observability = observability_options_at(model_directory, None)?;
         let session = sessions.take_active();
         let result = drive_run(
             runtime::run_in_session(
@@ -391,6 +453,7 @@ async fn conversation_loop(
                 tools,
                 &mut permissions,
                 RunConfig {
+                    observability,
                     model: model.clone(),
                     task,
                     max_model_calls,
@@ -409,7 +472,10 @@ async fn conversation_loop(
         .await;
         drop(console);
         match result {
-            Ok(result) => sessions.complete(result),
+            Ok(result) => {
+                recording_notice(&result);
+                sessions.complete(result)
+            }
             Err(error) => match error.downcast::<runtime::SessionStartError>() {
                 Ok(error) => {
                     eprintln!(
@@ -432,6 +498,77 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         None => return interactive_loop().await,
     };
     match command {
+        Commands::Settings { command } => {
+            let path = directory.join("settings.json");
+            let (mut settings, mut exists) = observability::Settings::load_with_source(&path)?;
+            if let Some(SettingsCommand::Set { value, .. }) = command {
+                settings.observability = value;
+                settings.save(&path)?;
+                exists = true;
+            }
+            let (value, source) = settings.resolve(None, exists);
+            println!(
+                "observability: {value} ({source})\nsettings: {}\ntraces: {}\nChanges affect future runs; existing traces are retained.",
+                path.display(),
+                directory.join("traces").display()
+            );
+        }
+        Commands::Trace { run_id } => {
+            let store = directory.join("traces");
+            if let Some(id) = run_id {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &observability::read_trace(&store, &id)?.summary()
+                    )?
+                );
+            } else {
+                let paths = observability::list_traces(&store)?;
+                if paths.is_empty() {
+                    println!("No retained traces. Observability defaults to off.");
+                }
+                for path in paths {
+                    let id = path
+                        .file_stem()
+                        .and_then(|v| v.to_str())
+                        .ok_or("invalid trace filename")?;
+                    match observability::read_trace(&store, id) {
+                        Ok(trace) => {
+                            let s = trace.summary();
+                            println!(
+                                "{}  {}  {}  {}",
+                                s.run_id,
+                                if s.complete { "complete" } else { "incomplete" },
+                                printable(s.model.as_deref().unwrap_or("model unavailable")),
+                                s.outcome.unwrap_or_else(|| "outcome unavailable".into())
+                            );
+                        }
+                        Err(e) => eprintln!("{}: {}", printable(id), printable(&e.to_string())),
+                    }
+                }
+            }
+        }
+        Commands::Stats => {
+            let store = directory.join("traces");
+            let mut stats = observability::Stats::default();
+            for path in observability::list_traces(&store)? {
+                let id = path
+                    .file_stem()
+                    .and_then(|v| v.to_str())
+                    .ok_or("invalid trace filename")?;
+                match observability::read_trace(&store, id) {
+                    Ok(trace) => stats.add(&trace.summary()),
+                    Err(e) => {
+                        stats.unreadable_traces += 1;
+                        eprintln!("{}: {}", printable(id), printable(&e.to_string()));
+                    }
+                }
+            }
+            println!("{}", serde_json::to_string_pretty(&stats)?);
+            println!(
+                "Known totals only; cached tokens are a subset of input. Cost and unrecorded runs are unavailable."
+            );
+        }
         Commands::Exit => return Ok(()),
         Commands::Login => {
             auth::login(&directory,|url| {
@@ -466,6 +603,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Run {
+            observability,
             task,
             model,
             max_model_calls,
@@ -481,6 +619,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             summary_bytes,
             context_policy,
         } => {
+            let observability = observability_options(observability)?;
             let context_budget = astrid::context::ContextBudget {
                 estimated_context_tokens: context_tokens,
                 response_reserve_tokens: response_reserve,
@@ -525,6 +664,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 &tools,
                 &mut permissions,
                 RunConfig {
+                    observability,
                     context_budget: Some(context_budget),
                     model,
                     task,
@@ -542,6 +682,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 &mut console,
             )
             .await?;
+            recording_notice(&result);
             match result.outcome {
                 RunOutcome::Completed=>{},
                 RunOutcome::Cancelled=>return Err("run cancelled".into()),

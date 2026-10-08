@@ -8,6 +8,7 @@ pub mod context;
 pub mod events;
 pub mod model;
 pub mod native;
+pub mod observability;
 pub mod openai;
 pub mod output;
 pub mod permissions;
