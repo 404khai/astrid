@@ -54,6 +54,7 @@ impl ModelProvider for Script {
 }
 fn config(policy: PermissionPolicy) -> RunConfig {
     RunConfig {
+        observability: None,
         context_budget: None,
         model: "fixture".into(),
         task: "environment acceptance".into(),

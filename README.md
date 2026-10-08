@@ -335,3 +335,49 @@ red. Set `NO_COLOR=1` for plain text. Redirected output stays plain.
 The previous fixed header/footer viewport is available with
 `ASTRID_FIXED_VIEWPORT=1`; its scroll region can prevent normal transcript
 scrollback, so it is no longer the default.
+
+
+## Optional observability
+
+```sh
+astrid settings
+astrid settings set observability on
+astrid run "inspect the failing test" --model <model>
+astrid run "task" --model <model> --observability off
+astrid trace
+astrid trace <run-id>
+astrid stats
+astrid settings set observability off
+```
+
+Observability defaults to off. A run flag overrides the persistent user setting;
+settings changes affect subsequent runs. Both one-shot and interactive runs use
+the same runtime recorder. Disabling recording preserves execution events,
+permissions, cancellation and context budgets, and retains existing trace files.
+Invalid settings fail explicitly, including when a run flag is present.
+
+Settings live in `~/.config/astrid/settings.json`; traces in
+`~/.config/astrid/traces/`, with private file/directory permissions. Traces contain
+correlated execution metadata, operation timings, numeric context accounting and
+provider-reported usage where available. They omit task/response text, file paths,
+tool arguments/results, summaries and private provider continuation. They cannot
+resume sessions or replay the full conversation.
+
+`trace <run-id>` prints a JSON summary. Timing names are explicit: inclusive
+runtime call duration, adapter preparation/authentication/provider attempt, first
+visible text, delivery waiting, and tool execution. Permission waiting is separate.
+These are overlapping intervals; do not sum them into total elapsed time. True
+first-token latency, prefill/decode rates and subscription monetary cost remain
+unavailable. Missing usage is `null`; reported zero is zero. `stats` reports known
+sums with reporting-call coverage; cached tokens are a subset of input tokens.
+Unrecorded runs are unknown, and incomplete/unreadable traces are counted separately.
+
+The recorder bounds its queue (256 records), each record (16 KiB), each run
+(8 MiB), and the store (256 MiB, at most 4,096 directory entries including reserved
+publication slots). It stops recording at limits or writer failure, reports
+incomplete/unavailable recording independently of the run outcome, and never
+silently deletes old traces. Finalization waits at most 250 ms by default. Partial
+files remain inspectable; a complete trace has a terminal event, valid sequence,
+footer and published `.jsonl` filename. See [Phase 4 evidence](docs/reviews/phase-4.md)
+and accepted [ADR 0008](docs/adr/0008-observability-control.md) /
+[ADR 0009](docs/adr/0009-persistent-trace-contract.md).

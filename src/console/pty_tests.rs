@@ -437,6 +437,7 @@ fn pty_child() {
             &tools,
             &mut permissions,
             astrid::runtime::RunConfig {
+                observability: None,
                 model: "fixture".into(),
                 task: "PTY fixture".into(),
                 max_model_calls: 3,

@@ -1309,7 +1309,7 @@ It is not sacred.
 Current phase:
 
 ```text
-Phase 3 — Context Engine
+Phase 4 — Trace and Inference Observability
 ```
 
 Phase 3 was authorized by the maintainer on 2026-10-07 with the instruction to
@@ -1322,7 +1322,12 @@ The maintainer subsequently accepted both recommended context contracts on
 (ADR 0006), and deterministic incomplete compaction (ADR 0007). The previous
 phase's separate closure disposition remains pending.
 
-Unless the user explicitly changes this value, implementation should remain within Phase 3.
+Phase 4 and ADRs 0008/0009 were authorized by the maintainer on 2026-10-08:
+"Implement the observability and its related adrs 8 & 9". This explicitly advances
+implementation scope without inventing separate closure dispositions for Phases
+2 or 3; those remain pending. See docs/plans/phase-4.md and docs/reviews/phase-4.md.
+
+Unless the user explicitly changes this value, implementation should remain within Phase 4.
 
 ---
 
