@@ -10,6 +10,7 @@ use std::{
 
 use crate::{
     auth::Authentication,
+    context::{ContextMeasurement, ContextSnapshot, ContextSource},
     model::{Message, ModelError, ModelProvider, ModelRequest, ModelResponse, TextSink, ToolCall},
     tools,
 };
@@ -50,6 +51,7 @@ impl OpenAiProvider {
         for message in request.messages {
             match message {
                 Message::User(text) => input.push(json!({"role":"user","content":text})),
+                Message::Summary(text) => input.push(json!({"role":"user","content":text})),
                 Message::Assistant(response) => input.extend(response.continuation.0.iter().cloned()),
                 Message::Tool(result) => input.push(json!({"type":"function_call_output","call_id":result.call_id,"output":serde_json::to_string(&result.outcome).expect("JSON tool outcome is serializable")})),
             }
@@ -59,15 +61,116 @@ impl OpenAiProvider {
             "store":false,"stream":true,"include":["reasoning.encrypted_content"],
             "tools":[{"type":"namespace","name":"astrid","description":"Astrid workspace tools", "tools":tools::definitions()}]})
     }
+
+    fn snapshot(body: &Value, request: &ModelRequest<'_>) -> ContextSnapshot {
+        use ContextSource::*;
+        let mut measurements = [
+            Instructions,
+            UserMessages,
+            AssistantContinuation,
+            ToolResults,
+            ToolDefinitions,
+            RequestFraming,
+            Summary,
+        ]
+        .map(|source| ContextMeasurement {
+            source,
+            entries: 0,
+            serialized_bytes: 0,
+            contains_opaque_data: false,
+        });
+        measurements[0].entries = 1;
+        measurements[0].serialized_bytes = serialized_bytes(&body["instructions"]);
+        measurements[4].entries = 1;
+        measurements[4].serialized_bytes = serialized_bytes(&body["tools"]);
+        let mut summary_positions = HashSet::new();
+        let mut position = 0;
+        for message in request.messages {
+            if matches!(message, Message::Summary(_)) {
+                summary_positions.insert(position);
+            }
+            position += match message {
+                Message::Assistant(response) => response.continuation.0.len(),
+                _ => 1,
+            };
+        }
+        for (position, item) in body["input"]
+            .as_array()
+            .expect("adapter constructs input array")
+            .iter()
+            .enumerate()
+        {
+            let index = if summary_positions.contains(&position) {
+                6
+            } else if item["role"] == "user" {
+                1
+            } else if item["type"] == "function_call_output" {
+                3
+            } else {
+                2
+            };
+            measurements[index].entries += 1;
+            measurements[index].serialized_bytes += serialized_bytes(item);
+            // Reasoning is provider-private. Its wire size cannot reveal context cost.
+            measurements[index].contains_opaque_data |= item["type"] == "reasoning";
+        }
+        let serialized_request_bytes = serialized_bytes(body);
+        measurements[5].entries = 1;
+        measurements[5].serialized_bytes = serialized_request_bytes
+            - measurements
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != 5)
+                .map(|(_, m)| m)
+                .map(|m| m.serialized_bytes)
+                .sum::<usize>();
+        let non_opaque_bytes = measurements
+            .iter()
+            .filter(|m| !m.contains_opaque_data)
+            .map(|m| m.serialized_bytes)
+            .sum::<usize>();
+        ContextSnapshot {
+            measurements: measurements.into(),
+            serialized_request_bytes,
+            non_opaque_json_size_token_heuristic: non_opaque_bytes.div_ceil(4),
+            provider_input_tokens: None,
+        }
+    }
+}
+
+/// Count UTF-8 JSON output without allocating another serialized prompt copy.
+fn serialized_bytes(value: &Value) -> usize {
+    struct Counter(usize);
+    impl std::io::Write for Counter {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 += bytes.len();
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut counter = Counter(0);
+    serde_json::to_writer(&mut counter, value).expect("JSON value serialization is infallible");
+    counter.0
 }
 
 #[async_trait]
 impl ModelProvider for OpenAiProvider {
+    fn measure_request(
+        &self,
+        request: &ModelRequest<'_>,
+    ) -> Result<Option<ContextSnapshot>, ModelError> {
+        Ok(Some(Self::snapshot(&Self::body(request), request)))
+    }
     async fn generate(
         &self,
         request: &ModelRequest<'_>,
         text: &mut dyn TextSink,
     ) -> Result<ModelResponse, ModelError> {
+        let body = Self::body(request);
+        text.request_prepared(Self::snapshot(&body, request))
+            .await?;
         let token = self
             .auth
             .bearer_token()
@@ -78,7 +181,7 @@ impl ModelProvider for OpenAiProvider {
             .post(&self.endpoint)
             .bearer_auth(token.as_str())
             .header(reqwest::header::ACCEPT, "text/event-stream")
-            .json(&Self::body(request))
+            .json(&body)
             .send()
             .await?;
         if !response.status().is_success() {

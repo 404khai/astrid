@@ -1309,10 +1309,20 @@ It is not sacred.
 Current phase:
 
 ```text
-Phase 2 — Execution Environment
+Phase 3 — Context Engine
 ```
 
-Unless the user explicitly changes this value, implementation should remain within Phase 2.
+Phase 3 was authorized by the maintainer on 2026-10-07 with the instruction to
+critique its plan using an adversarial model, then begin implementation. This
+authorization does not resolve the open design questions in docs/plans/phase-3.md
+or supply a separate Phase 2 closure decision.
+
+The maintainer subsequently accepted both recommended context contracts on
+2026-10-07: estimated admission plus a byte ceiling and whole-exchange selection
+(ADR 0006), and deterministic incomplete compaction (ADR 0007). The previous
+phase's separate closure disposition remains pending.
+
+Unless the user explicitly changes this value, implementation should remain within Phase 3.
 
 ---
 

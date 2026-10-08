@@ -237,3 +237,15 @@ permissions to explicit per-run policies with the same defaults;
 [ADR 0005](0005-workspace-change-evidence.md) adds bounded workspace evidence
 without changing invocation-directory scope. Final bounded observation after
 cancellation is bookkeeping, not permission to dispatch new task work.
+
+## Phase 3 amendments (2026-10-07)
+
+The historical Phase 1 no-context-engine scope is extended by accepted
+[ADR 0006](0006-context-admission-and-selection.md) and
+[ADR 0007](0007-context-compaction.md). Budgeted runs send selected complete
+exchanges rather than necessarily all retained history. Source/selection/prepared
+metadata and bounded visible summary task data participate in the existing
+checked event stream. Private provider continuation remains internal. Rejected
+preflight does not start/count a model call; deterministic summaries add no model
+invocations. Permissions, terminal outcomes, cancellation acknowledgement, and
+global tool-call-ID validation are preserved.

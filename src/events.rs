@@ -52,6 +52,12 @@ impl Status {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventKind {
+    ContextSelected {
+        selection: crate::context::ContextSelection,
+    },
+    ContextItemAdded {
+        item: crate::context::ContextItem,
+    },
     RunStarted {
         task: String,
         model: String,
@@ -75,6 +81,9 @@ pub enum EventKind {
     },
     ModelCallStarted {
         number: usize,
+    },
+    ContextPrepared {
+        snapshot: crate::context::ContextSnapshot,
     },
     ModelFirstTextDelta,
     ModelTextDelta {
@@ -163,12 +172,14 @@ pub struct ExecutionEvent {
 pub struct TurnState {
     pub status: Status,
     pub number: usize,
+    pub context_selected: bool,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelState {
     pub status: Status,
     pub turn_id: TurnId,
     pub first_text: bool,
+    pub context: Option<crate::context::ContextSnapshot>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolState {
@@ -194,6 +205,8 @@ pub struct ExecutionState {
     pub permission_policy: Option<PermissionPolicy>,
     pub workspace_baseline: Option<GitState>,
     pub workspace_changes: Option<WorkspaceReport>,
+    pub context_items: Vec<crate::context::ContextItem>,
+    pub context_selection: Option<crate::context::ContextSelection>,
 }
 /// Internal transition request; runtime state changes before an event envelope
 /// is constructed. Event replay is only a consumer/validation facility.
@@ -225,6 +238,8 @@ impl ExecutionState {
             permission_policy: None,
             workspace_baseline: None,
             workspace_changes: None,
+            context_items: Vec::new(),
+            context_selection: None,
         }
     }
     /// Validate on a copy so rejected transitions cannot partially change state.
@@ -286,6 +301,66 @@ impl ExecutionState {
             require(Some(t.turn_id) == e.turn_id && Some(t.model_call_id) == e.model_call_id)?;
         }
         match &e.kind {
+            EventKind::ContextItemAdded { item } => {
+                use crate::context::ContextOrigin;
+                require(item.id.0 == self.context_items.len())?;
+                require(!item.added_reason.is_empty())?;
+                let is_message = matches!(
+                    item.origin,
+                    ContextOrigin::UserTask
+                        | ContextOrigin::Assistant { .. }
+                        | ContextOrigin::ToolResult { .. }
+                );
+                let next_message = self
+                    .context_items
+                    .iter()
+                    .filter(|item| item.message_index.is_some())
+                    .count();
+                require(item.message_index == is_message.then_some(next_message))?;
+                require(
+                    !self
+                        .context_items
+                        .iter()
+                        .any(|existing| existing.origin == item.origin),
+                )?;
+                match &item.origin {
+                    ContextOrigin::OperatingInstructions
+                    | ContextOrigin::RepositoryInstructions { .. }
+                    | ContextOrigin::UserTask => {
+                        require(
+                            e.turn_id.is_none()
+                                && e.model_call_id.is_none()
+                                && e.tool_call_id.is_none()
+                                && self.turns.is_empty(),
+                        )?;
+                    }
+                    ContextOrigin::Assistant { model_call_id } => {
+                        require(
+                            e.model_call_id == Some(*model_call_id) && e.tool_call_id.is_none(),
+                        )?;
+                        require(self.models[model_call_id].status == Status::Completed)?;
+                    }
+                    ContextOrigin::ToolResult {
+                        model_call_id,
+                        tool_call_id,
+                        requested_path,
+                        path_truncated,
+                    } => {
+                        require(
+                            e.model_call_id == Some(*model_call_id)
+                                && e.tool_call_id == Some(*tool_call_id),
+                        )?;
+                        require(matches!(
+                            self.tools[tool_call_id].status,
+                            Status::Completed | Status::Failed | Status::Denied | Status::TimedOut
+                        ))?;
+                        require(
+                            crate::context::requested_path(&self.tools[tool_call_id].call)
+                                == (requested_path.clone(), *path_truncated),
+                        )?;
+                    }
+                }
+            }
             EventKind::RunStarted { .. }
             | EventKind::PermissionsConfigured { .. }
             | EventKind::WorkspaceBaseline { .. }
@@ -296,13 +371,14 @@ impl ExecutionState {
             | EventKind::ModelCallLimitReached { .. } => require(
                 e.turn_id.is_none() && e.model_call_id.is_none() && e.tool_call_id.is_none(),
             )?,
-            EventKind::TurnStarted { .. } => require(
+            EventKind::TurnStarted { .. } | EventKind::ContextSelected { .. } => require(
                 e.turn_id.is_some() && e.model_call_id.is_none() && e.tool_call_id.is_none(),
             )?,
             EventKind::TurnCompleted | EventKind::TurnFailed { .. } | EventKind::TurnCancelled => {
                 require(e.turn_id.is_some() && e.tool_call_id.is_none())?
             }
             EventKind::ModelCallStarted { .. }
+            | EventKind::ContextPrepared { .. }
             | EventKind::ModelFirstTextDelta
             | EventKind::ModelTextDelta { .. }
             | EventKind::ModelCallCompleted { .. }
@@ -331,6 +407,86 @@ impl ExecutionState {
                 .ok_or_else(|| TransitionError("missing tool ID".into()))
         };
         match &e.kind {
+            EventKind::ContextSelected { selection } => {
+                require(!self.turns[&turn()?].context_selected)?;
+                require(
+                    self.turns[&turn()?].status == Status::Running
+                        && !self.cancellation_acknowledged,
+                )?;
+                require(
+                    !self
+                        .models
+                        .values()
+                        .any(|model| model.turn_id == turn().unwrap()),
+                )?;
+                require(selection.budget.admits(&selection.snapshot))?;
+                require(selection.decisions.len() == self.context_items.len())?;
+                require(selection.decisions.iter().zip(&self.context_items).all(
+                    |(decision, item)| decision.item_id == item.id && !decision.reason.is_empty(),
+                ))?;
+                let mut exchange_retention = BTreeMap::new();
+                require(selection.decisions.iter().zip(&self.context_items).all(
+                    |(decision, item)| {
+                        let model = match item.origin {
+                            crate::context::ContextOrigin::Assistant { model_call_id }
+                            | crate::context::ContextOrigin::ToolResult { model_call_id, .. } => {
+                                Some(model_call_id)
+                            }
+                            _ => None,
+                        };
+                        model.is_none_or(|model| {
+                            exchange_retention
+                                .insert(model, decision.retained)
+                                .is_none_or(|previous| previous == decision.retained)
+                        })
+                    },
+                ))?;
+                let latest = self.context_items.iter().rev().find_map(|item| {
+                    if let crate::context::ContextOrigin::Assistant { model_call_id } = item.origin
+                    {
+                        Some(model_call_id)
+                    } else {
+                        None
+                    }
+                });
+                require(selection.decisions.iter().zip(&self.context_items).all(
+                    |(decision, item)| {
+                        let protected = match item.origin {
+                            crate::context::ContextOrigin::OperatingInstructions
+                            | crate::context::ContextOrigin::RepositoryInstructions { .. }
+                            | crate::context::ContextOrigin::UserTask => true,
+                            crate::context::ContextOrigin::Assistant { model_call_id }
+                            | crate::context::ContextOrigin::ToolResult { model_call_id, .. } => {
+                                Some(model_call_id) == latest
+                            }
+                        };
+                        !protected || decision.retained
+                    },
+                ))?;
+                if let Some(summary) = &selection.summary {
+                    let omitted = selection
+                        .decisions
+                        .iter()
+                        .filter(|decision| !decision.retained)
+                        .map(|decision| decision.item_id)
+                        .collect::<Vec<_>>();
+                    require(
+                        summary.incomplete
+                            && !omitted.is_empty()
+                            && summary.source_items == omitted
+                            && summary.text_bytes == summary.text.len()
+                            && summary.text_bytes <= selection.budget.max_summary_bytes,
+                    )?;
+                }
+                self.turns
+                    .get_mut(&turn()?)
+                    .expect("known turn")
+                    .context_selected = true;
+                self.context_selection = Some(selection.clone());
+            }
+            EventKind::ContextItemAdded { item } => {
+                self.context_items.push(item.clone());
+            }
             EventKind::RunStarted { .. } => {
                 require(self.status == Status::Pending && e.turn_id.is_none())?;
                 self.status = Status::Running;
@@ -372,6 +528,7 @@ impl ExecutionState {
                     TurnState {
                         status: Status::Running,
                         number: *number,
+                        context_selected: false,
                     },
                 );
             }
@@ -389,8 +546,26 @@ impl ExecutionState {
                         status: Status::Running,
                         turn_id: turn()?,
                         first_text: false,
+                        context: None,
                     },
                 );
+            }
+            EventKind::ContextPrepared { snapshot } => {
+                if self.turns[&turn()?].context_selected {
+                    require(
+                        self.context_selection
+                            .as_ref()
+                            .is_some_and(|selection| &selection.snapshot == snapshot),
+                    )?;
+                }
+                let m = self.models.get_mut(&model()?).expect("known model");
+                require(
+                    m.status == Status::Running
+                        && !m.first_text
+                        && m.context.is_none()
+                        && !self.cancellation_acknowledged,
+                )?;
+                m.context = Some(snapshot.clone());
             }
             EventKind::ModelFirstTextDelta
             | EventKind::ModelTextDelta { .. }

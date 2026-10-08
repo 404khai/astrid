@@ -1,4 +1,49 @@
-# Phase 2 architecture
+# Runtime architecture
+
+Phase 3 adds an explicit context subsystem. Session retains original messages
+and a source ledger with stable item IDs, history indices, model/tool provenance,
+and addition reasons. Operating and repository guidance have separate source
+identities. Native requested-path labels are bounded metadata, not successful-read
+or freshness claims. ContextItemAdded records these origins through the existing
+runtime transition boundary.
+
+Before each budgeted invocation, pure adapter accounting measures a selected
+candidate, including instructions, tool definitions, JSON outcomes, framing, and
+private continuation. ContextBudget applies a labeled non-opaque JSON bytes/4
+heuristic (with configured response planning reserve) and an independent exact
+serialized-byte ceiling. Unknown provider input tokens stay unavailable; reasoning
+causes the whole assistant category to be excluded from the heuristic while all
+its bytes remain in the exact ceiling. No guaranteed provider fit is claimed.
+
+ContextSelection protects instructions, task, and the latest complete exchange.
+Older assistant/continuation/tool-outcome exchanges are indivisible. The configured
+policy ranks them by recency or file-reference/lexical signals then recency. Omitted
+history can contribute one bounded deterministic summary of visible task data,
+status, requested path, coverage/truncation warnings, and excerpts. Summary text
+and source lineage are inspectable and explicitly incomplete/stale; no private
+reasoning is summarized and no summary inference or tool execution occurs.
+
+Preparation is separate from commit. Cancellation before selection commit leaves
+the previous selection unchanged. If summary text cannot fit, the valid candidate
+without a summary remains usable; protected overflow fails before allocating the
+next model ID/invocation count. ContextSelected commits retention/removal reasons
+and optional compaction atomically. Replay checks protection, exchange closure,
+lineage/bounds, and at most one selection per turn. Session/state/events match.
+
+The OpenAI adapter then prepares one dispatch body, counts it using a writer that
+does not allocate another serialized prompt, and publishes ContextPrepared before
+authentication/HTTP. The runtime rejects accounting drift against preflight before
+dispatch. Preparation is not proof of dispatch. Existing event backpressure and
+cancellation ordering remain; stalled publication can cancel before auth/HTTP.
+Seven aggregate categories contain only counts/sizes, never private continuation.
+`--show-context` renders source, selection, summary, and request metadata.
+
+Library callers may explicitly disable budgeting with `context_budget: None`.
+Budgeted providers must implement pure request accounting; otherwise preflight
+fails explicitly. No persistence, total retained-history/model-output memory bound,
+or immediate interruption of synchronous serialization is introduced. See
+[the Phase 3 plan](plans/phase-3.md), [ADR 0006](adr/0006-context-admission-and-selection.md),
+and [ADR 0007](adr/0007-context-compaction.md).
 
 One Cargo package contains a library and CLI binary. Sessions remain ephemeral;
 tools remain sequential; OpenAI remains the only provider.
@@ -18,8 +63,8 @@ CLI: config, event rendering, Ctrl-C, cancellable terminal permission input
 
 ## Model and conversation boundary
 
-`Message` distinguishes the user request, completed assistant responses, and
-tool results. `ModelRequest` carries the configured model, instructions, and
+`Message` distinguishes the user request, deterministic summary task data,
+completed assistant responses, and tool results. `ModelRequest` carries the configured model, instructions, and
 message history. `ModelResponse` contains assistant text, requested tools, and
 opaque continuation data owned by the OpenAI adapter.
 

@@ -60,6 +60,22 @@ enum Commands {
             help = "Shell authority: allow grants broad account-level execution"
         )]
         shell_policy: PermissionAction,
+        #[arg(long, help = "Show prepared request sizes and token-count uncertainty")]
+        show_context: bool,
+        #[arg(long, default_value = "32768", value_parser = positive, help = "Estimated context allowance; not the model's known capacity")]
+        context_tokens: usize,
+        #[arg(
+            long,
+            default_value = "4096",
+            help = "Planning reserve; does not enforce provider output length"
+        )]
+        response_reserve: usize,
+        #[arg(long, default_value = "524288", value_parser = positive)]
+        context_bytes: usize,
+        #[arg(long, default_value = "4096", value_parser = positive)]
+        summary_bytes: usize,
+        #[arg(long, value_enum, default_value = "file-references")]
+        context_policy: astrid::context::SelectionPolicy,
     },
 }
 
@@ -280,7 +296,26 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             read_policy,
             write_policy,
             shell_policy,
+            show_context,
+            context_tokens,
+            response_reserve,
+            context_bytes,
+            summary_bytes,
+            context_policy,
         } => {
+            let context_budget = astrid::context::ContextBudget {
+                estimated_context_tokens: context_tokens,
+                response_reserve_tokens: response_reserve,
+                max_request_bytes: context_bytes,
+                max_summary_bytes: summary_bytes,
+                policy: context_policy,
+            };
+            if !context_budget.validate() {
+                return Err(
+                    "context allowance must exceed the response reserve, with positive byte limits"
+                        .into(),
+                );
+            }
             let workspace = Workspace::new(std::env::current_dir()?)?;
             if directory.starts_with(workspace.root()) {
                 return Err(
@@ -292,6 +327,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             let tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
             let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
             let mut console = Console::new(&model, tools.workspace(), !interactive)?;
+            console.show_context = show_context;
             let cancel = Cancellation::default();
             let (sender, mut receiver) = tokio::sync::mpsc::channel(64);
             let (permission_sender, mut permission_receiver) =
@@ -314,6 +350,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 &tools,
                 &mut permissions,
                 RunConfig {
+                    context_budget: Some(context_budget),
                     model,
                     task,
                     max_model_calls,
@@ -401,6 +438,53 @@ mod tests {
             Cli::try_parse_from(["astrid", "models"]).unwrap().command,
             Some(Commands::Models)
         ));
+    }
+
+    #[test]
+    fn context_flags_expose_estimates_and_reject_zero_limits() {
+        let parsed = Cli::try_parse_from([
+            "astrid",
+            "run",
+            "task",
+            "--model",
+            "test",
+            "--context-tokens",
+            "8192",
+            "--response-reserve",
+            "1024",
+            "--context-bytes",
+            "65536",
+            "--summary-bytes",
+            "512",
+            "--context-policy",
+            "recency",
+            "--show-context",
+        ])
+        .unwrap();
+        assert!(matches!(
+            parsed.command,
+            Some(Commands::Run {
+                context_tokens: 8192,
+                response_reserve: 1024,
+                context_bytes: 65536,
+                summary_bytes: 512,
+                context_policy: astrid::context::SelectionPolicy::Recency,
+                show_context: true,
+                ..
+            })
+        ));
+        assert!(
+            Cli::try_parse_from([
+                "astrid",
+                "run",
+                "task",
+                "--model",
+                "test",
+                "--context-bytes",
+                "0"
+            ])
+            .is_err()
+        );
     }
     #[test]
     fn cli_permission_policies_are_explicit_and_reject_unenforceable_options() {

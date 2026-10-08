@@ -11,3 +11,5 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0003](0003-bounded-tool-output.md) | Bounded tool output and cleanup under backpressure | Accepted | Implemented |
 | [0004](0004-execution-authority.md) | Permission policy and execution authority | Accepted | Implemented |
 | [0005](0005-workspace-change-evidence.md) | Git baseline and workspace change evidence | Accepted | Implemented |
+| [0006](0006-context-admission-and-selection.md) | Estimated context admission and whole-exchange selection | Accepted | Implemented |
+| [0007](0007-context-compaction.md) | Deterministic compaction before model summaries | Accepted | Implemented |

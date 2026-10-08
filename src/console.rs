@@ -740,6 +740,7 @@ fn terminal_size() -> Option<(usize, usize)> {
 }
 
 pub struct Console {
+    pub show_context: bool,
     identity: Identity,
     screen: Option<Screen>,
     color: bool,
@@ -763,6 +764,7 @@ impl Console {
             && std::env::var("TERM").is_ok_and(|term| term != "dumb");
         let identity = identity(model, workspace);
         let mut console = Self {
+            show_context: false,
             identity,
             color: terminal
                 && std::env::var_os("NO_COLOR").is_none()
@@ -881,6 +883,19 @@ impl Console {
             EventKind::ModelCallStarted { number } => {
                 self.model_calls = *number;
                 self.state = "model";
+            }
+            EventKind::ContextPrepared { snapshot } if self.show_context => {
+                for line in snapshot.inspection_lines() {
+                    self.line(&line, Ink::Normal)?;
+                }
+            }
+            EventKind::ContextItemAdded { item } if self.show_context => {
+                self.line(&item.inspection_line(), Ink::Normal)?;
+            }
+            EventKind::ContextSelected { selection } if self.show_context => {
+                for line in selection.inspection_lines() {
+                    self.line(&line, Ink::Normal)?;
+                }
             }
             EventKind::ModelTextDelta { text } => {
                 self.emit(text, Ink::Reply, true)?;

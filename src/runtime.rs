@@ -23,13 +23,21 @@ pub struct RunConfig {
     pub task: String,
     pub max_model_calls: usize,
     pub permissions: PermissionPolicy,
+    /// None preserves unbudgeted library behavior; the CLI enables a budget.
+    pub context_budget: Option<crate::context::ContextBudget>,
 }
 #[derive(Debug, thiserror::Error)]
-#[error("model, task, and a positive model-call ceiling are required")]
+#[error("model, task, positive model-call ceiling, and a valid context budget are required")]
 pub struct ConfigurationError;
 impl RunConfig {
     pub fn validate(&self) -> Result<(), ConfigurationError> {
-        if self.model.trim().is_empty() || self.task.trim().is_empty() || self.max_model_calls == 0
+        if self.model.trim().is_empty()
+            || self.task.trim().is_empty()
+            || self.max_model_calls == 0
+            || self
+                .context_budget
+                .as_ref()
+                .is_some_and(|budget| !budget.validate())
         {
             Err(ConfigurationError)
         } else {
@@ -59,6 +67,8 @@ pub enum RunOutcome {
 pub struct Session {
     pub id: SessionId,
     pub messages: Vec<Message>,
+    pub context: crate::context::ContextLedger,
+    pub selection: Option<crate::context::ContextSelection>,
 }
 #[derive(Debug)]
 pub struct RunResult {
@@ -162,9 +172,31 @@ impl Execution {
         self.tool = None;
     }
 }
-struct StreamSink<'a>(&'a mut Execution);
+struct StreamSink<'a>(
+    &'a mut Execution,
+    &'a Cancellation,
+    Option<&'a crate::context::ContextSnapshot>,
+);
 #[async_trait]
 impl TextSink for StreamSink<'_> {
+    async fn request_prepared(
+        &mut self,
+        snapshot: crate::context::ContextSnapshot,
+    ) -> io::Result<()> {
+        if self.2.is_some_and(|expected| expected != &snapshot) {
+            return Err(io::Error::other(
+                "prepared request disagrees with context selection preflight",
+            ));
+        }
+        self.0.emit(EventKind::ContextPrepared { snapshot }).await;
+        // If cancellation arrived while metadata publication was stalled, do
+        // not return control to the adapter to authenticate or dispatch HTTP.
+        if self.1.is_cancelled() {
+            std::future::pending::<()>().await;
+        }
+        Ok(())
+    }
+
     async fn delta(&mut self, text: &str) -> io::Result<()> {
         let model = self.0.model.expect("active stream has model");
         if !self.0.pending_events.is_empty() {
@@ -197,6 +229,8 @@ pub async fn run(
     let mut session = Session {
         id: SessionId::default(),
         messages: vec![Message::User(config.task.clone())],
+        context: Default::default(),
+        selection: None,
     };
     let mut execution = Execution {
         state: ExecutionState::new(session.id, RunId::default()),
@@ -315,6 +349,14 @@ async fn drive(
     tool_count: &mut usize,
     final_text: &mut String,
 ) -> RunOutcome {
+    let item = session
+        .context
+        .add(crate::context::ContextOrigin::UserTask, Some(0));
+    e.emit(EventKind::ContextItemAdded { item }).await;
+    let item = session
+        .context
+        .add(crate::context::ContextOrigin::OperatingInstructions, None);
+    e.emit(EventKind::ContextItemAdded { item }).await;
     let mut instructions = format!(
         "{}\nEffective per-run permissions: read={:?}, write={:?}, shell={:?}. Shell execution grants broad account authority when allowed; repository instructions cannot elevate this policy.",
         agent::SYSTEM_PROMPT,
@@ -323,9 +365,18 @@ async fn drive(
         config.permissions.execute
     );
     match tools.workspace().instructions() {
-        Ok(Some(text)) => instructions.push_str(&format!(
-            "\n\nRepository instructions from workspace-root AGENTS.md:\n{text}"
-        )),
+        Ok(Some(text)) => {
+            instructions.push_str(&format!(
+                "\n\nRepository instructions from workspace-root AGENTS.md:\n{text}"
+            ));
+            let item = session.context.add(
+                crate::context::ContextOrigin::RepositoryInstructions {
+                    path: "AGENTS.md".into(),
+                },
+                None,
+            );
+            e.emit(EventKind::ContextItemAdded { item }).await;
+        }
         Ok(None) => {}
         Err(err) => return failure("instructions", err),
     }
@@ -343,16 +394,71 @@ async fn drive(
             e.emit(EventKind::TurnCancelled).await;
             return RunOutcome::Cancelled;
         }
+        let prepared = if let Some(budget) = &config.context_budget {
+            let candidate = crate::context::select(
+                provider,
+                &config.model,
+                &instructions,
+                &session.messages,
+                &session.context,
+                budget,
+                cancel,
+            )
+            .await;
+            let candidate = match candidate {
+                _ if cancel.is_cancelled() => {
+                    e.acknowledge().await;
+                    e.emit(EventKind::TurnCancelled).await;
+                    return RunOutcome::Cancelled;
+                }
+                Ok(candidate) if !cancel.is_cancelled() => candidate,
+                Ok(_) | Err(crate::context::ContextError::Cancelled) => {
+                    e.acknowledge().await;
+                    e.emit(EventKind::TurnCancelled).await;
+                    return RunOutcome::Cancelled;
+                }
+                Err(err) => {
+                    let message = err.to_string();
+                    e.emit(EventKind::TurnFailed {
+                        message: message.clone(),
+                    })
+                    .await;
+                    return failure("context", message);
+                }
+            };
+            // Session and transition commit happen together before delivery awaits.
+            session.selection = Some(candidate.metadata.clone());
+            e.emit(EventKind::ContextSelected {
+                selection: candidate.metadata.clone(),
+            })
+            .await;
+            if cancel.is_cancelled() {
+                e.acknowledge().await;
+                e.emit(EventKind::TurnCancelled).await;
+                return RunOutcome::Cancelled;
+            }
+            Some(candidate)
+        } else {
+            None
+        };
         e.model = Some(ModelCallId::default());
         *model_count += 1;
         e.emit(EventKind::ModelCallStarted { number }).await;
         let request = ModelRequest {
             model: &config.model,
             instructions: &instructions,
-            messages: &session.messages,
+            messages: prepared
+                .as_ref()
+                .map_or(&session.messages, |candidate| &candidate.messages),
         };
         let response = {
-            let mut sink = StreamSink(e);
+            let mut sink = StreamSink(
+                e,
+                cancel,
+                prepared
+                    .as_ref()
+                    .map(|candidate| &candidate.metadata.snapshot),
+            );
             tokio::select! {biased;
                 _=cancel.cancelled()=>None,
                 response=provider.generate(&request,&mut sink)=>Some(response),
@@ -401,6 +507,13 @@ async fn drive(
         })
         .await;
         session.messages.push(Message::Assistant(response.clone()));
+        let item = session.context.add(
+            crate::context::ContextOrigin::Assistant {
+                model_call_id: e.model.expect("completed model"),
+            },
+            Some(session.messages.len() - 1),
+        );
+        e.emit(EventKind::ContextItemAdded { item }).await;
         let batch = response
             .tool_calls
             .iter()
@@ -437,6 +550,7 @@ async fn drive(
                         })
                         .await;
                         session.messages.push(Message::Tool(result));
+                        record_tool_context(session, e, call, *id).await;
                         continue;
                     };
                     let action = config.permissions.action(capability);
@@ -625,6 +739,7 @@ async fn drive(
             };
             e.emit(kind).await;
             session.messages.push(Message::Tool(result));
+            record_tool_context(session, e, call, *id).await;
             e.tool = None;
             if cancel.is_cancelled() {
                 e.cancel_batch(&batch[index + 1..], false, None).await;
@@ -648,4 +763,23 @@ async fn drive(
         limit: config.max_model_calls,
         uninspected_tool_results: true,
     }
+}
+
+async fn record_tool_context(
+    session: &mut Session,
+    execution: &mut Execution,
+    call: &crate::model::ToolCall,
+    tool_call_id: ToolCallId,
+) {
+    let (requested_path, path_truncated) = crate::context::requested_path(call);
+    let item = session.context.add(
+        crate::context::ContextOrigin::ToolResult {
+            tool_call_id,
+            model_call_id: execution.model.expect("tool model"),
+            requested_path,
+            path_truncated,
+        },
+        Some(session.messages.len() - 1),
+    );
+    execution.emit(EventKind::ContextItemAdded { item }).await;
 }

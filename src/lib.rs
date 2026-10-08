@@ -4,6 +4,7 @@ pub mod agent;
 pub mod auth;
 pub mod cancellation;
 pub mod changes;
+pub mod context;
 pub mod events;
 pub mod model;
 pub mod native;

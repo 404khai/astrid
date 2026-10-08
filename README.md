@@ -4,6 +4,26 @@ Development planning: [phase review and delivery process](docs/development.md),
 [Phase 1 review](docs/reviews/phase-1.md), and
 [Phase 2 tickets](docs/plans/phase-2.md).
 
+Phase 3 implements [context accounting, selection, and compaction](docs/plans/phase-3.md).
+Use `astrid run "inspect this repository" --model <model-slug> --show-context`
+to see stable context item IDs/sources and each prepared request's serialized
+bytes by source, retention/removal reasons, and incomplete summary text/lineage.
+Provider token counts remain unavailable; the displayed non-opaque JSON size
+heuristic is not a full context total or guaranteed provider fit.
+
+The CLI protects instructions, your task, and the latest complete tool exchange.
+Older exchanges are selected with file-reference/lexical priority and recency,
+then omitted history can become one bounded deterministic summary. Defaults:
+32,768 estimated context units, 4,096 response-reserve units, 524,288 serialized
+request bytes, and 4,096 summary text bytes. Change them with `--context-tokens`,
+`--response-reserve`, `--context-bytes`, and `--summary-bytes`; compare policies
+with `--context-policy recency` or `--context-policy file-references`.
+
+If protected context exceeds the configured allowance, the run stops before the
+next model invocation. The response reserve is planning headroom, not an enforced
+provider output limit. Original ephemeral history remains retained; request
+selection does not bound all runtime memory or create persisted context.
+
 For hands-on checks, see [Try Phase 2](docs/testing-phase-2.md).
 
 An experimental Rust agent harness. Phase 2 provides a typed execution runtime
@@ -83,8 +103,7 @@ unavailable, rendering falls back to ordinary append-only text without cursor
 controls or colors. Assistant text continues to stream to stdout; concise tool
 activity, command output, and failures go to stderr. Operation approvals use
 `/dev/tty`, including the complete command and workspace, independently of
-redirected output. No telemetry, context budgets, or unsupported shortcuts are
-shown.
+redirected output. Context source/selection details are shown with `--show-context`.
 
 Every successful response without tool calls ends the task. Recoverable tool
 failures return to the model. Provider/protocol errors and an exhausted
@@ -148,7 +167,7 @@ record budget). Grep scans up to 1 MiB per file/16 MiB total and skips oversized
 16 KiB lines with explicit incomplete coverage. Large/deep inventories and
 nonrepresentable names cannot silently establish an empty search. Mutation
 inputs, repository instructions, model output, and total conversation/state
-memory do not acquire a context budget in this phase.
+memory remain separate from Phase 3's selected-request budget.
 
 Git observation reports branch/HEAD and staged, unstaged, and untracked paths.
 It disables optional index writes, fsmonitor, configured clean/process filters,

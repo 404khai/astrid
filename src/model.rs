@@ -9,6 +9,8 @@ use crate::openai::ResponseContinuation;
 #[derive(Debug, Clone)]
 pub enum Message {
     User(String),
+    /// Deterministic incomplete task data, never executable tool requests.
+    Summary(String),
     Assistant(ModelResponse),
     Tool(ToolResult),
 }
@@ -76,6 +78,14 @@ pub enum ModelError {
 
 #[async_trait]
 pub trait TextSink: Send {
+    /// Optional adapter-owned metadata for the exact prepared request, before dispatch.
+    async fn request_prepared(
+        &mut self,
+        _snapshot: crate::context::ContextSnapshot,
+    ) -> io::Result<()> {
+        Ok(())
+    }
+
     async fn delta(&mut self, text: &str) -> io::Result<()>;
 }
 
@@ -92,6 +102,14 @@ where
 /// A narrow seam for deterministic tests, not a universal provider abstraction.
 #[async_trait]
 pub trait ModelProvider: Send + Sync {
+    /// Pure preflight accounting; None means this provider cannot enforce a budget.
+    fn measure_request(
+        &self,
+        _request: &ModelRequest<'_>,
+    ) -> Result<Option<crate::context::ContextSnapshot>, ModelError> {
+        Ok(None)
+    }
+
     async fn generate(
         &self,
         request: &ModelRequest<'_>,
