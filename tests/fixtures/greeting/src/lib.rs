@@ -1,4 +1,5 @@
 pub fn greeting(name: &str) -> String {
+    let name = name.trim();
     format!("Hello, {}!", name)
 }
 
