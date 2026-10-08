@@ -251,3 +251,39 @@ The previous ANSI fixed viewport remains opt-in via `ASTRID_FIXED_VIEWPORT`;
 it retains canonical approval input and its oversized-approval fallback. Full-screen
 inspection is deferred; event projection and frame-relative widgets can be reused
 by a future adapter without modifying core execution.
+
+
+## Phase 4 observability boundary
+
+`RunConfig.observability: Option<observability::Options>` is explicit. `None`
+removes optional timing/usage collection and trace writes while leaving required
+execution events and context accounting intact. The CLI loads private user
+settings once per submitted task; the runtime has no terminal or config-file
+requirement. `RunResult.recording` describes recording separately from run outcome.
+
+Execution projects each checked event into allowlisted metadata before rendering
+or channel publication. Adapter-owned `TextSink` telemetry carries typed timing
+phases and validated optional usage without changing response completion/tool
+acceptance. Unknown provider identity remains unavailable. Provider continuation
+and credentials never enter the recorder. Context snapshots persist numeric
+request totals, local heuristic and numeric budget/selection counts, not sources,
+paths or summaries. Usage comes from the completed envelope only after response
+validation; malformed optional usage is unavailable with an invalid flag.
+
+A bounded nonblocking channel feeds one disk-worker thread per observed run.
+Overload stops recording instead of blocking execution. A nonblocking store lock
+serializes capacity checks and writes; contention may conservatively reject
+recording. An explicit unlock guard preserves lock release. Writer failures and
+finalization deadlines cannot change committed tool/run outcomes. A stuck OS disk
+syscall may leave the disk thread alive until the syscall returns; the runtime
+wait is bounded and does not attempt unsafe thread cancellation.
+
+Schema 1 JSONL headers/events/telemetry/footer are written into `.partial` files.
+After file sync, completion is published by a no-overwrite hard link to `.jsonl`
+and removal of the partial name. Readers bound bytes and records, require increasing
+sequences and monotonic offsets, reject unsupported schemas/unsafe run IDs/symlink
+files, and label valid crash prefixes incomplete. This is recording framing,
+not full ExecutionState replay, authenticated evidence or session recovery.
+Statistics disclose measurement coverage and preserve unavailable cost/rate facts.
+[ADR 0008](adr/0008-observability-control.md) and
+[ADR 0009](adr/0009-persistent-trace-contract.md) establish these boundaries.

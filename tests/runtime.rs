@@ -25,6 +25,7 @@ use tokio::sync::{Notify, mpsc};
 
 fn config(limit: usize) -> RunConfig {
     RunConfig {
+        observability: None,
         context_budget: None,
         model: "test-model".into(),
         task: "task".into(),

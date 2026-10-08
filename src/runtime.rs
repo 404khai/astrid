@@ -19,6 +19,8 @@ use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub struct RunConfig {
+    /// None disables optional telemetry/recording without suppressing core events.
+    pub observability: Option<crate::observability::Options>,
     pub model: String,
     pub task: String,
     pub max_model_calls: usize,
@@ -27,11 +29,14 @@ pub struct RunConfig {
     pub context_budget: Option<crate::context::ContextBudget>,
 }
 #[derive(Debug, thiserror::Error)]
-#[error("model, task, positive model-call ceiling, and a valid context budget are required")]
+#[error(
+    "model, task, positive model-call ceiling, valid context budget and observability limits are required"
+)]
 pub struct ConfigurationError;
 impl RunConfig {
     pub fn validate(&self) -> Result<(), ConfigurationError> {
-        if self.model.trim().is_empty()
+        if self.observability.as_ref().is_some_and(|o| !o.valid())
+            || self.model.trim().is_empty()
             || self.task.trim().is_empty()
             || self.max_model_calls == 0
             || self
@@ -127,6 +132,7 @@ pub struct SessionStartError {
 }
 #[derive(Debug)]
 pub struct RunResult {
+    pub recording: crate::observability::Report,
     pub outcome: RunOutcome,
     pub final_text: String,
     pub model_calls: usize,
@@ -137,6 +143,7 @@ pub struct RunResult {
 }
 
 struct Execution {
+    recorder: Option<crate::observability::Recorder>,
     state: ExecutionState,
     sender: Option<mpsc::Sender<ExecutionEvent>>,
     pending_events: VecDeque<ExecutionEvent>,
@@ -145,7 +152,21 @@ struct Execution {
     tool: Option<ToolCallId>,
 }
 impl Execution {
+    fn timing_start(&self) -> Option<std::time::Instant> {
+        self.recorder.as_ref().map(|_| std::time::Instant::now())
+    }
+    fn timing(&self, phase: crate::observability::Phase, start: Option<std::time::Instant>) {
+        if let (Some(recorder), Some(start)) = (&self.recorder, start) {
+            recorder.telemetry(
+                self.state.sequence,
+                self.model,
+                self.tool,
+                crate::observability::Telemetry::timing(phase, start.elapsed()),
+            );
+        }
+    }
     async fn flush(&mut self) {
+        let started = self.timing_start();
         while !self.pending_events.is_empty() {
             if let Some(sender) = self.sender.clone() {
                 match sender.reserve().await {
@@ -160,6 +181,9 @@ impl Execution {
             } else {
                 self.pending_events.clear();
             }
+        }
+        if !self.state.status.terminal() {
+            self.timing(crate::observability::Phase::DeliveryWait, started);
         }
     }
     fn begin(&mut self, kind: EventKind) {
@@ -187,6 +211,9 @@ impl Execution {
             tool_call_id: self.tool,
             kind,
         };
+        if let Some(recorder) = &self.recorder {
+            recorder.event(&event);
+        }
         self.pending_events.push_back(event);
     }
     async fn emit(&mut self, kind: EventKind) {
@@ -234,6 +261,14 @@ struct StreamSink<'a>(
 );
 #[async_trait]
 impl TextSink for StreamSink<'_> {
+    fn telemetry_enabled(&self) -> bool {
+        self.0.recorder.is_some()
+    }
+    async fn telemetry(&mut self, telemetry: crate::observability::Telemetry) {
+        if let Some(recorder) = &self.0.recorder {
+            recorder.telemetry(self.0.state.sequence, self.0.model, self.0.tool, telemetry);
+        }
+    }
     async fn request_prepared(
         &mut self,
         snapshot: crate::context::ContextSnapshot,
@@ -339,8 +374,13 @@ async fn run_owned(
 ) -> RunResult {
     session.messages.push(Message::User(config.task.clone()));
     session.selection = None;
+    let run_id = RunId::default();
+    let recorder = config.observability.clone().map(|options| {
+        crate::observability::Recorder::start(options, run_id, session.id, provider.provider_name())
+    });
     let mut execution = Execution {
-        state: ExecutionState::new(session.id, RunId::default()),
+        recorder,
+        state: ExecutionState::new(session.id, run_id),
         sender: events,
         pending_events: VecDeque::new(),
         turn: None,
@@ -424,7 +464,17 @@ async fn run_owned(
             },
         })
         .await;
+    let recording = if let Some(recorder) = execution.recorder.take() {
+        recorder.finish(execution.state.sequence).await
+    } else {
+        crate::observability::Report {
+            diagnostic: None,
+            status: crate::observability::RecordingStatus::Off,
+            run_id,
+        }
+    };
     RunResult {
+        recording,
         outcome,
         final_text,
         model_calls,
@@ -533,6 +583,7 @@ async fn drive(
             return RunOutcome::Cancelled;
         }
         let prepared = if let Some(budget) = &config.context_budget {
+            let selection_started = e.timing_start();
             let selection = crate::context::select(
                 provider,
                 &config.model,
@@ -543,6 +594,10 @@ async fn drive(
                 cancel,
             )
             .await;
+            e.timing(
+                crate::observability::Phase::ContextSelection,
+                selection_started,
+            );
             let candidate = match selection {
                 _ if cancel.is_cancelled() => {
                     e.acknowledge().await;
@@ -798,8 +853,26 @@ async fn drive(
                 };
                 // A blocked publish future cannot prevent polling execution,
                 // timeout, pipe draining, or process cleanup.
-                let execute = tools.execute_stream(call, cancel, Some(sender));
-                let ((), execution) = tokio::join!(publish, execute);
+                let started = config
+                    .observability
+                    .as_ref()
+                    .map(|_| std::time::Instant::now());
+                let execute = async {
+                    let result = tools.execute_stream(call, cancel, Some(sender)).await;
+                    (result, started.map(|s| s.elapsed()))
+                };
+                let ((), (execution, elapsed)) = tokio::join!(publish, execute);
+                if let (Some(recorder), Some(elapsed)) = (&e.recorder, elapsed) {
+                    recorder.telemetry(
+                        e.state.sequence,
+                        e.model,
+                        e.tool,
+                        crate::observability::Telemetry::timing(
+                            crate::observability::Phase::ToolExecution,
+                            elapsed,
+                        ),
+                    );
+                }
                 match execution {
                     ToolExecution::Finished(result) => {
                         if !result.is_error()

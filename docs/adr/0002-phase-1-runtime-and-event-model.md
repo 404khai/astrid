@@ -258,3 +258,13 @@ single-run ephemeral-session restriction and follow-up exclusion for the
 interactive client. The existing fresh-session API remains compatible; sessions
 still have no disk persistence. Follow-up run reconstruction includes inherited
 context provenance, with the original lifecycle and completion barriers retained.
+
+
+## Phase 4 amendment (2026-10-08)
+
+Accepted [ADR 0008](0008-observability-control.md) and
+[ADR 0009](0009-persistent-trace-contract.md) extend the historical no-persistence
+scope with optional bounded metadata traces. Core event transitions, channel
+ordering, private continuation, permissions and execution outcomes remain intact.
+Metadata trace framing is not full state replay or resumable-session persistence;
+recording failure has a separate RunResult diagnostic.

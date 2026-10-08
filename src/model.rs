@@ -78,6 +78,12 @@ pub enum ModelError {
 
 #[async_trait]
 pub trait TextSink: Send {
+    /// Optional instrumentation is explicitly selected by the runtime caller.
+    fn telemetry_enabled(&self) -> bool {
+        false
+    }
+    /// Only typed metadata; credentials and provider continuation stay private.
+    async fn telemetry(&mut self, _telemetry: crate::observability::Telemetry) {}
     /// Optional adapter-owned metadata for the exact prepared request, before dispatch.
     async fn request_prepared(
         &mut self,
@@ -102,6 +108,10 @@ where
 /// A narrow seam for deterministic tests, not a universal provider abstraction.
 #[async_trait]
 pub trait ModelProvider: Send + Sync {
+    /// Known backend identity for traces; unknown is represented as unavailable.
+    fn provider_name(&self) -> Option<&'static str> {
+        None
+    }
     /// Pure preflight accounting; None means this provider cannot enforce a budget.
     fn measure_request(
         &self,

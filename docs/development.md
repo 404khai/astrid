@@ -7,6 +7,8 @@ advance the active phase.
 
 Start here for the current phase:
 
+- [Phase 4 plan and tickets](plans/phase-4.md): accepted settings/trace contracts and implementation.
+- [Phase 4 review](reviews/phase-4.md): deterministic evidence, recording overhead, and limitations.
 - [Phase 3 plan and tickets](plans/phase-3.md): accepted context contracts, implementation, and evidence.
 - [Phase 3 review](reviews/phase-3.md): completed implementation, evidence, and limitations.
 - [Phase 3 adversarial review](reviews/phase-3-adversarial.md): plan critique and first-slice review.

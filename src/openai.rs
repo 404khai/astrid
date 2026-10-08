@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crate::{
@@ -17,6 +17,38 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub(crate) struct ResponseContinuation(Vec<Value>);
+
+struct MeasuredSink<'a> {
+    inner: &'a mut dyn TextSink,
+    dispatched: Option<Instant>,
+    first: bool,
+}
+#[async_trait]
+impl TextSink for MeasuredSink<'_> {
+    fn telemetry_enabled(&self) -> bool {
+        self.inner.telemetry_enabled()
+    }
+    async fn telemetry(&mut self, value: crate::observability::Telemetry) {
+        self.inner.telemetry(value).await;
+    }
+    async fn request_prepared(&mut self, value: ContextSnapshot) -> std::io::Result<()> {
+        self.inner.request_prepared(value).await
+    }
+    async fn delta(&mut self, value: &str) -> std::io::Result<()> {
+        if !value.is_empty() && !self.first {
+            self.first = true;
+            if let Some(start) = self.dispatched {
+                self.inner
+                    .telemetry(crate::observability::Telemetry::timing(
+                        crate::observability::Phase::FirstVisibleText,
+                        start.elapsed(),
+                    ))
+                    .await;
+            }
+        }
+        self.inner.delta(value).await
+    }
+}
 
 pub struct OpenAiProvider {
     client: reqwest::Client,
@@ -157,6 +189,9 @@ fn serialized_bytes(value: &Value) -> usize {
 
 #[async_trait]
 impl ModelProvider for OpenAiProvider {
+    fn provider_name(&self) -> Option<&'static str> {
+        Some("openai_codex_subscription")
+    }
     fn measure_request(
         &self,
         request: &ModelRequest<'_>,
@@ -168,72 +203,111 @@ impl ModelProvider for OpenAiProvider {
         request: &ModelRequest<'_>,
         text: &mut dyn TextSink,
     ) -> Result<ModelResponse, ModelError> {
+        let enabled = text.telemetry_enabled();
+        let started = enabled.then(Instant::now);
         let body = Self::body(request);
-        text.request_prepared(Self::snapshot(&body, request))
-            .await?;
-        let token = self
-            .auth
-            .bearer_token()
-            .await
+        let snapshot = Self::snapshot(&body, request);
+        if let Some(start) = started {
+            text.telemetry(crate::observability::Telemetry::timing(
+                crate::observability::Phase::Preparation,
+                start.elapsed(),
+            ))
+            .await;
+        }
+        text.request_prepared(snapshot).await?;
+        let started = enabled.then(Instant::now);
+        let token = self.auth.bearer_token().await;
+        if let Some(start) = started {
+            text.telemetry(crate::observability::Telemetry::timing(
+                crate::observability::Phase::Authentication,
+                start.elapsed(),
+            ))
+            .await;
+        }
+        let token = token
             .map_err(|error| ModelError::Provider(format!("authentication failed: {error}")))?;
-        let response = self
-            .client
-            .post(&self.endpoint)
-            .bearer_auth(token.as_str())
-            .header(reqwest::header::ACCEPT, "text/event-stream")
-            .json(&body)
-            .send()
-            .await?;
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-            let body = response.text().await?;
-            let parsed: Option<Value> = serde_json::from_str(&body).ok();
-            let message = parsed
-                .as_ref()
-                .and_then(|v| v["error"]["message"].as_str())
-                .unwrap_or("no structured provider error");
-            return Err(ModelError::Http {
-                status,
-                message: message.chars().take(2000).collect(),
-            });
+        let dispatched = enabled.then(Instant::now);
+        if enabled {
+            text.telemetry(crate::observability::Telemetry::timing(
+                crate::observability::Phase::Dispatch,
+                Duration::ZERO,
+            ))
+            .await;
         }
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        if !content_type.is_empty()
-            && !content_type
-                .split(';')
-                .next()
-                .unwrap_or("")
-                .trim()
-                .eq_ignore_ascii_case("text/event-stream")
-        {
-            let content_type = content_type.to_owned();
-            let body = response.text().await?;
-            if let Ok(value) = serde_json::from_str::<Value>(&body)
-                && let Some(message) = value["error"]["message"].as_str()
-            {
-                return Err(ModelError::Provider(message.chars().take(2000).collect()));
+        let mut text = MeasuredSink {
+            inner: text,
+            dispatched,
+            first: false,
+        };
+        let result = async {
+            let response = self
+                .client
+                .post(&self.endpoint)
+                .bearer_auth(token.as_str())
+                .header(reqwest::header::ACCEPT, "text/event-stream")
+                .json(&body)
+                .send()
+                .await?;
+            if !response.status().is_success() {
+                let status = response.status().as_u16();
+                let body = response.text().await?;
+                let parsed: Option<Value> = serde_json::from_str(&body).ok();
+                let message = parsed
+                    .as_ref()
+                    .and_then(|v| v["error"]["message"].as_str())
+                    .unwrap_or("no structured provider error");
+                return Err(ModelError::Http {
+                    status,
+                    message: message.chars().take(2000).collect(),
+                });
             }
-            return Err(ModelError::Protocol(format!(
-                "expected text/event-stream, received {content_type:?} (body omitted)"
-            )));
-        }
-        let mut stream = response.bytes_stream();
-        let mut decoder = SseDecoder::default();
-        let mut assembly = ResponseAssembly::default();
-        while let Some(chunk) = stream.next().await {
-            for event in decoder.feed(&chunk?)? {
-                if let Some(completed) = assembly.event(event, text).await? {
-                    return Ok(completed);
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+            if !content_type.is_empty()
+                && !content_type
+                    .split(';')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .eq_ignore_ascii_case("text/event-stream")
+            {
+                let content_type = content_type.to_owned();
+                let body = response.text().await?;
+                if let Ok(value) = serde_json::from_str::<Value>(&body)
+                    && let Some(message) = value["error"]["message"].as_str()
+                {
+                    return Err(ModelError::Provider(message.chars().take(2000).collect()));
+                }
+                return Err(ModelError::Protocol(format!(
+                    "expected text/event-stream, received {content_type:?} (body omitted)"
+                )));
+            }
+            let mut stream = response.bytes_stream();
+            let mut decoder = SseDecoder::default();
+            let mut assembly = ResponseAssembly::default();
+            while let Some(chunk) = stream.next().await {
+                for event in decoder.feed(&chunk?)? {
+                    if let Some(completed) = assembly.event(event, &mut text).await? {
+                        return Ok(completed);
+                    }
                 }
             }
+            Err(ModelError::Protocol(
+                "stream ended before response.completed; no tools executed".into(),
+            ))
         }
-        Err(ModelError::Protocol(
-            "stream ended before response.completed; no tools executed".into(),
-        ))
+        .await;
+        if let Some(start) = dispatched {
+            text.telemetry(crate::observability::Telemetry::timing(
+                crate::observability::Phase::ProviderAttempt,
+                start.elapsed(),
+            ))
+            .await;
+        }
+        result
     }
 }
 
@@ -400,6 +474,9 @@ impl ResponseAssembly {
                     envelope["output"] =
                         Value::Array(self.completed_items.values().cloned().collect());
                 }
+                let usage = text
+                    .telemetry_enabled()
+                    .then(|| crate::observability::Usage::from_response(&envelope));
                 let response = completed_response(envelope)?;
                 for item in &response.continuation.0 {
                     if item["type"] == "function_call" {
@@ -421,6 +498,14 @@ impl ResponseAssembly {
                     return Err(ModelError::Protocol(
                         "streamed text disagrees with final output".into(),
                     ));
+                }
+                if let Some(usage) = usage {
+                    text.telemetry(crate::observability::Telemetry {
+                        phase: None,
+                        elapsed_us: None,
+                        usage: Some(usage),
+                    })
+                    .await;
                 }
                 return Ok(Some(response));
             }
