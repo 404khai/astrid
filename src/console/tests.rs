@@ -771,3 +771,40 @@ fn file_mention_navigation_and_tab_keep_multiline_input() {
     assert_eq!(editor.handle(key(KeyCode::Tab)), Action::Continue);
     assert_eq!(editor.text(), "first\n@docs/b.md ");
 }
+
+#[test]
+fn targeted_inspection_previews_show_line_numbers_and_limits() {
+    let mut state = Presentation::new("test".into());
+    state.expanded_tool_calls = true;
+    state.apply(&event(EventKind::ToolCallCompleted {
+        outcome: ToolOutcome::Success {
+            data: json!({
+                "content":"needle\n", "lines":[{"line":600,"text":"needle"}],
+                "truncated":true,"coverage":{"truncation_reason":"output_limit"}
+            }),
+        },
+    }));
+    let output: String = state
+        .take_output()
+        .into_iter()
+        .map(|piece| piece.text)
+        .collect();
+    assert!(output.contains("600: needle"));
+    assert!(output.contains("truncated (output_limit)"));
+    assert_eq!(
+        summary(&ToolOutcome::Success {
+            data: json!({
+                "matches":[{"context_truncated":true}],"truncated":true,"page":{"next_offset":20}
+            })
+        }),
+        "1 matches · more results, next offset 20 · context truncated"
+    );
+    assert_eq!(
+        summary(&ToolOutcome::Success {
+            data: json!({
+                "matches":[],"truncated":true,"page":{"next_offset":null}
+            })
+        }),
+        "0 matches · incomplete coverage"
+    );
+}

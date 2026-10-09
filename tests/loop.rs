@@ -650,3 +650,58 @@ async fn empty_terminal_output_uses_completed_items_only_after_success() {
         server.finish().await;
     }
 }
+
+#[tokio::test]
+async fn targeted_inspection_controls_and_coverage_survive_provider_roundtrip() {
+    let root = tempfile::tempdir().unwrap();
+    fs::write(root.path().join("file.rs"), "first\nneedle\nlast\nneedle\n").unwrap();
+    fs::write(root.path().join("noise.txt"), "needle\n").unwrap();
+    let server = Server::start(vec![
+        reply(&[
+            call("search", "grep", json!({"path":".","pattern":"needle","include_glob":"**/*.rs","exclude_glob":null,"before_context":1,"after_context":1,"offset":0,"limit":1})),
+            call("read", "read_file", json!({"path":"file.rs","start_line":2,"end_line":3})),
+        ], "Inspecting targeted excerpts."),
+        reply(&[], "Finished."),
+    ]).await;
+    let result = support::run(
+        &server.provider,
+        &tools(root.path()),
+        &mut Confirmation::new(false),
+        &mut Recording::default(),
+        "test-model",
+        "inspect",
+        3,
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.tool_calls, 2);
+    let requests = server.finish().await;
+    let definitions = requests[0]["tools"][0]["tools"].as_array().unwrap();
+    let read = definitions
+        .iter()
+        .find(|definition| definition["name"] == "read_file")
+        .unwrap();
+    assert_eq!(
+        read["parameters"]["properties"]["start_line"]["type"],
+        json!(["integer", "null"])
+    );
+    let outputs: Vec<Value> = requests[1]["input"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|item| item["type"] == "function_call_output")
+        .map(|item| serde_json::from_str(item["output"].as_str().unwrap()).unwrap())
+        .collect();
+    assert_eq!(outputs[0]["data"]["matches"][0]["path"], "file.rs");
+    assert_eq!(
+        outputs[0]["data"]["matches"][0]["before"],
+        json!([{"line":1,"text":"first"}])
+    );
+    assert_eq!(outputs[0]["data"]["page"]["next_offset"], 1);
+    assert_eq!(outputs[1]["data"]["content"], "needle\nlast\n");
+    assert_eq!(
+        outputs[1]["data"]["lines"],
+        json!([{"line":2,"text":"needle"},{"line":3,"text":"last"}])
+    );
+    assert_eq!(outputs[1]["data"]["coverage"]["complete"], true);
+}

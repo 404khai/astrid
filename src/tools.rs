@@ -411,11 +411,14 @@ fn atomic_write(path: &Path, content: &str, overwrite: bool) -> Result<(), ToolE
 /// The same schemas are used for the provider and for documenting the boundary.
 pub fn definitions() -> Vec<Value> {
     let string = || json!({"type":"string"});
+    let optional_integer =
+        |min: usize, max: usize| json!({"type":["integer","null"],"minimum":min,"maximum":max});
+    let optional_glob = || json!({"type":["string","null"]});
     let specs = [
         (
             "read_file",
-            "Read a UTF-8 file within the workspace.",
-            json!({"path":string()}),
+            "Read a UTF-8 file with numbered lines. Prefer a targeted 1-based inclusive start_line/end_line range over whole-file reads. Null start_line defaults to 1; null end_line reads to EOF subject to byte/line/scan limits. Check coverage and truncated; lines may end partially at an output cap.",
+            json!({"path":string(),"start_line":optional_integer(1,usize::MAX),"end_line":optional_integer(1,usize::MAX)}),
         ),
         (
             "write_file",
@@ -439,8 +442,8 @@ pub fn definitions() -> Vec<Value> {
         ),
         (
             "grep",
-            "Search UTF-8 files using a Rust regular expression. Path may name a file or directory; skips .git, binary files, and symlinks.",
-            json!({"path":string(),"pattern":string()}),
+            "Search UTF-8 files using a Rust regex, ordered by workspace-relative path then line. Path is a file or directory. Optional include_glob/exclude_glob filter workspace-relative paths (e.g. **/*.rs). Null context defaults to 0, offset to 0, limit to 100. Follow page.next_offset with identical arguments on unchanged files; each page rescans bounded candidates. Check incomplete coverage separately from pagination. Skips .git, binary files, and symlinks.",
+            json!({"path":string(),"pattern":string(),"include_glob":optional_glob(),"exclude_glob":optional_glob(),"before_context":optional_integer(0,20),"after_context":optional_integer(0,20),"offset":optional_integer(0,usize::MAX),"limit":optional_integer(1,1024)}),
         ),
         (
             "shell",
