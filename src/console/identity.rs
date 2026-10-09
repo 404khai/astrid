@@ -73,7 +73,11 @@ pub(super) fn append_header(
     if width >= 78 {
         for (row, logo) in LOGO.lines().enumerate() {
             let text = metadata.get(row).map(String::as_str).unwrap_or("");
-            let ink = if row == 0 { Ink::Accent } else { Ink::Normal };
+            let ink = if row == 0 {
+                super::theme::title_ink(identity.mode == "unbound")
+            } else {
+                Ink::Normal
+            };
             writeln!(
                 out,
                 "{}{}{}",
@@ -96,11 +100,74 @@ pub(super) fn append_header(
             )?;
         }
         writeln!(out)?;
-        writeln!(out, "{}", Ink::Accent.paint(&metadata[0], color))?;
+        writeln!(
+            out,
+            "{}",
+            super::theme::title_ink(identity.mode == "unbound").paint(&metadata[0], color)
+        )?;
         for row in identity.rows(width) {
             writeln!(out, "{row}")?;
         }
     }
     writeln!(out)?;
     out.flush()
+}
+
+/// Live startup identity, owned by the composer until the first task is sent.
+pub(super) fn header_lines(
+    identity: &Identity,
+    width: usize,
+    color: bool,
+) -> Vec<ratatui::text::Line<'static>> {
+    use ratatui::{
+        style::{Color, Style},
+        text::{Line, Span},
+    };
+    let wide = width >= 78;
+    let mut metadata = vec![
+        format!("astrid  {}", env!("CARGO_PKG_VERSION")),
+        String::new(),
+    ];
+    metadata.extend(identity.rows(width.saturating_sub(34).max(20)));
+    let mut lines = vec![Line::default()];
+    for (row, logo) in LOGO.lines().enumerate() {
+        let mut spans: Vec<Span<'static>> = truncate(logo, width)
+            .chars()
+            .enumerate()
+            .map(|(column, pixel)| {
+                let (r, g, b) = super::theme::logo_rgb(row, column, identity.mode == "unbound");
+                Span::styled(
+                    pixel.to_string(),
+                    if color && pixel != ' ' {
+                        Style::default().fg(Color::Rgb(r, g, b))
+                    } else {
+                        Style::default()
+                    },
+                )
+            })
+            .collect();
+        if wide {
+            spans.push(Span::raw(" ".repeat(34 - logo.width())));
+            spans.push(Span::styled(
+                metadata.get(row).cloned().unwrap_or_default(),
+                if row == 0 {
+                    super::theme::title_ink(identity.mode == "unbound")
+                } else {
+                    Ink::Normal
+                }
+                .style(color),
+            ));
+        }
+        lines.push(Line::from(spans));
+    }
+    if !wide {
+        lines.push(Line::default());
+        lines.push(Line::styled(
+            metadata[0].clone(),
+            super::theme::title_ink(identity.mode == "unbound").style(color),
+        ));
+        lines.extend(identity.rows(width).into_iter().map(Line::from));
+    }
+    lines.push(Line::default());
+    lines
 }

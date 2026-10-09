@@ -77,6 +77,13 @@ impl Console {
         };
         let mut state = Presentation::new(identity.model.clone());
         state.mode = identity.mode.clone();
+        let settings = astrid::observability::Settings::load(
+            &astrid::auth::default_directory()
+                .map_err(io::Error::other)?
+                .join("settings.json"),
+        )?;
+        state.expanded_tool_calls =
+            settings.expanded_tool_calls == astrid::observability::Switch::On;
         let mut console = Self {
             show_context: false,
             state,

@@ -287,3 +287,15 @@ not full ExecutionState replay, authenticated evidence or session recovery.
 Statistics disclose measurement coverage and preserve unavailable cost/rate facts.
 [ADR 0008](adr/0008-observability-control.md) and
 [ADR 0009](adr/0009-persistent-trace-contract.md) establish these boundaries.
+
+
+Filename lookup lives in `file_lookup`, independent of terminal I/O. The CLI
+composer consumes its filename-only results for `@` completion; native tool
+inspection retains its existing coverage/permission contracts. Lookup borrows
+Aster's basename/path matching and empty-primary fallback concept, using Astrid's
+`ToolError` and workspace path boundary. Unlike Aster's early-stop lookup, it
+scans to completion and retains only the lexicographically smallest `max_hits`
+unique paths. Ignore/traversal failures are explicit, and neither pass follows
+symlinks or descends into the lookup-specific generated-directory exclusions.
+The one-slot composer worker queues bound pending queries/results and discard
+stale responses. References remain task text, not implicit content ingestion.

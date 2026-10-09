@@ -45,6 +45,7 @@ fn settings_are_private_atomic_and_resolve_without_enabling_on_invalid_input() {
     );
     Settings {
         observability: Switch::On,
+        ..Settings::default()
     }
     .save(&path)
     .unwrap();
@@ -56,6 +57,7 @@ fn settings_are_private_atomic_and_resolve_without_enabling_on_invalid_input() {
     );
     Settings {
         observability: Switch::Off,
+        ..Settings::default()
     }
     .save(&path)
     .unwrap();
@@ -528,6 +530,23 @@ fn settings_and_inspection_cli_work_without_authentication() {
             .success()
     );
     assert!(String::from_utf8_lossy(&run(&["settings"]).stdout).contains("on (user setting)"));
+    assert!(
+        run(&["settings", "set", "expanded-tool-calls", "on"])
+            .status
+            .success()
+    );
+    let output = run(&["settings"]);
+    let output = String::from_utf8_lossy(&output.stdout);
+    assert!(output.contains("expanded-tool-calls: on"));
+    assert!(output.contains("observability: on"));
+    assert!(
+        run(&["settings", "set", "expanded-tool-calls", "off"])
+            .status
+            .success()
+    );
+    assert!(
+        String::from_utf8_lossy(&run(&["settings"]).stdout).contains("expanded-tool-calls: off")
+    );
     assert!(run(&["stats"]).status.success());
     assert!(run(&["trace"]).status.success());
     assert!(

@@ -33,7 +33,7 @@ struct Cli {
 enum SettingsCommand {
     /// Persist the default for subsequent runs.
     Set {
-        #[arg(value_parser=["observability"])]
+        #[arg(value_parser=["observability", "expanded-tool-calls"])]
         key: String,
         #[arg(value_enum)]
         value: Switch,
@@ -344,19 +344,26 @@ async fn conversation_loop(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let max_model_calls = configured_limit("ASTRID_MAX_MODEL_CALLS", 20)?;
     let mut sessions = sessions::Sessions::new(tools.workspace());
-    let mut composer = console::Composer::default();
-    console::welcome(&startup_identity(
-        &model,
-        tools.workspace(),
-        composer.mode.policy(),
-    ))?;
+    let mut composer = console::Composer {
+        workspace_root: Some(tools.workspace().root().to_path_buf()),
+        ..Default::default()
+    };
+
+    let mut startup = true;
     loop {
+        if startup {
+            composer.header = Some(startup_identity(
+                &model,
+                tools.workspace(),
+                composer.mode.policy(),
+            ));
+        }
         composer.session_label = sessions.active_label();
         let task = composer.compose(&model)?;
         match task.trim() {
             "" => continue,
             "/" | "/help" => {
-                composer.notice = "/mode · /sessions · /new · /model · /quit".into();
+                composer.notice = "/mode · /sessions · /new · /model · /settings · /quit".into();
                 continue;
             }
             "/quit" | "/exit" => return Ok(()),
@@ -414,11 +421,6 @@ async fn conversation_loop(
                                 }
                             }
                             .into();
-                            console::welcome(&startup_identity(
-                                &model,
-                                tools.workspace(),
-                                mode.policy(),
-                            ))?;
                         }
                         Err(_) => {
                             composer.notice = "Use /mode ask, /mode auto, or /mode unbound.".into()
@@ -427,11 +429,50 @@ async fn conversation_loop(
                 }
                 continue;
             }
+            command if command == "/settings" || command.starts_with("/settings ") => {
+                let path = model_directory.join("settings.json");
+                let mut settings = observability::Settings::load(&path)?;
+                let value = if command == "/settings" {
+                    composer.choose(
+                        "Expanded tool calls",
+                        &["on".into(), "off".into()],
+                        &settings.expanded_tool_calls.to_string(),
+                    )?
+                } else {
+                    command
+                        .strip_prefix("/settings expanded-tool-calls ")
+                        .map(str::to_owned)
+                };
+                match value.as_deref() {
+                    Some("on") | Some("off") => {
+                        settings.expanded_tool_calls = if value.as_deref() == Some("on") {
+                            Switch::On
+                        } else {
+                            Switch::Off
+                        };
+                        settings.save(&path)?;
+                        composer.notice =
+                            format!("Expanded tool calls: {}", settings.expanded_tool_calls);
+                    }
+                    None if command == "/settings" => {}
+                    _ => composer.notice = "Use /settings expanded-tool-calls on|off".into(),
+                }
+                continue;
+            }
             command if command.starts_with('/') => {
                 composer.notice = "Unknown command. Type / for commands.".into();
                 continue;
             }
             _ => {}
+        }
+        if startup {
+            console::welcome(&startup_identity(
+                &model,
+                tools.workspace(),
+                composer.mode.policy(),
+            ))?;
+            composer.header = None;
+            startup = false;
         }
         remember_model_at(model_directory, &model)?;
         composer.notice.clear();
@@ -501,14 +542,19 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Settings { command } => {
             let path = directory.join("settings.json");
             let (mut settings, mut exists) = observability::Settings::load_with_source(&path)?;
-            if let Some(SettingsCommand::Set { value, .. }) = command {
-                settings.observability = value;
+            if let Some(SettingsCommand::Set { key, value }) = command {
+                if key == "expanded-tool-calls" {
+                    settings.expanded_tool_calls = value;
+                } else {
+                    settings.observability = value;
+                }
                 settings.save(&path)?;
                 exists = true;
             }
             let (value, source) = settings.resolve(None, exists);
             println!(
-                "observability: {value} ({source})\nsettings: {}\ntraces: {}\nChanges affect future runs; existing traces are retained.",
+                "observability: {value} ({source})\nexpanded-tool-calls: {}\nsettings: {}\ntraces: {}\nChanges affect future runs; existing traces are retained.",
+                settings.expanded_tool_calls,
                 path.display(),
                 directory.join("traces").display()
             );

@@ -54,18 +54,22 @@ impl Screen {
                         "{line:30}    {}",
                         right.get(index).map(String::as_str).unwrap_or("")
                     ),
-                    if index == 0 { Ink::Accent } else { Ink::Normal },
+                    if index == 0 {
+                        super::theme::title_ink(identity.mode == "unbound")
+                    } else {
+                        Ink::Normal
+                    },
                 ));
             }
         } else if self.width >= 34 && self.height >= 30 {
             rows.extend(LOGO.lines().map(|line| (line.to_owned(), Ink::Accent)));
             rows.push((String::new(), Ink::Normal));
-            rows.push((brand, Ink::Accent));
+            rows.push((brand, super::theme::title_ink(identity.mode == "unbound")));
             rows.push((String::new(), Ink::Normal));
             rows.extend(metadata.into_iter().map(|line| (line, Ink::Dim)));
         } else {
             // Preserve useful output space in small terminals.
-            rows.push((brand, Ink::Accent));
+            rows.push((brand, super::theme::title_ink(identity.mode == "unbound")));
             let budget = self.height.saturating_sub(9);
             rows.extend(
                 metadata
@@ -97,7 +101,12 @@ impl Screen {
                     let tail: String = text.chars().skip(30).collect();
                     write!(out, "{}", " ".repeat(30 - logo.width()))?;
                     if i == 1 {
-                        write!(out, "{}", Ink::Accent.paint(&tail, self.color))?;
+                        write!(
+                            out,
+                            "{}",
+                            super::theme::title_ink(identity.mode == "unbound")
+                                .paint(&tail, self.color)
+                        )?;
                     } else {
                         let boundary = 4 + self.content_width().saturating_sub(38).min(14);
                         let label: String = tail.chars().take(boundary).collect();
@@ -124,7 +133,19 @@ impl Screen {
                 write!(
                     out,
                     "{}",
-                    ink.paint(&truncate(text, self.content_width()), self.color)
+                    if let Some(rest) = text.strip_prefix("unbound") {
+                        format!(
+                            "{}{}",
+                            Ink::Unbound
+                                .paint(&truncate("unbound", self.content_width()), self.color),
+                            ink.paint(
+                                &truncate(rest, self.content_width().saturating_sub(7)),
+                                self.color
+                            )
+                        )
+                    } else {
+                        ink.paint(&truncate(text, self.content_width()), self.color)
+                    }
                 )?;
             }
         }
@@ -232,14 +253,29 @@ impl Screen {
             (
                 self.height - 1,
                 prompt,
-                if waiting { Ink::Accent } else { Ink::Dim },
+                if waiting {
+                    super::theme::title_ink(status.starts_with("unbound"))
+                } else {
+                    Ink::Dim
+                },
             ),
             (self.height, help, Ink::Dim),
         ] {
             write!(
                 out,
                 "\x1b[{row};1H\x1b[2K\x1b[2G{}",
-                ink.paint(&truncate(text, self.content_width()), self.color)
+                if let Some(rest) = text.strip_prefix("unbound") {
+                    format!(
+                        "{}{}",
+                        Ink::Unbound.paint(&truncate("unbound", self.content_width()), self.color),
+                        ink.paint(
+                            &truncate(rest, self.content_width().saturating_sub(7)),
+                            self.color
+                        )
+                    )
+                } else {
+                    ink.paint(&truncate(text, self.content_width()), self.color)
+                }
             )?;
         }
         if waiting {

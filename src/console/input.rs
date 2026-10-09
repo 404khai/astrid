@@ -4,12 +4,13 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui_textarea::{CursorMove, TextArea, WrapMode};
 use unicode_segmentation::UnicodeSegmentation;
 
-const COMMANDS: [(&str, &str); 6] = [
+const COMMANDS: [(&str, &str); 7] = [
     ("/model", "Switch the active model"),
     ("/help", "Show available commands"),
     ("/quit", "Exit Astrid"),
     ("/mode", "Switch permission mode"),
     ("/sessions", "Switch conversation"),
+    ("/settings", "Toggle expanded tool calls"),
     ("/new", "Start a fresh session"),
 ];
 const MAX_INPUT_BYTES: usize = 64 * 1024;
@@ -27,6 +28,8 @@ pub(super) struct Editor {
     pub textarea: TextArea<'static>,
     pub selected: usize,
     models: Option<Vec<String>>,
+    pub file_options: Vec<(String, String)>,
+    pub lookup_error: Option<String>,
     pub notice: Option<&'static str>,
     pub choice_title: Option<String>,
 }
@@ -36,13 +39,15 @@ impl Editor {
         textarea.set_placeholder_text(if models.is_some() {
             "Search models…"
         } else {
-            "Message Astrid… (/ for commands)"
+            "Message Astrid… (/ commands, @ files)"
         });
         textarea.set_wrap_mode(WrapMode::Glyph);
         Self {
             textarea,
             notice: None,
             choice_title: None,
+            file_options: Vec::new(),
+            lookup_error: None,
             models: models.map(<[String]>::to_vec),
             selected: models
                 .and_then(|m| m.iter().position(|v| v == current))
@@ -53,7 +58,7 @@ impl Editor {
         self.textarea.lines().join("\n")
     }
     pub(super) fn menu(&self) -> bool {
-        self.models.is_some() || self.text().starts_with('/')
+        self.models.is_some() || self.text().starts_with('/') || self.mention().is_some()
     }
     pub(super) fn model_menu(&self) -> bool {
         self.models.is_some()
@@ -66,6 +71,8 @@ impl Editor {
                 .filter(|m| m.to_lowercase().contains(&text.to_lowercase()))
                 .map(|m| (m.clone(), String::new()))
                 .collect()
+        } else if self.mention().is_some() {
+            self.file_options.clone()
         } else if self.menu() {
             COMMANDS
                 .iter()
@@ -75,6 +82,47 @@ impl Editor {
         } else {
             Vec::new()
         }
+    }
+    /// Active mention before the cursor; email addresses are not mentions.
+    pub(super) fn mention(&self) -> Option<(usize, usize, String)> {
+        if self.models.is_some() {
+            return None;
+        }
+        let cursor = self.textarea.cursor();
+        let (row, column) = (cursor.0, cursor.1);
+        let line = &self.textarea.lines()[row];
+        let end = line
+            .char_indices()
+            .nth(column)
+            .map_or(line.len(), |(i, _)| i);
+        let prefix = &line[..end];
+        let start = prefix.rfind('@')?;
+        if start > 0 && !prefix[..start].ends_with(char::is_whitespace) {
+            return None;
+        }
+        let query = &prefix[start + 1..];
+        if query.contains(char::is_whitespace) {
+            return None;
+        }
+        Some((row, start, query.to_owned()))
+    }
+    fn accept_file(&mut self, path: &str) {
+        let Some((row, start, query)) = self.mention() else {
+            return;
+        };
+        let mut lines = self.textarea.lines().to_vec();
+        let end = start + query.len() + 1;
+        let replacement = format!("@{path} ");
+        if self.text().len() - (end - start) + replacement.len() > MAX_INPUT_BYTES {
+            self.notice = Some("Input limit: 64 KiB; file reference was not inserted.");
+            return;
+        }
+        lines[row].replace_range(start..end, &replacement);
+        let column = lines[row][..start + replacement.len()].chars().count();
+        self.replace(&lines.join("\n"));
+        self.textarea
+            .move_cursor(CursorMove::Jump(row as u16, column as u16));
+        self.file_options.clear();
     }
     fn replace(&mut self, text: &str) {
         self.textarea.select_all();
@@ -133,6 +181,10 @@ impl Editor {
                 } else {
                     self.notice = Some("Input limit: 64 KiB.");
                 }
+                Action::Continue
+            }
+            KeyCode::Enter | KeyCode::Tab if self.mention().is_some() && !options.is_empty() => {
+                self.accept_file(&options[self.selected].0);
                 Action::Continue
             }
             KeyCode::Enter => {

@@ -12,6 +12,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
+#[cfg(test)]
 pub(super) fn composer(
     frame: &mut Frame,
     editor: &mut Editor,
@@ -19,10 +20,18 @@ pub(super) fn composer(
     notice: &str,
     color: bool,
 ) {
-    frame.render_widget(
-        Paragraph::new("").style(theme::composer_style(color)),
-        frame.area(),
-    );
+    composer_in_area(frame, frame.area(), editor, model, notice, color);
+}
+
+pub(super) fn composer_in_area(
+    frame: &mut Frame,
+    bounds: Rect,
+    editor: &mut Editor,
+    model: &str,
+    notice: &str,
+    color: bool,
+) {
+    let unbound = model.starts_with("unbound ·");
     let options = editor.options();
     editor.selected = editor.selected.min(options.len().saturating_sub(1));
     let menu_rows = if editor.menu() {
@@ -30,7 +39,22 @@ pub(super) fn composer(
     } else {
         0
     };
-    let (menu, area, footer) = layout::composer(frame.area(), menu_rows);
+    let width = usize::from(bounds.width.saturating_sub(2)).max(1);
+    let rows = editor
+        .textarea
+        .lines()
+        .iter()
+        .map(|line| {
+            use unicode_width::UnicodeWidthStr;
+            // Leave room for the cursor when the final cell is occupied.
+            (line.width() + 1).div_ceil(width).max(1)
+        })
+        .sum::<usize>();
+    let height = (menu_rows + rows.max(2) + 2).min(usize::from(bounds.height)) as u16;
+    let bounds = Rect::new(bounds.x, bounds.bottom() - height, bounds.width, height);
+    let (menu, area, footer) = layout::composer(bounds, menu_rows);
+    frame.render_widget(Paragraph::new("").style(theme::composer_style(color)), menu);
+    frame.render_widget(Paragraph::new("").style(theme::composer_style(color)), area);
     if menu.height > 0 {
         let mut lines = vec![Line::styled(
             if editor.model_menu() {
@@ -39,7 +63,14 @@ pub(super) fn composer(
                     .clone()
                     .unwrap_or_else(|| "Switch model — type to filter".to_owned())
             } else {
-                "Commands".to_owned()
+                if editor.mention().is_some() {
+                    editor
+                        .lookup_error
+                        .clone()
+                        .unwrap_or_else(|| "Files — Enter/Tab insert".into())
+                } else {
+                    "Commands".to_owned()
+                }
             },
             Ink::Dim.style(color),
         )];
@@ -58,7 +89,11 @@ pub(super) fn composer(
                     if index == editor.selected { "▸" } else { " " }
                 ),
                 if index == editor.selected {
-                    theme::selection_style(color)
+                    if unbound {
+                        theme::composer_style(color).patch(Ink::Unbound.style(color))
+                    } else {
+                        theme::selection_style(color)
+                    }
                 } else {
                     theme::composer_style(color)
                 },
@@ -80,7 +115,7 @@ pub(super) fn composer(
         .set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
     let editor_area = if area.width > 2 {
         frame.render_widget(
-            Paragraph::new("❯").style(Ink::Accent.style(color)),
+            Paragraph::new("❯").style(theme::title_ink(unbound).style(color)),
             Rect::new(area.x, area.y, 2, area.height),
         );
         Rect::new(area.x + 2, area.y, area.width - 2, area.height)
@@ -98,11 +133,10 @@ pub(super) fn composer(
         format!("{model} · Enter sends · Ctrl-J newline · / commands")
     };
     frame.render_widget(
-        Paragraph::new(format!(
-            "{}\n{}",
-            "─".repeat(footer.width as usize),
-            truncate(&help, footer.width as usize)
-        ))
+        Paragraph::new(vec![
+            Line::styled("─".repeat(footer.width as usize), Ink::Dim.style(color)),
+            theme::mode_line(truncate(&help, footer.width as usize), unbound, color),
+        ])
         .style(Ink::Dim.style(color)),
         footer,
     );
@@ -118,7 +152,11 @@ pub(super) fn status(
 ) {
     let (_, area, input) = layout::execution(frame.area());
     frame.render_widget(
-        Paragraph::new(truncate(status, area.width as usize)).style(Ink::Dim.style(color)),
+        Paragraph::new(theme::mode_line(
+            truncate(status, area.width as usize),
+            status.starts_with("unbound"),
+            color,
+        )),
         area,
     );
     let label = if waiting {
@@ -130,7 +168,7 @@ pub(super) fn status(
     };
     frame.render_widget(
         Paragraph::new(truncate(&label, input.width as usize)).style(if waiting {
-            Ink::Accent.style(color)
+            theme::title_ink(status.starts_with("unbound")).style(color)
         } else {
             Ink::Dim.style(color)
         }),

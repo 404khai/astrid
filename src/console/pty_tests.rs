@@ -79,6 +79,9 @@ impl Pty {
         {
             command.env_remove("NO_COLOR");
         }
+        if scenario == "conversations" {
+            command.env_remove("NO_COLOR");
+        }
         if scenario == "redirected_stderr" {
             command.stderr(Stdio::piped());
         }
@@ -506,6 +509,32 @@ fn pty_conversation_continues_switches_modes_and_returns_to_selected_session() {
     let root = tempfile::tempdir().unwrap();
     let mut pty = Pty::new("conversations", root.path(), "xterm-256color");
     pty.wait_for_screen("Message Astrid");
+    for (mode, notice, expected) in [
+        (
+            "unbound",
+            "full tool access",
+            vt100::Color::Rgb(236, 26, 29),
+        ),
+        ("ask", "reads allowed", vt100::Color::Rgb(26, 50, 236)),
+        (
+            "auto",
+            "workspace edits allowed",
+            vt100::Color::Rgb(26, 50, 236),
+        ),
+    ] {
+        pty.send(format!("/mode {mode}\r").as_bytes());
+        pty.wait_for_screen(notice);
+        let screen = pty.parser.screen();
+        assert_eq!(screen.contents().matches("astrid  0.1.0").count(), 1);
+        assert!(
+            (0..24).any(|row| (0..30).any(|col| {
+                screen
+                    .cell(row, col)
+                    .is_some_and(|cell| cell.contents() == "█" && cell.fgcolor() == expected)
+            })),
+            "logo did not recolor for {mode}"
+        );
+    }
     pty.send(b"first\r");
     pty.wait_for("REPLY:first:COUNT:1");
     // The prompt must be back before supplying each new task/command.
@@ -703,4 +732,23 @@ fn detached_client_without_tty_denies_approval() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+#[test]
+fn pty_file_mentions_lookup_and_insert_without_dispatching() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir(root.path().join("docs")).unwrap();
+    std::fs::write(root.path().join("docs/architecture.md"), "").unwrap();
+    let mut pty = Pty::new("conversations", root.path(), "xterm-256color");
+    pty.wait_for_screen("Message Astrid");
+    pty.send(b"@doc");
+    pty.wait_for_screen("docs/architecture.md");
+    pty.send(b"\t");
+    pty.wait_for_screen("@docs/architecture.md");
+    assert!(!String::from_utf8_lossy(&pty.output).contains("REPLY:"));
+    pty.send(b"\r");
+    pty.wait_for("REPLY:@docs/architecture.md");
+    pty.wait_for_screen("Message Astrid");
+    pty.send(b"/quit\r");
+    pty.finish();
 }

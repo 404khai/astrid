@@ -618,6 +618,7 @@ fn unbound_palette_and_mode_visibility_use_effective_authority() {
     append_header(&mut bytes, &id, 80, true).unwrap();
     let output = String::from_utf8(bytes).unwrap();
     assert!(output.contains("unbound"));
+    assert!(output.contains("\x1b[38;2;249;68;71mastrid"));
     assert!(output.contains("38;2;249;68;71"));
     assert!(output.contains("38;2;236;26;29"));
     assert!(output.contains("38;2;247;198;0"));
@@ -666,4 +667,107 @@ fn slash_mode_arguments_submit_as_commands_and_unknown_commands_reach_dispatch()
     for command in ["/mode", "/sessions", "/new"] {
         assert!(names.iter().any(|name| name == command));
     }
+}
+
+#[test]
+fn expanded_tool_results_are_optional_and_bounded() {
+    for expanded in [false, true] {
+        let mut state = Presentation::new("test".into());
+        state.expanded_tool_calls = expanded;
+        state.apply(&event(EventKind::ToolCallCompleted {
+            outcome: ToolOutcome::Success { data: json!({"content": (0..20).map(|n| format!("preview-{n}\n")).collect::<String>()}) },
+        }));
+        let output: String = state.take_output().into_iter().map(|p| p.text).collect();
+        assert_eq!(output.contains("preview-0"), expanded);
+        assert!(!output.contains("preview-12"));
+        assert_eq!(output.contains("additional output omitted"), expanded);
+    }
+}
+
+#[test]
+fn composer_background_starts_at_two_rows_and_grows() {
+    use ratatui::style::Color;
+    let mut terminal = Terminal::new(TestBackend::new(40, 12)).unwrap();
+    let mut editor = Editor::new(None, "test");
+    for (input, expected) in [("", 2), ("first\nsecond", 2), (&"a".repeat(80), 3)] {
+        editor.textarea.select_all();
+        editor.textarea.insert_str(input);
+        terminal
+            .draw(|f| widgets::composer(f, &mut editor, "test", "", true))
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let rows = (0..12)
+            .filter(|y| buffer[(0, *y)].bg == Color::Indexed(235))
+            .count();
+        assert_eq!(rows, expected);
+    }
+}
+
+#[test]
+fn unbound_theme_recolors_transcript_prompt_and_mode_label() {
+    use ratatui::style::Color;
+    let red = Color::Rgb(249, 68, 71);
+    let mut state = Presentation::new("test".into());
+    state.mode = "unbound".into();
+    state.apply(&event(EventKind::ModelTextDelta {
+        text: "reply".into(),
+    }));
+    assert_eq!(state.take_output()[0].ink, Ink::Unbound);
+    state.mode = "auto".into();
+    state.apply(&event(EventKind::ModelTextDelta {
+        text: "reply".into(),
+    }));
+    assert_eq!(state.take_output()[0].ink, Ink::Reply);
+    let mut terminal = Terminal::new(TestBackend::new(80, 12)).unwrap();
+    let mut editor = Editor::new(None, "test");
+    terminal
+        .draw(|f| widgets::composer(f, &mut editor, "unbound · session · test", "", true))
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    assert_eq!(buffer[(0, 8)].fg, red); // prompt chevron
+    for x in 0..7 {
+        assert_eq!(buffer[(x, 11)].fg, red);
+    }
+    terminal
+        .draw(|f| widgets::status(f, "unbound · running", "", true, false, true))
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    for x in 0..7 {
+        assert_eq!(buffer[(x, 10)].fg, red);
+    }
+    assert_eq!(buffer[(0, 11)].fg, red);
+}
+
+#[test]
+fn file_mentions_complete_at_the_cursor_without_submitting_or_losing_text() {
+    let mut editor = Editor::new(None, "test");
+    editor.handle(Event::Paste("inspect 界 @doc then fix".into()));
+    editor
+        .textarea
+        .move_cursor(ratatui_textarea::CursorMove::Jump(0, 14));
+    assert_eq!(editor.mention().unwrap().2, "doc");
+    editor.file_options = vec![("docs/architecture.md".into(), String::new())];
+    assert_eq!(editor.handle(key(KeyCode::Enter)), Action::Continue);
+    assert_eq!(editor.text(), "inspect 界 @docs/architecture.md  then fix");
+    assert!(editor.mention().is_none());
+    assert_eq!(
+        editor.handle(key(KeyCode::Enter)),
+        Action::Submit(editor.text())
+    );
+    let mut editor = Editor::new(None, "test");
+    editor.handle(Event::Paste("a@doc".into()));
+    assert!(editor.mention().is_none());
+}
+
+#[test]
+fn file_mention_navigation_and_tab_keep_multiline_input() {
+    let mut editor = Editor::new(None, "test");
+    editor.handle(Event::Paste("first\n@doc".into()));
+    editor.file_options = vec![
+        ("docs/a.md".into(), String::new()),
+        ("docs/b.md".into(), String::new()),
+    ];
+    editor.handle(key(KeyCode::Down));
+    assert_eq!(editor.handle(key(KeyCode::Tab)), Action::Continue);
+    assert_eq!(editor.text(), "first\n@docs/b.md ");
 }

@@ -381,3 +381,20 @@ files remain inspectable; a complete trace has a terminal event, valid sequence,
 footer and published `.jsonl` filename. See [Phase 4 evidence](docs/reviews/phase-4.md)
 and accepted [ADR 0008](docs/adr/0008-observability-control.md) /
 [ADR 0009](docs/adr/0009-persistent-trace-contract.md).
+
+Tool result previews can be enabled with `/settings` or
+`/settings expanded-tool-calls on` (use `off` to collapse them). The preference
+persists across launches. From the shell, use
+`astrid settings set expanded-tool-calls on|off`. Expanded previews show up to
+12 lines; shell output and permission/error information remain visible in either
+mode. The input starts at two lines and grows with wrapping or Ctrl-J newlines.
+
+Type `@doc` in the composer to look up matching repository files; use ↑/↓ to
+select and Enter or Tab to insert a repository-relative `@path`. Lookup runs off
+the terminal thread and adds a path reference to the message, without reading or
+attaching file contents. Ignore rules apply first; ignored/hidden files appear
+only when no ordinary files match. Dependency/build directories remain excluded.
+
+Library callers can use `astrid::file_lookup::find_files(repo_root, base, pattern,
+max_hits)`. It accepts repository-relative bases and glob patterns, returns sorted,
+unique paths with `/` separators, and reports validation/traversal failures.

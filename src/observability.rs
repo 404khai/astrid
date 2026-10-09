@@ -33,6 +33,8 @@ impl std::fmt::Display for Switch {
 #[serde(deny_unknown_fields)]
 pub struct Settings {
     pub observability: Switch,
+    #[serde(default)]
+    pub expanded_tool_calls: Switch,
 }
 impl Settings {
     pub fn load(path: &Path) -> io::Result<Self> {

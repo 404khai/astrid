@@ -20,6 +20,7 @@ pub(super) struct Presentation {
     model: String,
     pub mode: String,
     pub show_context: bool,
+    pub expanded_tool_calls: bool,
     pieces: Vec<Piece>,
     calls: BTreeMap<ToolCallId, String>,
     run: String,
@@ -40,6 +41,7 @@ impl Presentation {
             model,
             mode: "auto".into(),
             show_context: false,
+            expanded_tool_calls: false,
             pieces: Vec::new(),
             calls: BTreeMap::new(),
             run: String::new(),
@@ -58,7 +60,7 @@ impl Presentation {
     fn emit(&mut self, text: &str, ink: Ink, model: bool) {
         self.pieces.push(Piece {
             text: printable(text),
-            ink,
+            ink: super::theme::mode_ink(ink, self.mode == "unbound"),
             model,
         });
     }
@@ -361,6 +363,8 @@ impl Presentation {
                 );
                 if name == "shell" {
                     self.command_output(outcome);
+                } else if self.expanded_tool_calls {
+                    self.result_preview(outcome);
                 }
             }
             EventKind::ToolCallCancelled { .. } | EventKind::ToolCallSkipped { .. } => {
@@ -408,6 +412,24 @@ impl Presentation {
                 );
             }
             _ => {}
+        }
+    }
+    fn result_preview(&mut self, outcome: &ToolOutcome) {
+        if let ToolOutcome::Success { data } = outcome {
+            let text = data["content"]
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| serde_json::to_string_pretty(data).unwrap_or_default());
+            let text = printable(&text);
+            for line in text.lines().take(12) {
+                self.line(
+                    &format!("    {}", super::format::truncate(line, 160)),
+                    Ink::Dim,
+                );
+            }
+            if text.lines().count() > 12 {
+                self.line("    … additional output omitted from preview", Ink::Dim);
+            }
         }
     }
     fn command_output(&mut self, outcome: &ToolOutcome) {
