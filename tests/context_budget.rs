@@ -99,7 +99,10 @@ async fn budgeted_run_inspects_prunes_compacts_and_keeps_global_call_ids() {
         let budget = ContextBudget {
             estimated_context_tokens: 100_000,
             response_reserve_tokens: 1000,
-            max_request_bytes: 18_000,
+            // Numbered read results retain both raw content and line records.
+            // Admit one large protected exchange, but still force pruning when
+            // both large reads are present; the assertions below prove this.
+            max_request_bytes: 28_000,
             max_summary_bytes: 1200,
             ..Default::default()
         };
@@ -111,9 +114,10 @@ async fn budgeted_run_inspects_prunes_compacts_and_keeps_global_call_ids() {
         )
         .await;
         let wire_bytes = server.request_bytes.lock().unwrap().clone();
-        let requests = server.finish().await;
-        assert_eq!(result.model_calls, 4);
+        // Fail before waiting for unused mock replies if admission stops early.
+        assert_eq!(result.model_calls, 4, "{:?}", result.outcome);
         assert_eq!(result.tool_calls, 3);
+        let requests = server.finish().await;
         if reused {
             assert!(matches!(&result.outcome,RunOutcome::Failed{code,..} if code=="protocol"));
         } else {

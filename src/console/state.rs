@@ -416,10 +416,23 @@ impl Presentation {
     }
     fn result_preview(&mut self, outcome: &ToolOutcome) {
         if let ToolOutcome::Success { data } = outcome {
-            let text = data["content"]
-                .as_str()
-                .map(str::to_owned)
-                .unwrap_or_else(|| serde_json::to_string_pretty(data).unwrap_or_default());
+            let text = if let Some(lines) = data["lines"].as_array() {
+                lines
+                    .iter()
+                    .map(|line| {
+                        format!(
+                            "{}: {}\n",
+                            line["line"],
+                            line["text"].as_str().unwrap_or("")
+                        )
+                    })
+                    .collect::<String>()
+            } else {
+                data["content"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .unwrap_or_else(|| serde_json::to_string_pretty(data).unwrap_or_default())
+            };
             let text = printable(&text);
             for line in text.lines().take(12) {
                 self.line(
@@ -486,7 +499,16 @@ pub(super) fn summary(outcome: &ToolOutcome) -> String {
                 };
             }
             if let Some(text) = data["content"].as_str() {
-                return format!("{} lines", text.lines().count());
+                let mut result = format!("{} lines", text.lines().count());
+                if data["truncated"] == true {
+                    result.push_str(&format!(
+                        " · truncated ({})",
+                        data["coverage"]["truncation_reason"]
+                            .as_str()
+                            .unwrap_or("limit")
+                    ));
+                }
+                return result;
             }
             if let Some(bytes) = data["bytes_written"].as_u64() {
                 return format!("{bytes} bytes written");
@@ -497,7 +519,16 @@ pub(super) fn summary(outcome: &ToolOutcome) -> String {
                 ("entries", "entries"),
             ] {
                 if let Some(items) = data[key].as_array() {
-                    return format!("{} {label}", items.len());
+                    let mut result = format!("{} {label}", items.len());
+                    if let Some(offset) = data["page"]["next_offset"].as_u64() {
+                        result.push_str(&format!(" · more results, next offset {offset}"));
+                    } else if data["truncated"] == true {
+                        result.push_str(" · incomplete coverage");
+                    }
+                    if items.iter().any(|item| item["context_truncated"] == true) {
+                        result.push_str(" · context truncated");
+                    }
+                    return result;
                 }
             }
             if let Some(code) = data["exit_code"].as_i64() {
