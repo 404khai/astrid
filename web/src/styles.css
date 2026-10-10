@@ -77,7 +77,7 @@ h3 {
   gap: 48px;
   position: sticky;
   top: 0;
-  background: #000;
+  /* background: #000; */
   z-index: 10;
 }
 .nav-box {
@@ -160,7 +160,7 @@ h3 {
 }
 .mobile-menu,
 .mobile-github {
-  display: none;
+  display: none !important;
 }
 .mobile-nav-box {
   border: 1px solid var(--line);
@@ -896,11 +896,11 @@ footer {
     display: none;
   }
   .mobile-menu {
-    display: block;
+    display: block !important;
     justify-self: start;
   }
   .mobile-github {
-    display: flex;
+    display: flex !important;
     justify-self: end;
   }
   .mobile-nav-box {
