@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Astrid",
+    "slug": "astrid-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "dev.astrid.mobile",
+      "icon": "./assets/app-icon.png"
+    },
+    "platforms": [
+      "ios"
+    ],
+    "plugins": [
+      "expo-status-bar",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ]
+    ],
+    "icon": "./assets/app-icon.png"
+  }
+}
