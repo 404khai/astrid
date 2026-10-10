@@ -149,18 +149,66 @@ Modes are not remembered after exit or read from repository settings.
 
 | Tool             | Arguments                      | Behavior                                                  |
 | ---------------- | ------------------------------ | --------------------------------------------------------- |
-| `read_file`      | `path`                         | Read a UTF-8 file                                         |
+| `read_file`      | `path`, optional `start_line`, `end_line` | Bounded UTF-8 content and numbered lines; inclusive range |
 | `write_file`     | `path`, `content`, `overwrite` | Atomic creation or explicit overwrite; parent must exist  |
 | `edit_file`      | `path`, `old_text`, `new_text` | Exact replacement only when there is one match            |
 | `list_directory` | `path`                         | Sorted immediate entries                                  |
 | `glob`           | `pattern`                      | Sorted workspace-relative file matches                    |
-| `grep`           | `path`, `pattern`              | Rust regex search with filenames and 1-based line numbers |
+| `grep`           | `path`, `pattern`, optional filters/context/page controls | Bounded Rust regex results with filenames and numbered context |
 | `shell`          | `command`                      | Policy-controlled noninteractive `/bin/sh -c` execution |
 
 File tools automatically operate within the workspace. Traversal, outside
 paths, symlink paths, and mutations to hard-linked files are denied. Search
 skips `.git`, symlinks, and binary files for textual grep. Existing file
 permissions survive edits. Empty or ambiguous edit targets cause no mutation.
+
+Prefer targeted inspection over whole-file reads. For example, the model can call
+`read_file` with `{"path":"src/runtime.rs","start_line":600,"end_line":660}`.
+Line numbers are 1-based and both ends are inclusive. Omitted/null `start_line`
+means 1; omitted/null `end_line` means EOF. Results preserve raw `content` and
+add `lines: [{"line":600,"text":"..."}]`. An EOF before the requested start
+returns an empty range with `range_start_reached=false`, not a tool error.
+`coverage.complete` describes delivery of the requested range, not the whole file.
+Check `truncated`, `coverage.truncation_reason` (`output_limit` or `scan_limit`),
+and `last_line_partial` before treating an excerpt as a complete line.
+
+Reads scan at most 16 MiB plus one EOF-detection byte, with cancellation between
+fixed-size chunks. Only the requested range is retained: at most 32 KiB of raw
+content and 1,024 lines, reduced further to keep the entire JSON result within
+64 KiB. A distant range therefore avoids retaining its prefix but still requires
+bounded prefix IO. Unscanned bytes and total omitted file size are unknown;
+`observed_bytes`/`omitted_observed_bytes` count only observed requested-range data.
+Line text removes LF/CRLF endings; `content` retains them. A long line may end at
+a valid UTF-8 boundary, explicitly marked partial.
+
+`grep` supports `include_glob` and `exclude_glob` on workspace-relative paths
+(e.g. `**/*.rs`); filters are applied before bounded candidate selection.
+`before_context` and `after_context` each accept 0–20 lines (default 0).
+Each match retains `path`, `line`, and `text`, adding numbered `before`/`after`
+arrays when context is requested. Each context array has a 4 KiB serialized budget;
+oversized surrounding lines are omitted and `context_truncated` reports this.
+Match text is not clipped: an indivisible match exceeding the page byte budget
+is omitted with `coverage.oversized_matches` and incomplete search coverage.
+
+Pages use `offset` (default 0) and `limit` (default 100, maximum 1,024), with a
+32 KiB serialized match budget. For example:
+
+```json
+{"path":"src","pattern":"ModelCall","include_glob":"**/*.rs","before_context":2,"after_context":2,"offset":0,"limit":20}
+```
+
+Follow `page.next_offset` using identical query/filter/context arguments. Ordering
+is workspace-relative path then line; each call rescans the bounded candidates.
+Offsets count matching lines eligible for inspection, including records omitted
+because their serialized size is too large. Pagination is stable only while files
+are unchanged; it is not a saved filesystem snapshot. `page.stop_reason` distinguishes
+`match_limit` from `output_limit`. A null next offset means no additional page is
+known within the bounded scan; it does **not** prove complete repository coverage.
+Always inspect `coverage.complete` and its omission/scan counters. Existing 1 MiB
+per-file, 16 MiB aggregate, 16 KiB match-line, depth, and inventory limits still apply.
+The final page does not require an extra empty call merely to confirm completion.
+Omitted or null optional arguments use defaults; provider strict schemas expose
+these controls as required nullable fields.
 
 Permission policies are `allow`, `ask`, or `deny` for native reads, native
 writes, and shell execution. Defaults allow validated workspace file operations
