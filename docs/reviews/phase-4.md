@@ -1,15 +1,59 @@
 # Phase 4 review: optional trace and inference observability
 
-Date: 2026-10-08
-Implementation baseline: `010a36d` (`feat/interactive-sessions-modes`)
-Isolated branch/worktree: `feat/observability`, `/Users/admin/Developer/astrid-worktrees/feat-observability`
-Status: Implementation complete; deterministic validation and solo review
+Current audit: 2026-10-10, `cdebe18` plus closure worktree changes
+Status: Administratively closed with documented limitations; solo current audit
 Authorization: Maintainer requested "Implement the observability and its related adrs 8 & 9".
-Maintainer closure decision: Pending
+Maintainer closure decision: Approved on 2026-10-10, conditional on verified exit
+criteria and accurate limitations; the current audit below supplies that evidence
 Next-phase authorization: None; AGENTS.md remains Phase 4
-Separate previous-phase closure dispositions: Phase 2 and Phase 3 pending
+Separate previous-phase closure dispositions: Phases 2 and 3 approved 2026-10-10
+Historical implementation baseline: 2026-10-08, `010a36d`
+(`feat/interactive-sessions-modes`); isolated `feat/observability` worktree
 
-## Exit criteria and evidence
+## Current exit-criteria audit
+
+The exit criterion is completed-run inspection showing where context, tokens,
+time, tools and model calls were spent, with provider availability limits.
+
+| Requirement | Current code and rerun evidence | Assessment / limit |
+| --- | --- | --- |
+| Prompt/completion/cached tokens and provider/model | [openai.rs](../../src/openai.rs), [observability.rs](../../src/observability.rs); actual-adapter local HTTP and absent/zero/partial/invalid usage tests | Met where supplied; usage never inferred and cached tokens are an input subset; no live subscription telemetry verification |
+| TTFT, model latency, generation rate | Adapter preparation/auth/dispatch/first-visible-text/attempt and runtime offsets; fixed-timeline, no-text, cancellation and stalled-consumer tests | Honest measured latency available; true TTFT and generation/decode rate unavailable, not synthesized from chunks |
+| Tool execution time | Runtime measures actual executor future; fixed permission/execution and multicall fixtures | Met; permission and delivery waits separated, inclusive intervals can overlap |
+| Context utilization | ContextSelected/Prepared allowlist snapshots, budgets/counts/summary bytes; multicall fixture reads recorded summaries | Met for local request admission/selection; no exact provider-capacity utilization or persisted source text |
+| Cost and local telemetry | Summary/stats explicit optional cost/true_ttft/decode fields, missing-usage tests | Unavailable; no known subscription billing basis or implemented local backend exposing prefill/decode/memory/KV metrics |
+| Persistent traces and reconstruction | Bounded private schema-1 JSONL projection and reader; disconnected/headless multicall, cancellation/failure, privacy sentinels and malformed-prefix/schema tests | Met as ADR 0009 lifecycle/measurement inspection; no transcript, event sourcing or recovery |
+| trace/list/stats and completeness | CLI isolated settings/inspection fixture, reader and stats coverage assertions | Met; unknown differs from zero, partial/unreadable/unrecorded coverage explicit |
+| Optional observability preserves execution | Off-mode, disk-limit-after-committed-edit, queue/deadline and runtime regressions | Met; default off, frozen per run, separate recorder diagnostics, no disabling mandatory events |
+
+Recommendation: **close Phase 4 with explicit limitations**, including no live
+subscription telemetry acceptance. P4-06 requires separating live evidence from
+mocks; it does not require inventing unavailable provider data or a live call.
+No required implementation gap was found under accepted ADRs 0008/0009. The
+[shared validation and debt dispositions](foundation-closure.md) record 189 passing
+tests and the subsequently approved maintainer decision. Phase 4 remains active
+until a separate successor authorization; ADR 0013 is accepted with implementation
+Not Started.
+
+Current retrospective: preserve the six lessons and measured historical overhead
+below. Sessions are now resumable at idle boundaries under ADR 0012 in a separate
+content store; metadata traces still cannot resume them. Total retained history,
+recorder startup/capacity scan overhead, store contention and syscall lifetime
+remain debt with future triggers in the shared audit. Neither first text nor
+inclusive intervals should be relabeled as token/prefill/decode performance.
+Next recommended milestone is scoped Mac A after foundation disposition and
+ADR 0013 acceptance, not automatic Phase 5 or background-service implementation.
+
+Closure resolution (2026-10-10): the maintainer explicitly approved administrative
+closure of Phases 2, 3 and 4 provided existing exit criteria were verified and
+limitations accurately documented. The current matrix and shared validation
+record satisfy those conditions within the accepted contracts. No unverified live
+telemetry, unavailable metric or new runtime guarantee is marked complete.
+Phase 4 remains the active marker. ADR 0013 is separately accepted, with Mac A
+implementation Not Started and separate implementation authorization required.
+The remaining decision/status statements below preserve the historical review.
+
+## Historical exit criteria and evidence (2026-10-08)
 
 | Criterion | Implementation / evidence | Limits |
 | --- | --- | --- |

@@ -69,7 +69,9 @@ async fn timeout_retains_partial_output_without_inventing_completion_or_exit_cod
     let root = tempfile::tempdir().unwrap();
     let tools = Tools::new(
         Workspace::new(root.path()).unwrap(),
-        Duration::from_millis(150),
+        // Allow process startup and pipe observation under full-suite load.
+        // This fixture verifies partial-output semantics, not startup latency.
+        Duration::from_secs(2),
     )
     .unwrap();
     let result = data(

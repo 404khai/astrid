@@ -9,9 +9,17 @@ Active phase: Phase 4; explicitly authorized by the maintainer on 2026-10-08
 Maintainer request: "use our protocol on phase4" and consider a settings command
 to turn observability on or off. Subsequent authorization:
 "Implement the observability and its related adrs 8 & 9" accepts both proposed
-contracts and authorizes implementation. Separate Phase 2/3 closure remains pending.
+contracts and authorizes implementation. Separate Phase 2/3 closure was pending
+until the maintainer decision on 2026-10-10.
 
-## Previous-phase review
+Current disposition (2026-10-10): all implementation requirements re-audited;
+administrative closure approved with documented limitations and verified criteria,
+including explicitly unverified live subscription telemetry. Phase 4 remains active. Historical baseline
+and merge instructions below are not the current Git state. See the
+[current review](../reviews/phase-4.md) and
+[foundation audit](../reviews/foundation-closure.md).
+
+## Historical previous-phase review (2026-10-08)
 
 The [Phase 3 review](../reviews/phase-3.md) evidences all context-engine exit
 criteria and recommends closure with explicit limitations. Its separate
@@ -93,13 +101,17 @@ sourcing, tracing framework dependency or new crate is necessary.
 
 Owner: Codex root agent. P4-01 through P4-06 are Done with evidence in
 [the review](../reviews/phase-4.md). P4-00's authorization and ADR acceptance are Done;
-its separate Phase 2/3 closure dispositions remain pending and do not undo explicit
-Phase 4 authorization. No independent agent review is claimed.
+its separate Phase 2/3 closure dispositions were approved on 2026-10-10. This
+does not change the earlier Phase 4 authorization or advance its marker. No independent agent review is claimed.
 Every implementation ticket requires deterministic failure
 fixtures, documentation, and the standard locked test/fmt/clippy checks from
 [the development protocol](../development.md).
 
 ### P4-00: Resolve closure, contracts and authorization
+
+State: Done. Phase 4 and ADRs 0008/0009 authorized 2026-10-08; separate
+Phase 2/3 administrative closure approved 2026-10-10 against the current audits.
+The following acceptance text records the original ticket requirements.
 
 Dependencies: maintainer disposition, ADRs 0008/0009.
 Acceptance: separately record Phase 3 closure and Phase 4 authorization; record
@@ -182,7 +194,7 @@ and repetitions recorded. Review exit criteria against actual evidence, document
 metadata-only deviations and retained memory debt. Live telemetry evidence is
 separate from mocks. No automatic Phase 5 transition.
 
-## Grilling resolution
+## Historical grilling resolution (2026-10-08)
 
 The maintainer accepted both contracts and explicitly requested implementation.
 AGENTS.md now records Phase 4. Closure of Phase 3 remains a separately named

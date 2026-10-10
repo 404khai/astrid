@@ -3,12 +3,19 @@
 Date: 2026-10-07
 Status: Implementation complete; deterministic acceptance and adversarial review passed
 Baseline: `debd385` (same source tree as inspected `c62df7a`)
-Active phase: Phase 3; do not begin Phase 4
+Historical implementation phase: Phase 3
 Phase authorization: maintainer requested adversarial critique and implementation
 on 2026-10-07. Admission and compaction recommendations were explicitly accepted
 later with: "use both recommendations, then open a pr for it on a new branch".
-Previous-phase closure: separate [Phase 2 review](../reviews/phase-2.md) disposition
-remains pending; this does not undo explicit Phase 3 authorization.
+Previous-phase closure: [Phase 2 review](../reviews/phase-2.md) administratively
+closed on 2026-10-10; this is separate from the earlier Phase 3 authorization.
+
+Current disposition (2026-10-10): administrative closure approved with documented
+limitations and verified criteria evidenced in the current review. Phase 4 was authorized on 2026-10-08 and remains
+active. This plan records historical delivery scope; ADRs 0010–0012 extend
+follow-ups, permission presets and idle persistence. See the
+[current review](../reviews/phase-3.md) and
+[foundation audit](../reviews/foundation-closure.md).
 
 ## Plain-language outcome
 
@@ -49,7 +56,7 @@ were never silently recorded as consent.
 
 | ID | Outcome | Dependencies | State |
 | --- | --- | --- | --- |
-| P3-00 | Record phase authorization and separate previous-phase closure | Maintainer decisions | Authorization done; Phase 2 closure disposition pending |
+| P3-00 | Record phase authorization and separate previous-phase closure | Maintainer decisions | Done; Phase 2 closure approved 2026-10-10 |
 | P3-01 | Resolve context admission/compaction contracts | Grilling; ADRs 0006/0007 | Done |
 | P3-02 | Measure the actual prepared request | Phase authorization; provider boundary | Done |
 | P3-08 | Track stable context sources and addition reasons | Existing runtime/event contracts | Done |
@@ -167,7 +174,8 @@ checks respectively; those historical numbers are not the final suite total.
 
 ## Configuration and limits
 
-CLI defaults: estimated context allowance 32,768; response reserve 4,096;
+Current CLI defaults (2026-10-10): estimated context allowance 65,536
+(original implementation: 32,768); response reserve 4,096;
 serialized request ceiling 524,288 bytes; summary ceiling 4,096 UTF-8 bytes;
 `file-references` policy. Configure `--context-tokens`, `--response-reserve`,
 `--context-bytes`, `--summary-bytes`, and `--context-policy`. The reserve subtracts

@@ -18,3 +18,4 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0010](0010-interactive-sessions.md) | Interactive in-memory sessions | Accepted | Implemented |
 | [0011](0011-permission-modes.md) | Permission modes and client display | Accepted | Implemented |
 | [0012](0012-local-session-persistence.md) | Workspace-scoped local session persistence | Accepted | Implemented; deterministic validation passed |
+| [0013](0013-native-mac-helper-boundary.md) | Native Mac client and bundled Rust helper boundary | Accepted | Not Started; separate implementation authorization pending |

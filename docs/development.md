@@ -7,6 +7,13 @@ advance the active phase.
 
 Start here for the current phase:
 
+- [Phase 2–4 foundation closure audit](reviews/foundation-closure.md): current
+  validation, explicit debt dispositions and the 2026-10-10 administrative closure decision.
+
+- [Personal-agent roadmap reconciliation](plans/personal-agent-roadmap.md): established
+  product direction, architecture audit, proposed delivery order and Mac client
+  gates. This proposal does not close Phase 4 or authorize its successor.
+
 - [Phase 4 plan and tickets](plans/phase-4.md): accepted settings/trace contracts and implementation.
 - [Phase 4 review](reviews/phase-4.md): deterministic evidence, recording overhead, and limitations.
 - [Phase 3 plan and tickets](plans/phase-3.md): accepted context contracts, implementation, and evidence.

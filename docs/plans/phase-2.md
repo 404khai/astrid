@@ -3,8 +3,16 @@
 Status: Implementation complete; acceptance and adversarial review passed
 Closure review: [Phase 2 review](../reviews/phase-2.md), 2026-10-07
 Baseline: `4b8e93f`, reviewed 2026-10-06
-Active implementation phase: Phase 2, authorized by maintainer on 2026-10-07
+Historical implementation phase: Phase 2, authorized by maintainer on 2026-10-07
 Owner: Maintainer; ticket implementers assigned when work starts
+
+Current disposition (2026-10-10): implementation criteria re-audited against
+`cdebe18`; administrative closure approved by the maintainer with documented
+limitations, conditional on verified criteria (evidenced in the current review).
+Phase 4 remains active. Original exclusions and terminal follow-ups below record
+the Phase 2 delivery history; later accepted context/trace/session ADRs extend them.
+See [current review](../reviews/phase-2.md) and
+[foundation audit](../reviews/foundation-closure.md).
 
 ## Outcome
 

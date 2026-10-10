@@ -1,12 +1,59 @@
 # Phase 3 review: context engine
 
-Date: 2026-10-07
-Baseline: `debd385` plus the reviewed implementation worktree
-Status: Implementation complete; final acceptance evidence below
-Maintainer closure decision: Pending review disposition
-Next-phase authorization: Not requested; AGENTS.md remains Phase 3
+Current audit: 2026-10-10, `cdebe18` plus closure worktree changes
+Status: Administratively closed with documented limitations; solo current audit
+Maintainer closure decision: Approved on 2026-10-10, conditional on verified exit
+criteria and accurate limitations; the current audit below supplies that evidence
+Current phase: Phase 4; separately authorized 2026-10-08
+Historical review: 2026-10-07, `debd385` plus reviewed implementation worktree
 
-## Exit criteria and evidence
+## Current exit-criteria audit
+
+The exit criterion is inspecting, budgeting, compacting and explaining the actual
+working request context.
+
+| Requirement | Current code and rerun evidence | Assessment / limit |
+| --- | --- | --- |
+| ContextItem/Source/Budget/Snapshot/Selection and provenance | [context.rs](../../src/context.rs), model/runtime/events; source/history-index and independent replay tests | Met; requested file labels do not establish successful/current reads |
+| Token estimation/counting and context budget | [openai.rs](../../src/openai.rs) actual request accounting; context/context_budget HTTP, Unicode/opaque, reserve/byte and default-budget fixtures | Met as ADR 0006 estimate plus exact byte ceiling; provider fit remains unknown |
+| Message pruning | Complete-exchange selection in context and checked events; multi-tool denied/success, overflow, reused-ID and follow-up history fixtures | Met; instructions/original/current tasks/latest exchange protected, original history retained |
+| Compaction | Deterministic bounded summary; privacy, coverage/path-before-excerpt, lineage, fallback and cancellation tests | Met under ADR 0007; incomplete/stale, no semantic equivalence or extra inference |
+| File relevance heuristics/experiment | File-reference/lexical and recency policies; fixed selection comparison fixture and recorded experiment | Met; retention comparison supplies no task-success evidence or semantic index |
+| Inspection and reasons for addition/retention/eviction/compaction | Runtime ContextItemAdded/Inherited/Selected/Prepared, CLI show-context; sent-wire match and replay/forgery tests | Met; live headless state/CLI inspection, metadata traces omit source text; no required standalone historical context command |
+| Preserve previous guarantees | Runtime preflight, preparation drift checks and permission/cancellation suites | Met; rejected admission starts no inference/auth, cancellation checks surround synchronous measurement |
+
+Recommendation: **close Phase 3 with explicit limitations**. No remaining required
+implementation work was found. [Shared validation and debt dispositions](foundation-closure.md)
+record the current 189-test suite and closure decision. Historical Phase 2/3
+adversarial findings have regression coverage; this current audit is solo.
+
+Current differences: the default estimated allowance is **65,536**, response
+reserve 4,096, exact request ceiling 524,288 bytes and summary ceiling 4,096 bytes
+(`ContextBudget::default`, CLI uses that default). ADR 0010 extends whole-exchange
+selection to follow-up submissions; ADR 0012 persists private idle conversations
+and provenance independently of metadata traces. Targeted read results include
+numbered lines and coverage within bounded JSON; corresponding wire-accounting
+fixtures still assert eviction and compaction. These accepted extensions do not
+erase the original limits or silently change the provider-fit guarantee.
+
+Current retrospective: retain the six lessons below. Ephemeral-only history and
+no persistence are historical scope statements now extended by ADR 0012. Model
+summaries, embeddings and dependency indexing remain premature. Total retained
+history/assembly memory and synchronous copying remain debt; bound future client
+history projections without claiming the request budget bounds all memory. Do
+not equate summaries with fresh file evidence, idle snapshots with active-run
+recovery, or selection quality with task success. Only closure disposition remains.
+
+Closure resolution (2026-10-10): the maintainer explicitly approved administrative
+closure of Phases 2, 3 and 4 provided existing exit criteria were verified and
+limitations accurately documented. The current matrix and shared validation
+record satisfy those conditions within the accepted contracts. No unverified live
+telemetry, unavailable metric or new runtime guarantee is marked complete.
+Phase 4 remains the active marker. ADR 0013 is separately accepted, with Mac A
+implementation Not Started and separate implementation authorization required.
+The remaining decision/status statements below preserve the historical review.
+
+## Historical exit criteria and evidence (2026-10-07)
 
 | Criterion | Implementation | Evidence | Limits |
 | --- | --- | --- | --- |

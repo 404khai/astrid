@@ -1,5 +1,13 @@
 # Astrid
 
+An inference-aware personal AI agent runtime for delegated tasks across applications,
+devices, and compute environments. The Rust harness is its execution foundation;
+coding is its first implemented capability. The CLI remains supported, and native
+macOS using SwiftUI/AppKit is the next recommended application milestone.
+See the [roadmap reconciliation](docs/plans/personal-agent-roadmap.md) for the
+current audit, proposed milestones and implementation gates. Background execution
+and connected device capabilities are not implemented yet.
+
 Development planning: [phase review and delivery process](docs/development.md),
 [Phase 1 review](docs/reviews/phase-1.md), and
 [Phase 2 tickets](docs/plans/phase-2.md).
