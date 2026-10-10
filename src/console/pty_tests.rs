@@ -752,3 +752,36 @@ fn pty_file_mentions_lookup_and_insert_without_dispatching() {
     pty.send(b"/quit\r");
     pty.finish();
 }
+
+#[test]
+fn pty_sessions_survive_restart_with_first_message_names_and_active_selection() {
+    let root = tempfile::tempdir().unwrap();
+    let mut first = Pty::new("conversations", root.path(), "xterm-256color");
+    first.wait_for_screen("Message Astrid");
+    first.send(b"first session name\r");
+    first.wait_for("REPLY:first session name:COUNT:1");
+    first.wait_for_screen("Message Astrid");
+    first.send(b"/new\r");
+    first.wait_for_screen("New session");
+    first.send(b"second session name\r");
+    first.wait_for("REPLY:second session name:COUNT:1");
+    first.wait_for_screen("Message Astrid");
+    first.send(b"/quit\r");
+    assert!(first.finish().success());
+    let mut second = Pty::new("conversations", root.path(), "xterm-256color");
+    second.wait_for_screen("Message Astrid");
+    second.send(b"follow up after restart\r");
+    second.wait_for("REPLY:follow up after restart:COUNT:2");
+    second.wait_for_screen("Message Astrid");
+    second.send(b"/sessions\r");
+    second.wait_for_screen("first session name");
+    second.wait_for_screen("second session name");
+    assert!(!second.parser.screen().contents().contains("in memory"));
+    second.send(b"\x1b[A\r");
+    second.wait_for_screen("saved locally");
+    second.send(b"resume the first session\r");
+    second.wait_for("REPLY:resume the first session:COUNT:2");
+    second.wait_for_screen("Message Astrid");
+    second.send(b"/quit\r");
+    assert!(second.finish().success());
+}

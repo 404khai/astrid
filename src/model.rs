@@ -6,7 +6,8 @@ use std::io;
 use crate::openai::ResponseContinuation;
 
 /// Conversation entries remain typed; provider replay data belongs to its adapter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum Message {
     User(String),
     /// Deterministic incomplete task data, never executable tool requests.
@@ -23,11 +24,35 @@ pub struct ModelRequest<'a> {
 }
 
 /// Constructed by the adapter only after successful response completion.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ModelResponse {
     pub text: String,
     pub tool_calls: Vec<ToolCall>,
     pub(crate) continuation: ResponseContinuation,
+}
+
+// Deserialization must preserve the adapter's completed-response invariant.
+impl<'de> Deserialize<'de> for ModelResponse {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct StoredResponse {
+            text: String,
+            tool_calls: Vec<ToolCall>,
+            continuation: ResponseContinuation,
+        }
+        let stored = StoredResponse::deserialize(deserializer)?;
+        let response = Self {
+            text: stored.text,
+            tool_calls: stored.tool_calls,
+            continuation: stored.continuation,
+        };
+        response
+            .continuation
+            .validate_response(&response)
+            .map_err(serde::de::Error::custom)?;
+        Ok(response)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

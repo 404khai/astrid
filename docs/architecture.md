@@ -43,20 +43,22 @@ Seven aggregate categories contain only counts/sizes, never private continuation
 
 Library callers may explicitly disable budgeting with `context_budget: None`.
 Budgeted providers must implement pure request accounting; otherwise preflight
-fails explicitly. No persistence, total retained-history/model-output memory bound,
-or immediate interruption of synchronous serialization is introduced. See
+fails explicitly. Context selection does not bound total retained-history or model
+output memory, nor interrupt synchronous serialization. Idle session persistence
+is defined separately by ADR 0012. See
 [the Phase 3 plan](plans/phase-3.md), [ADR 0006](adr/0006-context-admission-and-selection.md),
 and [ADR 0007](adr/0007-context-compaction.md).
 
-One Cargo package contains a library and CLI binary. Sessions remain ephemeral;
-tools remain sequential; OpenAI remains the only provider. `run` creates a fresh
+One Cargo package contains a library and CLI binary. Sessions and tools execute
+sequentially; interactive clients persist idle snapshots under ADR 0012. OpenAI
+remains the only provider. `run` creates a fresh
 session; `run_in_session` transfers an existing workspace-bound session through
 another run with a fresh RunId. Rejected submissions return unchanged session
 ownership. Follow-up runs emit `ContextInherited` to seed prior context provenance
 for independent event reconstruction. Incomplete terminal tool batches reject
 continuation before new work. The interactive CLI owns active selection and a
-32-session list; it returns to input after each terminal run outcome. Permission
-modes are presets over the existing policy, not a new executor or path bypass.
+32-session list restored from workspace-scoped local storage. It returns to input
+after each terminal run outcome. Permission modes are presets over the existing policy, not a new executor or path bypass.
 See [ADR 0010](adr/0010-interactive-sessions.md) and
 [ADR 0011](adr/0011-permission-modes.md).
 
@@ -299,3 +301,12 @@ unique paths. Ignore/traversal failures are explicit, and neither pass follows
 symlinks or descends into the lookup-specific generated-directory exclusions.
 The one-slot composer worker queues bound pending queries/results and discard
 stale responses. References remain task text, not implicit content ingestion.
+
+
+`session_store` is a headless versioned store of idle workspace sessions. The
+runtime validates restored message/ledger ordering and provider continuation;
+terminal incomplete batches can be stored but retain existing continuation
+rejection. `Sessions` owns names derived from first tasks, menu selection and
+save timing; atomic storage, private permissions, per-workspace writer locks and
+byte limits are library policy. Session content never enters metadata-only traces.
+Corrupt or unsupported stores are rejected without silent replacement. See ADR 0012.

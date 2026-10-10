@@ -14,15 +14,15 @@ heuristic is not a full context total or guaranteed provider fit.
 The CLI protects instructions, your task, and the latest complete tool exchange.
 Older exchanges are selected with file-reference/lexical priority and recency,
 then omitted history can become one bounded deterministic summary. Defaults:
-32,768 estimated context units, 4,096 response-reserve units, 524,288 serialized
+65,536 estimated context units, 4,096 response-reserve units, 524,288 serialized
 request bytes, and 4,096 summary text bytes. Change them with `--context-tokens`,
 `--response-reserve`, `--context-bytes`, and `--summary-bytes`; compare policies
 with `--context-policy recency` or `--context-policy file-references`.
 
 If protected context exceeds the configured allowance, the run stops before the
 next model invocation. The response reserve is planning headroom, not an enforced
-provider output limit. Original ephemeral history remains retained; request
-selection does not bound all runtime memory or create persisted context.
+provider output limit. Original session history remains retained; request
+selection does not bound all runtime memory; interactive idle snapshots persist session state separately.
 
 For hands-on checks, see [Try Phase 2](docs/testing-phase-2.md).
 
@@ -58,7 +58,7 @@ Authentication follows the documented [open-source Sign in with ChatGPT flow](ht
 Astrid owns its registration and credentials; it never reads Codex credentials.
 Credentials and a stable host identifier live under `~/.config/astrid/`, with
 owner-only permissions. Refreshes are serialized across processes and rotating
-credentials are saved atomically. Conversation history is only held in memory.
+credentials are saved atomically. Interactive conversations are saved separately in a private workspace-scoped session store.
 This release implements subscription authentication; API-key authentication is
 not a prerequisite and is not automatically selected as a fallback.
 
@@ -273,8 +273,9 @@ and collection failures are explicit. No rollback, staging, or commits occur.
 Native mutation evidence is correlated to its tool under the stated concurrency
 assumption. Shell/external changes are observations during the run; causation is
 not guaranteed. Final evidence is attempted even for cancelled/failed runs without
-rewriting committed tool outcomes. Events/results remain in memory; conversation
-history still grows without compaction.
+rewriting committed tool outcomes. Full event streams are not saved as session
+logs. Interactive idle snapshots persist original conversation history separately;
+request selection does not compact that retained history.
 
 ## Validation and acceptance
 
@@ -371,8 +372,8 @@ Input is capped at 64 KiB with a visible notice when a paste exceeds that limit.
 During a run, approvals require typing `yes` and pressing Enter after the full
 command is displayed. Pasted text and pre-prompt typeahead cannot grant an
 inline approval. Redirected output retains canonical `/dev/tty` approval input.
-Saved authentication is reused. Bare `astrid` keeps in-memory conversations
-available for follow-ups; `astrid run` starts one fresh repository task.
+Saved authentication is reused. Bare `astrid` saves workspace conversations
+for follow-ups across launches; `astrid run` starts one fresh repository task.
 
 The default inline display inserts completed rows above its live region, keeping
 the transcript in normal scrollback. Use your terminal's scrollbar, mouse wheel, trackpad, or
@@ -446,3 +447,24 @@ only when no ordinary files match. Dependency/build directories remain excluded.
 Library callers can use `astrid::file_lookup::find_files(repo_root, base, pattern,
 max_hits)`. It accepts repository-relative bases and glob patterns, returns sorted,
 unique paths with `/` separators, and reports validation/traversal failures.
+
+Interactive context limits can be set before launch with `ASTRID_CONTEXT_TOKENS`,
+`ASTRID_RESPONSE_RESERVE`, and `ASTRID_CONTEXT_BYTES`; the same environment
+variables supply defaults for the equivalent `astrid run` flags. Defaults remain
+65,536 estimated tokens, a 4,096 response reserve, and 524,288 serialized bytes.
+These are local admission limits, not a claim about the model's context window.
+Protected overflow reports its measured heuristic, byte limits, and category
+sizes. Instructions, the original/current tasks, and the latest complete exchange
+cannot be silently discarded to make a request fit.
+
+
+`/sessions` restores conversations and active selection when Astrid is reopened in
+the same repository. Session names come from the first submitted message. Snapshots
+live under `~/.config/astrid/sessions/<workspace-hash>/state.json`, with private
+file/directory permissions, atomic replacement, a 32 MiB workspace ceiling, and
+an 8 MiB per-session ceiling. They include conversation/tool data and provider
+continuation, independently of observability, but no authentication state or saved
+permission grants. One interactive process can write each workspace store at a
+time. Save failures remain visible and do not change a run's outcome. Recovery
+uses the last saved idle state; no interrupted tool execution is replayed.
+Sessions that were already lost before persistence was introduced are unavailable.

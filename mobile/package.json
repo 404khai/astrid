@@ -1,0 +1,27 @@
+{
+  "name": "astrid-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit",
+    "export:ios": "expo export --platform ios"
+  },
+  "dependencies": {
+    "@expo/ui": "~57.0.22",
+    "expo": "~57.0.27",
+    "expo-build-properties": "~57.0.22",
+    "expo-status-bar": "~57.0.1",
+    "expo-symbols": "~57.0.3",
+    "react": "19.2.3",
+    "react-dom": "^19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "~6.0.3"
+  }
+}

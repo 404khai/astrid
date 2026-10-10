@@ -85,7 +85,7 @@ impl Settings {
         }
     }
 }
-fn private_directory(path: &Path) -> io::Result<()> {
+pub(crate) fn private_directory(path: &Path) -> io::Result<()> {
     match fs::symlink_metadata(path) {
         Ok(m) if !m.is_dir() || m.file_type().is_symlink() => {
             return Err(io::Error::other(
@@ -103,7 +103,7 @@ fn private_directory(path: &Path) -> io::Result<()> {
     }
     fs::set_permissions(path, fs::Permissions::from_mode(0o700))
 }
-fn private_open(path: &Path, create: bool) -> io::Result<fs::File> {
+pub(crate) fn private_open(path: &Path, create: bool) -> io::Result<fs::File> {
     let mut opts = fs::OpenOptions::new();
     opts.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .mode(0o600);
