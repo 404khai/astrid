@@ -1778,9 +1778,10 @@ Required behavior:
 
 - Bare `astrid` returns to input after completed, failed, or cancelled runs.
   Each message is a new run in the selected session, retaining committed history.
-- `/new` creates a fresh session; `/sessions` lists and switches sessions in the
-  current process. Sessions are ephemeral and workspace-bound. Initial client
-  limit: 32 sessions. Request budgets do not bound total retained session memory.
+- `/new` creates a fresh session; `/sessions` lists and switches workspace-bound
+  sessions, restored across launches under ADR 0012. Names derive from the first
+  chat sent in each session. Initial client limit: 32 sessions. Request budgets
+  do not bound total retained session memory; storage snapshots have byte ceilings.
 - `astrid run` remains a one-shot interface.
 - `/mode` selects a mode; `/mode ask`, `/mode auto`, and `/mode unbound` select it
   directly. The active mode is shown in input and execution status.
@@ -1799,5 +1800,10 @@ Required behavior:
   committed state, reject the follow-up explicitly, and direct the user to
   `/new`; never silently replay side effects or manufacture tool results.
 
-Session restoration after process exit, persisted transcripts, background
-workers, and checkpoint recovery remain outside this extension.
+On 2026-10-09, the maintainer explicitly required non-temporary sessions and names
+based on the first submitted chat. ADR 0012 supersedes only ADR 0010's ephemeral
+storage restriction: workspace-scoped private idle snapshots restore conversations
+and selection across launches. Snapshots include tool data/provider continuation,
+are separate from metadata traces, and never persist permissions or replay tools.
+Background workers and mid-run checkpoint recovery remain outside this extension.
+The current phase remains Phase 4.

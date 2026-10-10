@@ -1,4 +1,4 @@
-//! Sequential, observable execution with ephemeral conversational state.
+//! Sequential, observable execution with headless conversational sessions and optional local idle snapshots.
 
 pub mod agent;
 pub mod auth;
@@ -14,5 +14,6 @@ pub mod openai;
 pub mod output;
 pub mod permissions;
 pub mod runtime;
+pub mod session_store;
 pub mod tools;
 pub mod workspace;

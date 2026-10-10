@@ -68,7 +68,8 @@ pub enum RunOutcome {
         uninspected_tool_results: bool,
     },
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Session {
     pub id: SessionId,
     pub messages: Vec<Message>,
@@ -86,10 +87,59 @@ impl Session {
             workspace: workspace.root().to_owned(),
         }
     }
+    /// Validate restored state, preserving a terminal incomplete tool batch for
+    /// inspection. `run_in_session` still rejects continuing that batch.
+    pub(crate) fn validate_persisted(
+        &self,
+        workspace: &crate::workspace::Workspace,
+    ) -> Result<(), String> {
+        if self.workspace != workspace.root() {
+            return Err("stored session belongs to another workspace".into());
+        }
+        self.validate_provenance()?;
+        if self.messages.is_empty() {
+            return Ok(());
+        }
+        if !matches!(self.messages.first(), Some(Message::User(_))) {
+            return Err("stored session lacks an original task".into());
+        }
+        let mut seen = std::collections::HashSet::new();
+        let mut index = 1;
+        while index < self.messages.len() {
+            match &self.messages[index] {
+                Message::User(_) => index += 1,
+                Message::Assistant(response) => {
+                    response.continuation.validate_response(response)?;
+                    for call in &response.tool_calls {
+                        if call.call_id.is_empty() || !seen.insert(&call.call_id) {
+                            return Err("invalid or duplicate stored tool call ID".into());
+                        }
+                    }
+                    index += 1;
+                    for call in &response.tool_calls {
+                        match self.messages.get(index) {
+                            Some(Message::Tool(result))
+                                if result.call_id == call.call_id && result.name == call.name =>
+                            {
+                                index += 1
+                            }
+                            None => return Ok(()), // Interrupted terminal batch: preserved, never resumed.
+                            _ => return Err("stored tool result does not match its request".into()),
+                        }
+                    }
+                }
+                _ => return Err("invalid stored exchange ordering".into()),
+            }
+        }
+        Ok(())
+    }
     fn validate_history(&self) -> Result<(), String> {
         if !self.messages.is_empty() {
             crate::context::exchange_ranges(&self.messages).map_err(|error| error.to_string())?;
         }
+        self.validate_provenance()
+    }
+    fn validate_provenance(&self) -> Result<(), String> {
         let mut next_message = 0;
         for (index, item) in self.context.items.iter().enumerate() {
             if item.id.0 != index || item.added_reason.is_empty() {
@@ -328,7 +378,7 @@ pub async fn run(
     .await)
 }
 
-/// Execute another task in an owned, workspace-bound ephemeral session.
+/// Execute another task in an owned, workspace-bound session.
 /// Incomplete terminal tool batches are rejected, never retried or replayed.
 pub async fn run_in_session(
     provider: &dyn ModelProvider,

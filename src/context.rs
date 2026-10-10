@@ -193,7 +193,7 @@ pub struct ContextBudget {
 impl Default for ContextBudget {
     fn default() -> Self {
         Self {
-            estimated_context_tokens: 32_768,
+            estimated_context_tokens: 65_536,
             response_reserve_tokens: 4_096,
             max_request_bytes: 524_288,
             max_summary_bytes: 4_096,
@@ -286,9 +286,9 @@ pub enum ContextError {
     #[error("provider does not expose request accounting required for context budgeting")]
     AccountingUnavailable,
     #[error(
-        "protected instructions, task, and latest exchange exceed the configured context allowance"
+        "protected instructions, task, and latest exchange exceed the configured context allowance: {details}"
     )]
-    ProtectedOverflow,
+    ProtectedOverflow { details: String },
     #[error("invalid context history: {0}")]
     InvalidHistory(String),
     #[error("context accounting failed: {0}")]
@@ -537,8 +537,24 @@ pub(crate) async fn select(
         messages
     };
     let mandatory = assemble(&selected, None);
-    if !budget.admits(&measure(&mandatory)?) {
-        return Err(ContextError::ProtectedOverflow);
+    let snapshot = measure(&mandatory)?;
+    if !budget.admits(&snapshot) {
+        let sizes = snapshot
+            .measurements
+            .iter()
+            .map(|item| format!("{:?}={} bytes", item.source, item.serialized_bytes))
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(ContextError::ProtectedOverflow {
+            details: format!(
+                "non-opaque JSON bytes/4 heuristic {} / {} input allowance ({} response reserve); serialized request {} / {} bytes; {sizes}. Provider fit is unknown. Protected items cannot be pruned; reduce inspection output or explicitly increase the configured budget.",
+                snapshot.non_opaque_json_size_token_heuristic,
+                budget.estimated_context_tokens - budget.response_reserve_tokens,
+                budget.response_reserve_tokens,
+                snapshot.serialized_request_bytes,
+                budget.max_request_bytes,
+            ),
+        });
     }
     let mut candidates = (0..groups.len().saturating_sub(1)).collect::<Vec<_>>();
     candidates.sort_by_key(|index| {
@@ -888,8 +904,28 @@ mod tests {
                 &Cancellation::default()
             )
             .await,
-            Err(ContextError::ProtectedOverflow)
+            Err(ContextError::ProtectedOverflow { .. })
         ));
+        let error = select(
+            &provider,
+            "test",
+            "operating",
+            &history,
+            &ledger,
+            &tiny,
+            &Cancellation::default(),
+        )
+        .await
+        .err()
+        .unwrap()
+        .to_string();
+        assert!(error.contains(&format!(
+            "serialized request {} / {} bytes",
+            bytes(&provider, &history),
+            tiny.max_request_bytes
+        )));
+        assert!(error.contains("ToolResults="));
+        assert!(error.contains("Provider fit is unknown"));
         history.pop();
         assert!(matches!(
             select(
@@ -996,7 +1032,7 @@ mod tests {
                 &Cancellation::default()
             )
             .await,
-            Err(ContextError::ProtectedOverflow)
+            Err(ContextError::ProtectedOverflow { .. })
         ));
     }
     #[tokio::test]
@@ -1073,5 +1109,31 @@ mod tests {
             .filter(|m| !matches!(m, Message::Summary(_)))
             .collect::<Vec<_>>();
         assert!(exchange_ranges(&messages).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod default_budget_regression {
+    use super::{ContextBudget, ContextSnapshot};
+    #[test]
+    fn default_admits_reported_architecture_inspection_without_relaxing_byte_ceiling() {
+        let snapshot = ContextSnapshot {
+            measurements: Vec::new(),
+            serialized_request_bytes: 133_328,
+            non_opaque_json_size_token_heuristic: 32_251,
+            provider_input_tokens: None,
+        };
+        let default = ContextBudget::default();
+        assert!(default.admits(&snapshot));
+        let previous = ContextBudget {
+            estimated_context_tokens: 32_768,
+            ..default.clone()
+        };
+        assert!(!previous.admits(&snapshot));
+        let oversized = ContextSnapshot {
+            serialized_request_bytes: default.max_request_bytes + 1,
+            ..snapshot
+        };
+        assert!(!default.admits(&oversized));
     }
 }

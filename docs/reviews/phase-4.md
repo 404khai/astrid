@@ -125,3 +125,47 @@ telemetry, settings and inspection integration; they do not repeat session/mode
 implementation. The base README conversation wording and rejection display after
 console cleanup are preserved. Observability uses the base's `model_directory`
 settings seam. No change was made to the shared main checkout during extraction.
+
+
+## 2026-10-09 authorized session persistence extension
+
+The maintainer required non-temporary sessions and names from the first submitted
+chat. ADR 0012 supersedes only ADR 0010's ephemeral-storage clause. Phase 4 remains
+active; metadata-only trace retention remains unchanged. Session snapshots are a
+separate private workspace store containing full conversation/tool data and provider
+continuation, with atomic idle saves, schema validation, byte ceilings, and an
+exclusive writer lock. Permissions and authentication are not restored from it.
+
+Solo review checked persistence against whole-exchange selection, provider response
+completion, permission recomputation, first-message naming, incomplete terminal
+batch rejection, cross-workspace isolation, and atomic failed-save behavior. A
+long-name footer regression was corrected by keeping the compact SessionId in the
+footer and the derived names in the picker. A real-write restart fixture verifies
+that manually changed file contents are not overwritten by restoration.
+
+Validation passed: `cargo test --locked --test session_store --test sessions`,
+`cargo test --locked --bin astrid`, `cargo test --locked`, `cargo fmt --check`,
+`cargo clippy --locked --all-targets -- -D warnings`, and `git diff --check`.
+Limitations: restore the last successful idle snapshot only; no mid-run checkpoint,
+background execution, simultaneous interactive writers in one workspace, or recovery
+of conversations already lost by earlier releases. Unsupported/corrupt/oversized
+stores fail explicitly; save failures do not relabel runtime outcomes.
+
+Protected context overflow now reports numeric admission limits and category sizes.
+Interactive environment overrides permit explicit budget changes without silently
+increasing defaults or pruning protected exchanges. The rejected request is not
+proof of exceeding a provider context window.
+
+
+### Default allowance adjustment
+
+On 2026-10-09 the maintainer requested a larger default after an architecture
+question stopped with a 32,251 input heuristic against the former 28,672 usable
+allowance. The default total allowance is now 65,536, leaving 61,440 for input
+with the existing 4,096 reserve. CLI and interactive/library defaults share the
+same ContextBudget value; explicit flag/environment overrides remain. The existing
+524,288-byte ceiling and protected-exchange policy are unchanged. A regression
+fixture uses the reported 133,328-byte request and input heuristic to establish
+admission under the new default and rejection under the old default, while keeping
+oversized byte requests rejected. This is an admission policy change, not a claim
+about provider capacity or task success.

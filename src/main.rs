@@ -90,15 +90,16 @@ enum Commands {
         shell_policy: Option<PermissionAction>,
         #[arg(long, help = "Show prepared request sizes and token-count uncertainty")]
         show_context: bool,
-        #[arg(long, default_value = "32768", value_parser = positive, help = "Estimated context allowance; not the model's known capacity")]
+        #[arg(long, env = "ASTRID_CONTEXT_TOKENS", default_value_t = astrid::context::ContextBudget::default().estimated_context_tokens, value_parser = positive, help = "Estimated context allowance; not the model's known capacity")]
         context_tokens: usize,
         #[arg(
             long,
+            env = "ASTRID_RESPONSE_RESERVE",
             default_value = "4096",
             help = "Planning reserve; does not enforce provider output length"
         )]
         response_reserve: usize,
-        #[arg(long, default_value = "524288", value_parser = positive)]
+        #[arg(long, env = "ASTRID_CONTEXT_BYTES", default_value = "524288", value_parser = positive)]
         context_bytes: usize,
         #[arg(long, default_value = "4096", value_parser = positive)]
         summary_bytes: usize,
@@ -343,7 +344,24 @@ async fn conversation_loop(
     model_directory: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let max_model_calls = configured_limit("ASTRID_MAX_MODEL_CALLS", 20)?;
-    let mut sessions = sessions::Sessions::new(tools.workspace());
+    let mut context_budget = astrid::context::ContextBudget::default();
+    context_budget.estimated_context_tokens = configured_limit(
+        "ASTRID_CONTEXT_TOKENS",
+        context_budget.estimated_context_tokens,
+    )?;
+    context_budget.response_reserve_tokens = configured_limit(
+        "ASTRID_RESPONSE_RESERVE",
+        context_budget.response_reserve_tokens,
+    )?;
+    context_budget.max_request_bytes =
+        configured_limit("ASTRID_CONTEXT_BYTES", context_budget.max_request_bytes)?;
+    if !context_budget.validate() {
+        return Err(
+            "context allowance must exceed the response reserve, with positive byte limits".into(),
+        );
+    }
+
+    let mut sessions = sessions::Sessions::open(tools.workspace(), model_directory)?;
     let mut composer = console::Composer {
         workspace_root: Some(tools.workspace().root().to_path_buf()),
         ..Default::default()
@@ -351,6 +369,14 @@ async fn conversation_loop(
 
     let mut startup = true;
     loop {
+        if let Err(error) = sessions.persist() {
+            let message = format!(
+                "Session save failed; latest changes may not survive restart: {}",
+                printable(&error.to_string())
+            );
+            eprintln!("astrid: {message}");
+            composer.notice = message;
+        }
         if startup {
             composer.header = Some(startup_identity(
                 &model,
@@ -379,20 +405,18 @@ async fn conversation_loop(
                 composer.notice = sessions
                     .create(tools.workspace())
                     .err()
-                    .unwrap_or_else(|| "New session. Sessions last until Astrid exits.".into());
+                    .unwrap_or_else(|| "New session. Saved locally for this workspace.".into());
                 continue;
             }
             "/sessions" => {
                 let options = sessions.choices();
                 let current = options[sessions.active_index()].clone();
-                if let Some(choice) = composer.choose(
-                    "Sessions — select to continue (in memory)",
-                    &options,
-                    &current,
-                )? {
+                if let Some(choice) =
+                    composer.choose("Sessions — select to continue", &options, &current)?
+                {
                     sessions.select(&choice);
                 }
-                composer.notice = "Sessions last until Astrid exits.".into();
+                composer.notice = "Sessions are saved locally for this workspace.".into();
                 continue;
             }
             command if command == "/mode" || command.starts_with("/mode ") => {
@@ -499,7 +523,7 @@ async fn conversation_loop(
                     task,
                     max_model_calls,
                     permissions: composer.mode.policy(),
-                    context_budget: Some(Default::default()),
+                    context_budget: Some(context_budget.clone()),
                 },
                 cancel.clone(),
                 Some(sender),

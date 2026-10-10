@@ -1,10 +1,10 @@
 //! Client selection and labels; conversations execute through the runtime API.
 use astrid::{
     runtime::{RunOutcome, RunResult, Session},
+    session_store::{MAX_SESSIONS, SessionSnapshot, SessionStore, StoredSession},
     workspace::Workspace,
 };
 
-const MAX_SESSIONS: usize = 32;
 struct Entry {
     session: Option<Session>,
     label: String,
@@ -14,15 +14,60 @@ struct Entry {
 pub struct Sessions {
     entries: Vec<Entry>,
     active: usize,
+    store: SessionStore,
+    workspace: Workspace,
+    dirty: bool,
 }
 impl Sessions {
-    pub fn new(workspace: &Workspace) -> Self {
+    pub fn open(workspace: &Workspace, directory: &std::path::Path) -> std::io::Result<Self> {
+        let store = SessionStore::open(directory, workspace)?;
+        let snapshot = store.load()?;
         let mut sessions = Self {
             entries: Vec::new(),
             active: 0,
+            store,
+            workspace: workspace.clone(),
+            dirty: false,
         };
-        sessions.create(workspace).expect("initial session fits");
-        sessions
+        if let Some(snapshot) = snapshot {
+            sessions.active = snapshot.active;
+            sessions.entries = snapshot
+                .entries
+                .into_iter()
+                .map(|entry| Entry {
+                    label: session_name(&entry.session),
+                    session: Some(entry.session),
+                    runs: entry.runs,
+                    outcome: entry.outcome,
+                })
+                .collect();
+        } else {
+            sessions.create(workspace).map_err(std::io::Error::other)?;
+        }
+        Ok(sessions)
+    }
+    pub fn persist(&mut self) -> std::io::Result<()> {
+        if !self.dirty {
+            return Ok(());
+        }
+        let entries =
+            self.entries
+                .iter()
+                .map(|entry| {
+                    let session = entry.session.as_ref().ok_or_else(|| {
+                        std::io::Error::other("cannot save a session while running")
+                    })?;
+                    Ok(StoredSession {
+                        session: session.clone(),
+                        runs: entry.runs,
+                        outcome: entry.outcome.clone(),
+                    })
+                })
+                .collect::<std::io::Result<Vec<_>>>()?;
+        self.store
+            .save(&SessionSnapshot::new(&self.workspace, self.active, entries))?;
+        self.dirty = false;
+        Ok(())
     }
     pub fn create(&mut self, workspace: &Workspace) -> Result<(), String> {
         if self.entries.len() == MAX_SESSIONS {
@@ -35,6 +80,7 @@ impl Sessions {
             outcome: None,
         });
         self.active = self.entries.len() - 1;
+        self.dirty = true;
         Ok(())
     }
     pub fn active_index(&self) -> usize {
@@ -75,6 +121,7 @@ impl Sessions {
     pub fn select(&mut self, choice: &str) -> bool {
         if let Some(index) = self.choices().iter().position(|value| value == choice) {
             self.active = index;
+            self.dirty = true;
             true
         } else {
             false
@@ -91,17 +138,31 @@ impl Sessions {
     }
     pub fn complete(&mut self, result: RunResult) {
         let entry = &mut self.entries[self.active];
-        if entry.runs == 0
-            && let Some(astrid::model::Message::User(task)) = result.session.messages.first()
-        {
-            entry.label = crate::console::printable(task)
-                .replace(['\n', '\r', '\t'], " ")
-                .chars()
-                .take(80)
-                .collect();
-        }
+        entry.label = session_name(&result.session);
         entry.runs += 1;
         entry.outcome = Some(result.outcome);
         entry.session = Some(result.session);
+        self.dirty = true;
+    }
+}
+
+fn session_name(session: &Session) -> String {
+    match session.messages.first() {
+        Some(astrid::model::Message::User(task)) => {
+            let clean = crate::console::printable(task)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ");
+            let mut name: String = clean.chars().take(80).collect();
+            if clean.chars().count() > 80 {
+                name.push('…');
+            }
+            if name.is_empty() {
+                "New conversation".into()
+            } else {
+                name
+            }
+        }
+        _ => "New conversation".into(),
     }
 }

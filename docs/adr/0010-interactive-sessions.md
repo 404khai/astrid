@@ -1,7 +1,7 @@
 # ADR 0010: Interactive in-memory sessions
 
 Date: 2026-10-08
-Status: Accepted
+Status: Accepted; ephemeral-storage restriction superseded by [ADR 0012](0012-local-session-persistence.md) on 2026-10-09
 Implementation: Implemented; deterministic validation passed
 Related: ADR 0002 session/run lifecycle; ADRs 0006 and 0007 context contracts
 Decision evidence: Maintainer requested `/sessions`, then explicitly requested

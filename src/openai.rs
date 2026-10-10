@@ -15,8 +15,19 @@ use crate::{
     tools,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ResponseContinuation(Vec<Value>);
+
+impl ResponseContinuation {
+    pub(crate) fn validate_response(&self, response: &ModelResponse) -> Result<(), String> {
+        let parsed = completed_response(serde_json::json!({"status":"completed", "output":self.0}))
+            .map_err(|error| format!("invalid stored provider continuation: {error}"))?;
+        if parsed.text != response.text || parsed.tool_calls != response.tool_calls {
+            return Err("stored provider continuation differs from assistant response".into());
+        }
+        Ok(())
+    }
+}
 
 struct MeasuredSink<'a> {
     inner: &'a mut dyn TextSink,
