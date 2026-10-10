@@ -14,9 +14,11 @@ Preview: http://127.0.0.1:5173. Tests use locally installed Google Chrome. The s
 
 ## Components and sources
 
-- `AstridLogo`: original `references/mobile/svgs/logo.svg`, with isolated eye motion. Nine-second cycle: forward → up → left → right → forward → blink. Reduced-motion preferences disable the animation. Gradient IDs are unique per instance.
+- `AstridLogo`: original `references/mobile/svgs/logo.svg`, with isolated eye motion. Nine-second cycle: forward → up → left → right → forward → blink twice. The independent `tracking` prop follows mouse position with bounded eye travel, while `animated` controls the idle gaze and double blink. Tracking takes precedence over the idle gaze; touch input is ignored. Reduced-motion preferences disable both animation and cursor tracking. Gradient IDs are unique per instance.
 - `LaptopMockupCard`: [Nexvyn laptop mockup](https://ui.nexvyn.dev/components/laptop-mockup), adapted from its [component registry](https://ui.nexvyn.dev/r/laptop-mockup.json) to scoped CSS and the Paper layout’s larger scale. Keeps its screen, bezel, chassis, base, notch, forwarded ref, and variant API. Nexvyn permits personal and commercial component use; the blueprint illustration is not included.
 - Icons use the actual upstream `RuneIcon` component and lookup helpers, vendored because `runeicons-react` is private and absent from npm. See `vendor/runeicons-react/README.md` for the pinned source and subset.
 - Space Grotesk and IBM Plex Mono are self-hosted through Fontsource.
 
 The More dropdown supports Tab navigation, Escape dismissal with focus restoration, and outside-click dismissal. No tracking, hosted forms, or remote font requests are added.
+
+The navbar stays sticky while scrolling. Mobile uses Paper’s Menu / centered logo / GitHub layout; Menu opens the section and project links and supports Escape, outside clicks, and closing after navigation.

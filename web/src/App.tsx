@@ -30,17 +30,25 @@ function Action({
 }
 function Navigation() {
   const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileMenu = useRef<HTMLDivElement>(null);
+  const mobileTrigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (!open) return;
+    if (!open && !mobileOpen) return;
     const outside = (event: PointerEvent) => {
       if (!menu.current?.contains(event.target as Node)) setOpen(false);
+      if (!mobileMenu.current?.contains(event.target as Node))
+        setMobileOpen(false);
     };
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
-        trigger.current?.focus();
+        if (mobileOpen) {
+          setMobileOpen(false);
+          mobileTrigger.current?.focus();
+        } else trigger.current?.focus();
       }
     };
     document.addEventListener("pointerdown", outside);
@@ -49,19 +57,57 @@ function Navigation() {
       document.removeEventListener("pointerdown", outside);
       document.removeEventListener("keydown", escape);
     };
-  }, [open]);
+  }, [open, mobileOpen]);
   return (
     <header className="navbar">
       <a className="skip-link" href="#main">
         Skip to content
       </a>
+      <div className="mobile-menu" ref={mobileMenu}>
+        <button
+          className="mobile-nav-box"
+          ref={mobileTrigger}
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-links"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          Menu
+          <Icon name="chevron-down" />
+        </button>
+        {mobileOpen && (
+          <nav
+            className="mobile-dropdown"
+            id="mobile-links"
+            aria-label="Mobile navigation"
+          >
+            {[
+              ["The loop", "#loop"],
+              ["Philosophy", "#philosophy"],
+              ["Roadmap", "#roadmap"],
+              ["Docs", doc("docs/architecture.md")],
+              ["Build notes", doc("docs/development.md")],
+              ["Contributing", doc("AGENTS.md")],
+              ["Issues", `${repo}/issues`],
+            ].map(([label, href]) => (
+              <a key={label} href={href} onClick={() => setMobileOpen(false)}>
+                {label}
+                <Icon />
+              </a>
+            ))}
+          </nav>
+        )}
+      </div>
       <nav className="nav-box nav-left" aria-label="Sections">
         <a href="#loop">The loop</a>
         <a href="#philosophy">Philosophy</a>
         <a href="#roadmap">Roadmap</a>
       </nav>
       <a className="brand" href="#" aria-label="Astrid home">
-        <AstridLogo animated />
+        <AstridLogo animated tracking />
+      </a>
+      <a className="mobile-nav-box mobile-github" href={repo}>
+        GitHub
+        <Icon name="arrow-up-right" />
       </a>
       <nav className="nav-box nav-right" aria-label="Project">
         <a href={doc("docs/architecture.md")}>Docs</a>

@@ -1,10 +1,57 @@
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 
 /** The original Astrid mark, with independently animated eyes. */
-export function AstridLogo({ animated = false }: { animated?: boolean }) {
+export function AstridLogo({
+  animated = false,
+  tracking = false,
+}: {
+  animated?: boolean;
+  tracking?: boolean;
+}) {
   const id = useId();
+  const logo = useRef<SVGSVGElement>(null);
+  const gaze = useRef<SVGGElement>(null);
+  useEffect(() => {
+    if (!tracking) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const reset = () => {
+      gaze.current?.classList.remove("tracking");
+      logo.current?.style.removeProperty("--eye-x");
+      logo.current?.style.removeProperty("--eye-y");
+    };
+    const follow = (event: PointerEvent) => {
+      if (
+        event.pointerType !== "mouse" ||
+        reducedMotion.matches ||
+        !logo.current
+      )
+        return;
+      const bounds = logo.current.getBoundingClientRect();
+      const dx = event.clientX - (bounds.left + bounds.width / 2);
+      const dy = event.clientY - (bounds.top + bounds.height / 2);
+      // Bound travel in SVG coordinates so the eyes stay inside the original mark.
+      logo.current.style.setProperty(
+        "--eye-x",
+        `${Math.tanh(dx / 180) * 1.2}px`,
+      );
+      logo.current.style.setProperty("--eye-y", `${Math.tanh(dy / 180) * 1}px`);
+      gaze.current?.classList.add("tracking");
+    };
+    window.addEventListener("pointermove", follow, { passive: true });
+    document.addEventListener("pointerleave", reset);
+    window.addEventListener("blur", reset);
+    reducedMotion.addEventListener("change", reset);
+    return () => {
+      window.removeEventListener("pointermove", follow);
+      document.removeEventListener("pointerleave", reset);
+      window.removeEventListener("blur", reset);
+      reducedMotion.removeEventListener("change", reset);
+      reset();
+    };
+  }, [tracking]);
   return (
     <svg
+      ref={logo}
       className="astrid-logo"
       aria-hidden="true"
       viewBox="0 0 20 16"
@@ -19,15 +66,17 @@ export function AstridLogo({ animated = false }: { animated?: boolean }) {
         d="M18.5666 10.3564H16.3256L13.421 13.2362H6.63854L3.74965 10.3784H0.053252C0.0219531 10.3784 0.00317383 10.3972 0.00317383 10.4222V13.0356C0.00317383 13.0607 0.0219531 13.0764 0.053252 13.0764H2.88893L5.82477 16H14.1784L17.1268 13.0764H19.9468C19.975 13.0764 19.9969 13.0607 19.9969 13.0356V10.4222C19.9969 10.3972 19.975 10.3784 19.9468 10.3784H18.5666V10.3564Z"
         fill={`url(#${id}-bottom)`}
       />
-      <g className={animated ? "logo-eyes animated" : "logo-eyes"}>
-        <path
-          d="M8.94511 5.49634H6.04997C6.02493 5.49634 6.00928 5.51201 6.00928 5.53081V10.391C6.00928 10.4129 6.02493 10.4317 6.04997 10.4317H8.94511C8.97015 10.4317 8.98893 10.4129 8.98893 10.391V5.53081C8.98893 5.51201 8.97015 5.49634 8.94511 5.49634Z"
-          fill="#00F7D5"
-        />
-        <path
-          d="M13.9811 5.49634H11.0578C11.0359 5.49634 11.0203 5.51201 11.0203 5.53081V10.391C11.0203 10.4129 11.0359 10.4317 11.0578 10.4317H13.9811C14.0124 10.4317 14.0375 10.4098 14.0375 10.3816V5.54961C14.0375 5.51827 14.0124 5.49634 13.9811 5.49634Z"
-          fill="#00F7D5"
-        />
+      <g ref={gaze} className={animated ? "logo-gaze animated" : "logo-gaze"}>
+        <g className={animated ? "logo-eyes animated" : "logo-eyes"}>
+          <path
+            d="M8.94511 5.49634H6.04997C6.02493 5.49634 6.00928 5.51201 6.00928 5.53081V10.391C6.00928 10.4129 6.02493 10.4317 6.04997 10.4317H8.94511C8.97015 10.4317 8.98893 10.4129 8.98893 10.391V5.53081C8.98893 5.51201 8.97015 5.49634 8.94511 5.49634Z"
+            fill="#00F7D5"
+          />
+          <path
+            d="M13.9811 5.49634H11.0578C11.0359 5.49634 11.0203 5.51201 11.0203 5.53081V10.391C11.0203 10.4129 11.0359 10.4317 11.0578 10.4317H13.9811C14.0124 10.4317 14.0375 10.4098 14.0375 10.3816V5.54961C14.0375 5.51827 14.0124 5.49634 13.9811 5.49634Z"
+            fill="#00F7D5"
+          />
+        </g>
       </g>
       <defs>
         <linearGradient

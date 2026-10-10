@@ -14,7 +14,7 @@
 }
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 28px;
+  scroll-padding-top: 148px;
 }
 body {
   margin: 0;
@@ -75,7 +75,9 @@ h3 {
   grid-template-columns: 1fr 88px 1fr;
   align-items: center;
   gap: 48px;
-  position: relative;
+  position: sticky;
+  top: 0;
+  background: #000;
   z-index: 10;
 }
 .nav-box {
@@ -109,16 +111,25 @@ h3 {
   display: block;
   overflow: visible;
 }
+.logo-gaze,
 .logo-eyes {
   transform-box: fill-box;
   transform-origin: center;
 }
-.logo-eyes.animated {
+.logo-gaze {
+  transform: translate(var(--eye-x, 0px), var(--eye-y, 0px));
+}
+.logo-gaze.animated:not(.tracking) {
   animation: eyes-look 9s ease-in-out infinite;
+}
+.logo-eyes.animated {
+  animation: eyes-blink 9s ease-in-out infinite;
 }
 @keyframes eyes-look {
   0%,
-  8% {
+  8%,
+  62%,
+  100% {
     transform: translate(0, 0);
   }
   14%,
@@ -133,17 +144,57 @@ h3 {
   56% {
     transform: translate(1.2px, 0);
   }
-  62%,
-  74% {
-    transform: translate(0, 0) scaleY(1);
-  }
-  77% {
-    transform: translate(0, 0) scaleY(0.05);
-  }
+}
+@keyframes eyes-blink {
+  0%,
+  74%,
   80%,
+  88%,
   100% {
-    transform: translate(0, 0) scaleY(1);
+    transform: scaleY(1);
   }
+  77%,
+  85% {
+    transform: scaleY(0.05);
+  }
+}
+.mobile-menu,
+.mobile-github {
+  display: none;
+}
+.mobile-nav-box {
+  border: 1px solid var(--line);
+  background: #101010;
+  height: 44px;
+  width: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 18px;
+}
+.mobile-dropdown {
+  position: absolute;
+  top: 76px;
+  left: 24px;
+  right: 24px;
+  border: 1px solid var(--line);
+  padding: 8px;
+  background: #101010;
+}
+.mobile-dropdown a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.mobile-dropdown a:hover,
+.mobile-dropdown a:focus-visible {
+  background: var(--button);
+  color: white;
 }
 .more {
   position: relative;
@@ -831,47 +882,38 @@ footer {
   }
 }
 @media (max-width: 650px) {
+  html {
+    scroll-padding-top: 108px;
+  }
   .navbar {
-    height: auto;
-    min-height: 132px;
-    padding: 20px;
-    grid-template-columns: 1fr 60px 1fr;
-    gap: 12px;
-  }
-  .brand {
-    justify-self: center;
-    height: 68px;
-    width: 60px;
-  }
-  .brand .astrid-logo {
-    width: 60px;
-    height: 48px;
+    height: 88px;
+    min-height: 0;
+    padding: 12px 24px;
+    grid-template-columns: 1fr 64px 1fr;
+    gap: 10px;
   }
   .nav-box {
-    min-width: 0;
-    font-size: 11px;
-    height: 92px;
-    flex-direction: column;
-    justify-content: center;
-    gap: 8px;
-    padding: 8px;
+    display: none;
   }
-  .nav-box a {
-    padding: 2px 0;
+  .mobile-menu {
+    display: block;
+    justify-self: start;
   }
-  .more button {
-    gap: 2px;
-    font-size: 11px;
-    padding: 2px 0;
+  .mobile-github {
+    display: flex;
+    justify-self: end;
   }
-  .more .icon svg {
-    width: 14px;
+  .mobile-nav-box {
+    width: min(110px, calc((100vw - 132px) / 2));
   }
-  .dropdown {
-    right: -12px;
-    top: 36px;
-    width: 205px;
-    font-size: 14px;
+  .brand {
+    width: 64px;
+    height: 64px;
+    justify-self: center;
+  }
+  .brand .astrid-logo {
+    width: 51px;
+    height: 41px;
   }
   .hero {
     padding: 40px 20px 0;
@@ -1118,7 +1160,8 @@ footer {
   html {
     scroll-behavior: auto;
   }
-  .logo-eyes.animated {
+  .logo-eyes.animated,
+  .logo-gaze.animated:not(.tracking) {
     animation: none;
   }
   .action {
