@@ -50,7 +50,7 @@ it contains reasoning. Preparation/counting remain synchronous over unbounded
 existing inputs. This is request measurement, not a memory bound, exact provider
 token count, admission rule, context selection, or compaction implementation.
 
-Acceptance evidence is owned by [P3-02](../plans/phase-3.md#p3-02-show-what-the-prepared-model-request-contains).
+Acceptance evidence is owned by [P3-02](../plans/phase-3.md#p3-02-measure-the-actual-request).
 Root validation passed: 97 deterministic tests, formatting, Clippy with warnings
 denied, CLI help, and local Markdown link targets. No live-model or interactive
 terminal acceptance was performed for this slice.

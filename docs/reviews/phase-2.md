@@ -1,12 +1,54 @@
 # Phase 2 review: execution environment
 
-Date: 2026-10-07
-Baseline: `4b8e93f` plus the current implementation worktree
-Status: Implementation complete; acceptance and independent adversarial review passed
-Maintainer closure decision: Pending disposition of this completed review
-Next-phase authorization: Not requested; AGENTS.md remains Phase 2
+Current audit: 2026-10-10, `cdebe18` plus closure worktree changes
+Status: Administratively closed with documented limitations; solo current audit
+Maintainer closure decision: Approved on 2026-10-10, conditional on verified exit
+criteria and accurate limitations; the current audit below supplies that evidence
+Current phase: Phase 4; separately authorized 2026-10-08
+Historical review: 2026-10-07, `4b8e93f` plus implementation worktree;
+acceptance and independent adversarial review passed
 
-## Exit criteria and evidence
+## Current exit-criteria audit
+
+The exit criterion is safe repository modification with visibility into changes
+and executed commands, under the accepted trusted-local-repository contract.
+
+| Requirement | Current code and rerun evidence | Assessment / limit |
+| --- | --- | --- |
+| Timeout, cancellation and exit status | [tools.rs](../../src/tools.rs), [runtime.rs](../../src/runtime.rs); tools, environment, runtime and phase2 tests | Met; process-group cleanup, partial timeout/cancel output and truthful unavailable status; detached descendants excluded |
+| Separate streamed stdout/stderr, bounded output | [output.rs](../../src/output.rs), runtime; dual-pipe flood, handshake-before-exit, stalled-consumer cleanup, decoder fixtures | Met; accepted events lossless, raw-output omissions explicit; final delivery can await attached consumer |
+| Workspace boundaries/path validation | [workspace.rs](../../src/workspace.rs), atomic writes in tools; traversal/symlink/hard-link/nested-root and exact-edit tests | Met under trusted-filesystem assumptions; cwd does not confine shell |
+| Configurable permissions | [permissions.rs](../../src/permissions.rs), runtime; executor-spy matrix, approval/cancel race, event replay and sessions preset tests | Met for read/write/execute; independent network/destructive shell policies intentionally unavailable under ADR 0004 |
+| Git branch and starting dirty files | [changes.rs](../../src/changes.rs); staged/unstaged/untracked, unborn/detached/nested/non-Git, filter/fsmonitor/index fixtures | Met; read-only collection and explicit bounded/unavailable metadata |
+| Run-relative patches/change visibility | changes/runtime and CLI; repository acceptance, ignored native edits, binary/mode/deletion/ignore-membership and cancelled-commit fixtures | Met; native evidence correlated, shell/external changes observed with limited attribution |
+| Commands and actual outcomes remain observable | [events.rs](../../src/events.rs), runtime and CLI/PTY tests | Met in live events/results; metadata-only persisted traces deliberately omit shell command text |
+
+Recommendation: **close Phase 2 with explicit limitations**. No remaining required
+implementation work was found. The tight timeout fixture was repaired without
+changing runtime behavior. See [shared validation and debt dispositions](foundation-closure.md)
+for the 189-test rerun, first-run failure, checks, Git preservation and exact
+maintainer decision. The current audit is solo; the independent review below is
+historical and its regression tests were rerun in the full suite.
+
+Current retrospective: preserve the six lessons below. The historical claim that
+conversation is not budgeted or persisted is superseded for selected requests
+and idle sessions by ADRs 0006/0007/0012. Total retained memory remains unbounded.
+Do not carry shell confinement, complete inventory, rollback or agent-authorship
+assumptions into the native client. A client must preserve output coverage,
+approval ordering and cleanup even when its rendering stalls. No new Phase 2
+architectural decision is required; maintainer closure disposition is the only
+remaining phase gate.
+
+Closure resolution (2026-10-10): the maintainer explicitly approved administrative
+closure of Phases 2, 3 and 4 provided existing exit criteria were verified and
+limitations accurately documented. The current matrix and shared validation
+record satisfy those conditions within the accepted contracts. No unverified live
+telemetry, unavailable metric or new runtime guarantee is marked complete.
+Phase 4 remains the active marker. ADR 0013 is separately accepted, with Mac A
+implementation Not Started and separate implementation authorization required.
+The remaining decision/status statements below preserve the historical review.
+
+## Historical exit criteria and evidence (2026-10-07)
 
 | Criterion | Implementation | Evidence | Assessment |
 | --- | --- | --- | --- |
@@ -19,8 +61,9 @@ Next-phase authorization: Not requested; AGENTS.md remains Phase 2
 | Reviewable changes relative to run start | changes/runtime/events/console | Native and shell changes, ignore membership, binary/mode/deletion/oversized/incomplete inventories; live dirty-repo repair | Implemented; native evidence correlated, shell/external attribution limited |
 | Honest terminal history | [events.rs](../../src/events.rs) | Independent projection, serialization, exactly-one-terminal tests, policy/start validation | Preserved; configuration/action/grant consistency is checked |
 
-Assessment: Phase 2 meets the accepted trusted-repository contract. Recommend
-closing with the explicit limitations below. Phase 3 remains a separate decision.
+Historical assessment: Phase 2 meets the accepted trusted-repository contract.
+Recommended closing with the explicit limitations below; Phase 3 authorization
+was then a separate decision and has since been recorded in AGENTS.md.
 
 ## What we learned
 

@@ -2,9 +2,14 @@
 
 ## 1. Project
 
-Astrid is an experimental, inference-aware AI agent harness.
+Astrid is an inference-aware personal AI agent runtime that autonomously carries
+out delegated tasks across applications, devices, and compute environments.
 
-The primary purpose of Astrid is not to compete feature-for-feature with mature coding agents. It exists to explore and implement the systems underneath capable agents:
+The harness is its execution foundation, not its final product identity. Coding
+is a supported capability; a future Agent Development Environment (ADE) is one
+possible client experience. Tasks must not universally require a source-code
+repository. Astrid also exists to explore and understand the systems underneath
+capable agents:
 
 - agent execution loops
 - model/provider abstraction
@@ -18,9 +23,54 @@ The primary purpose of Astrid is not to compete feature-for-feature with mature 
 - evaluation
 - eventually multi-agent execution
 
-Coding repositories are Astrid's first environment, not necessarily its final domain.
+Coding repositories are Astrid's first execution environment.
 
 The project should prioritize **learning, correctness, observability, and architectural clarity** over feature count.
+
+## Established product direction — 2026-10-10
+
+The maintainer established these priorities, in order:
+
+1. Autonomous personal tasks under explicit user-defined permissions and boundaries.
+2. A reliable headless Rust runtime shared by all clients.
+3. A native macOS experience using SwiftUI and AppKit.
+4. Background execution independent of GUI lifecycle.
+5. Accessible thin clients, particularly low-memory Android devices.
+6. Device capabilities, remote execution and authenticated cross-device operation.
+7. Personal context and memory under user control.
+8. Coding and ADE functionality as a capability, not the defining purpose.
+
+Native macOS uses SwiftUI for primary views, AppKit for windows, panels, menu bar,
+shortcuts and desktop behavior, and Rust for execution/authoritative state. Prefer
+a bundled helper and versioned local protocol subject to a documented transport
+and lifecycle decision. Do not introduce Tauri, Electron or a web desktop shell
+without explicit authorization. Preserve the CLI as an independent client.
+
+Keep window management in the Mac client so a future floating Astrid panel can
+reuse application state. Screen reading and desktop control require separately
+scoped authorization; displaying a panel does not grant those capabilities.
+
+Preserve Expo/React Native for the mobile interface. Use native Kotlin modules
+when authorized Android overlays, device capabilities or services require them.
+Android may be both a runtime client and a capability provider. Low-memory clients
+must not require large local models. Do not assume iOS has Android's cross-app
+overlay capabilities.
+
+Autonomy means bounded delegation. Each action must have an identifiable
+requesting principal, execution target, granted capability and observable result.
+General operating-system access is not an implicit grant. Current local-account
+permissions are not a cross-device trust model.
+
+The runtime remains independent of terminal, native UI, React Native, Telegram
+and foreground-window lifetime. Do not claim durable background execution before
+implementation and verification. Preserve accepted guarantees and functioning
+subsystems; add boundaries when concrete capabilities require them.
+
+See [the roadmap reconciliation](docs/plans/personal-agent-roadmap.md) for the
+audit and proposed delivery order. Original phase numbers remain historical
+references; a proposal does not close incomplete foundational phases or change
+the current-phase marker. The maintainer's immediate request is planning before
+implementation, beginning with a scoped native Mac milestone.
 
 ---
 
@@ -61,7 +111,6 @@ Until explicitly introduced by a later phase, Astrid is NOT:
 
 - an IDE
 - a VS Code extension
-- a desktop application
 - an agent marketplace
 - a hosted SaaS platform
 - a collaboration platform
@@ -69,9 +118,13 @@ Until explicitly introduced by a later phase, Astrid is NOT:
 - a multi-agent swarm framework
 - an autonomous software company
 - a replacement for every existing coding agent
-- a GUI-first product
+- a runtime whose capabilities depend on a GUI
 
 Do not add features merely because existing coding agents have them.
+
+The native Mac client is now a product priority; its implementation still requires
+the scoped milestone and architectural gates below. Earlier phase-specific GUI
+exclusions describe those phases, not a permanent desktop prohibition.
 
 Every major feature must support the central goal of understanding or improving agent execution.
 
@@ -1320,12 +1373,22 @@ or supply a separate Phase 2 closure decision.
 The maintainer subsequently accepted both recommended context contracts on
 2026-10-07: estimated admission plus a byte ceiling and whole-exchange selection
 (ADR 0006), and deterministic incomplete compaction (ADR 0007). The previous
-phase's separate closure disposition remains pending.
+phase's separate closure disposition remained pending until 2026-10-10.
 
 Phase 4 and ADRs 0008/0009 were authorized by the maintainer on 2026-10-08:
 "Implement the observability and its related adrs 8 & 9". This explicitly advances
 implementation scope without inventing separate closure dispositions for Phases
-2 or 3; those remain pending. See docs/plans/phase-4.md and docs/reviews/phase-4.md.
+2 or 3; those remained pending until 2026-10-10. See docs/plans/phase-4.md and docs/reviews/phase-4.md.
+
+On 2026-10-10, the maintainer approved administrative closure of Phases 2, 3
+and 4 provided their existing exit criteria were verified and limitations accurately
+documented. The current phase reviews and docs/reviews/foundation-closure.md
+record that evidence and the closure disposition without claiming unverified work.
+The maintainer separately accepted ADR 0013 with its native layout, privacy,
+authority, lifetime and local-only clarifications. Mac A implementation remains
+Not Started and requires separate authorization. Prepare its smallest implementation
+plan and genuine blockers in a new thread, using references/desktop as the primary
+UI layout specification. These decisions do not change the Phase 4 marker.
 
 Unless the user explicitly changes this value, implementation should remain within Phase 4.
 
