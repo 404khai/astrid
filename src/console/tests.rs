@@ -808,3 +808,107 @@ fn targeted_inspection_previews_show_line_numbers_and_limits() {
         "0 matches · incomplete coverage"
     );
 }
+
+#[test]
+fn workspace_snapshot_gaps_are_summarized_without_hiding_known_changes() {
+    use astrid::changes::{Change, WorkspaceReport};
+    let mut changes: Vec<_> = (0..1000).map(|index| Change {
+        path: format!("utf8:apps/macos/.build/ModuleCache/cache-{index}.pcm"),
+        kind: "modified_or_unavailable".into(), before_mode: Some(0o644), after_mode: Some(0o644),
+        patch: None, unavailable: Some("Before/after content unavailable; content change cannot be established: Content exceeds per-file or aggregate snapshot budget".into()),
+    }).collect();
+    changes.push(Change {
+        path: "utf8:household-notes/shopping.txt".into(),
+        kind: "modified_or_unavailable".into(),
+        before_mode: Some(0o644),
+        after_mode: Some(0o644),
+        patch: Some("-old\n+new\n".into()),
+        unavailable: None,
+    });
+    changes.push(Change {
+        path: "utf8:changed.bin".into(),
+        kind: "modified_or_unavailable".into(),
+        before_mode: Some(0o644),
+        after_mode: Some(0o644),
+        patch: None,
+        unavailable: Some("Binary content changed; text patch unavailable".into()),
+    });
+    let report = WorkspaceReport {
+        before_git: Default::default(),
+        after_git: Default::default(),
+        changes,
+        complete: false,
+        errors: vec![],
+        attribution: "observed evidence".into(),
+    };
+    let original = report.clone();
+    let mut state = Presentation::new("test".into());
+    state.apply(&event(EventKind::WorkspaceChanges {
+        report: report.clone(),
+    }));
+    let output = state
+        .take_output()
+        .into_iter()
+        .map(|p| p.text)
+        .collect::<String>();
+    assert!(output.contains("1000 paths could not be compared"));
+    assert!(output.contains("content changes are unverified"));
+    assert!(output.contains("evidence incomplete"));
+    assert!(!output.contains("ModuleCache"));
+    assert!(output.contains("household-notes/shopping.txt"));
+    assert!(output.contains("-old\n+new\n"));
+    assert!(output.contains("changed.bin"));
+    assert!(output.contains("Binary content changed"));
+    assert!(output.len() < 2000);
+    assert_eq!(report, original);
+}
+
+#[test]
+fn workspace_change_details_are_bounded_and_native_mutations_remain_visible() {
+    use astrid::changes::{Change, MutationEvidence, WorkspaceReport};
+    let changes: Vec<_> = (0..25)
+        .map(|index| Change {
+            path: format!("utf8:changed-{index}"),
+            kind: "added".into(),
+            before_mode: None,
+            after_mode: Some(0o644),
+            patch: Some("+new\n".into()),
+            unavailable: None,
+        })
+        .collect();
+    let native = changes[24].clone();
+    let mut state = Presentation::new("test".into());
+    state.apply(&event(EventKind::WorkspaceChanges {
+        report: WorkspaceReport {
+            before_git: Default::default(),
+            after_git: Default::default(),
+            changes,
+            complete: true,
+            errors: vec![],
+            attribution: "observed evidence".into(),
+        },
+    }));
+    let output = state
+        .take_output()
+        .into_iter()
+        .map(|p| p.text)
+        .collect::<String>();
+    assert_eq!(output.matches(" · added").count(), 20);
+    assert!(output.contains("5 additional change details retained"));
+    assert!(output.contains("evidence complete within scope"));
+    state.apply(&event(EventKind::NativeMutationRecorded {
+        evidence: MutationEvidence {
+            path: native.path.clone(),
+            change: Some(native),
+            complete: true,
+            errors: vec![],
+        },
+    }));
+    let output = state
+        .take_output()
+        .into_iter()
+        .map(|p| p.text)
+        .collect::<String>();
+    assert!(output.contains("utf8:changed-24"));
+    assert!(output.contains("+new"));
+}
