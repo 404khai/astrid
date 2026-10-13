@@ -210,7 +210,7 @@ impl Presentation {
             EventKind::WorkspaceChanges { report } => {
                 self.line(
                     &format!(
-                        "  changes      {} observed paths · evidence {}",
+                        "  changes      {} reported paths · evidence {}",
                         report.changes.len(),
                         if report.complete {
                             "complete within scope"
@@ -221,7 +221,23 @@ impl Presentation {
                     Ink::Dim,
                 );
                 self.line(&report.attribution, Ink::Dim);
-                for change in &report.changes {
+                let unverified = report
+                    .changes
+                    .iter()
+                    .filter(|change| unverified_change(change))
+                    .count();
+                let visible: Vec<_> = report
+                    .changes
+                    .iter()
+                    .filter(|change| !unverified_change(change))
+                    .collect();
+                if unverified > 0 {
+                    self.line(&format!(
+                        "    {unverified} paths could not be compared; content changes are unverified. Details retained in runtime evidence."
+                    ), Ink::Dim);
+                }
+                const DETAIL_LIMIT: usize = 20;
+                for change in visible.iter().take(DETAIL_LIMIT) {
                     self.line(
                         &format!("    {} · {}", change.path, change.kind),
                         Ink::Normal,
@@ -232,6 +248,15 @@ impl Presentation {
                     if let Some(reason) = &change.unavailable {
                         self.line(&format!("    evidence unavailable: {reason}"), Ink::Dim);
                     }
+                }
+                if visible.len() > DETAIL_LIMIT {
+                    self.line(
+                        &format!(
+                            "    {} additional change details retained in runtime evidence",
+                            visible.len() - DETAIL_LIMIT
+                        ),
+                        Ink::Dim,
+                    );
                 }
                 for error in &report.errors {
                     self.line(&format!("    evidence: {error}"), Ink::Dim);
@@ -475,6 +500,18 @@ impl Presentation {
         self.decoders.clear();
     }
 }
+// Missing snapshot content cannot establish a content delta. Keep confirmed
+// binary/mode changes visible even when their text patch is unavailable.
+fn unverified_change(change: &astrid::changes::Change) -> bool {
+    change.kind == "modified_or_unavailable"
+        && change.patch.is_none()
+        && change.before_mode == change.after_mode
+        && change
+            .unavailable
+            .as_deref()
+            .is_some_and(|reason| reason.starts_with("Before/after content unavailable;"))
+}
+
 fn target(call: &ToolCall) -> String {
     let args: Value = serde_json::from_str(&call.arguments).unwrap_or(Value::Null);
     let parts: Vec<_> = ["command", "path", "pattern"]
