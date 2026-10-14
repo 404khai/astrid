@@ -1,0 +1,8 @@
+{
+  "name": "astrid-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": { "build": "npm --prefix ui run build && tauri build --bundles app", "dev": "npm --prefix ui run build && tauri dev" },
+  "devDependencies": { "@tauri-apps/cli": "2.12.2" }
+}

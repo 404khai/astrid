@@ -1,0 +1,28 @@
+{
+  "identifier": "main",
+  "description": "Bundled main view only; no generic shell, filesystem or network plugins.",
+  "windows": [
+    "main"
+  ],
+  "webviews": [
+    "main"
+  ],
+  "permissions": [
+    "allow-snapshot",
+    "allow-pick-folder",
+    "allow-new-session",
+    "allow-select-session",
+    "allow-set-workflow",
+    "allow-submit-task",
+    "allow-cancel-run",
+    "allow-decide-permission",
+    "allow-history",
+    "allow-subscribe",
+    "allow-acknowledge",
+    "allow-subscription-status",
+    "allow-sign-in",
+    "allow-material-status",
+    "allow-quit-application",
+    "core:window:allow-start-dragging"
+  ]
+}

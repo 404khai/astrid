@@ -1,0 +1,12 @@
+{
+  "name": "astrid-desktop-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc && node scripts/assets.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs"
+  },
+  "devDependencies": { "typescript": "5.9.3", "jsdom": "30.1.2" }
+}

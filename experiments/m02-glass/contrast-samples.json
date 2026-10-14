@@ -1,0 +1,85 @@
+{
+  "method" : "sRGB screenshot point samples; hypothetical white foreground; not full audit",
+  "rows" : [
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.733333 0.352941 0.278431 1",
+      "white_contrast" : 3.5553046917412034,
+      "xy" : [
+        140,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.572549 0.556863 0.227451 1",
+      "white_contrast" : 2.7928197628360389,
+      "xy" : [
+        400,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.439216 0.580392 0.25098 1",
+      "white_contrast" : 2.8912996103307083,
+      "xy" : [
+        580,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.368627 0.6 0.239216 1",
+      "white_contrast" : 2.8861505237106586,
+      "xy" : [
+        720,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.298039 0.6 0.427451 1",
+      "white_contrast" : 2.876203371636469,
+      "xy" : [
+        1000,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.286275 0.592157 0.596078 1",
+      "white_contrast" : 2.8075032877770703,
+      "xy" : [
+        1180,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.305882 0.501961 0.709804 1",
+      "white_contrast" : 3.2436725240119961,
+      "xy" : [
+        1360,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.32549 0.352941 0.811765 1",
+      "white_contrast" : 4.2028840316221752,
+      "xy" : [
+        1550,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.541176 0.34902 0.780392 1",
+      "white_contrast" : 3.6299566536177048,
+      "xy" : [
+        1750,
+        280
+      ]
+    },
+    {
+      "color" : "NSCalibratedRGBColorSpace 0.117647 0.117647 0.117647 1",
+      "white_contrast" : 14.740008849154602,
+      "xy" : [
+        1000,
+        780
+      ]
+    }
+  ]
+}
