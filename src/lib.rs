@@ -7,6 +7,7 @@ pub mod changes;
 pub mod context;
 pub mod events;
 pub mod file_lookup;
+pub mod host;
 pub mod model;
 pub mod native;
 pub mod observability;

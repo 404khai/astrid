@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Astrid Material Probe",
+  "version": "0.0.0",
+  "identifier": "dev.astrid.material-probe",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "material-probe",
+        "title": "Astrid M02 \u2014 Tauri Liquid Glass feasibility",
+        "width": 1000,
+        "height": 660,
+        "transparent": true
+      }
+    ],
+    "security": {
+      "capabilities": [],
+      "csp": "default-src 'none'; style-src 'self'; img-src 'none'; script-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "../../../references/logo.png"
+    ]
+  }
+}

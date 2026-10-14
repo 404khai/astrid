@@ -35,6 +35,15 @@ impl Default for PermissionPolicy {
 }
 
 impl PermissionPolicy {
+    /// Host-selected notes authority; independent of the existing presets.
+    pub const fn read_only() -> Self {
+        Self {
+            read: PermissionAction::Allow,
+            write: PermissionAction::Deny,
+            execute: PermissionAction::Deny,
+        }
+    }
+
     pub fn action(self, capability: Capability) -> PermissionAction {
         match capability {
             Capability::Read => self.read,

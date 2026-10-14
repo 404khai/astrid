@@ -1,0 +1,11 @@
+[package]
+name = "astrid-m02-material-probe"
+version = "0.0.0"
+edition = "2024"
+[build-dependencies]
+tauri-build = "=2.6.3"
+[dependencies]
+tauri = { version = "=2.11.5", features = ["macos-private-api"] }
+objc2 = "=0.6.4"
+objc2-app-kit = { version = "=0.3.2", features = ["NSGlassEffectView", "NSView", "NSWindow", "NSColor", "NSWorkspace"] }
+objc2-foundation = "=0.3.2"
