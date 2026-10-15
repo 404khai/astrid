@@ -198,3 +198,34 @@ impl<W: Write> Write for Limited<W> {
         self.writer.flush()
     }
 }
+
+impl Drop for SessionStore {
+    fn drop(&mut self) {
+        // Release this owner's lock explicitly. A descriptor inherited briefly
+        // across a concurrent subprocess spawn must not prolong the workspace lock.
+        // The field still closes normally, including on process termination.
+        unsafe { libc::flock(self._lock.as_raw_fd(), libc::LOCK_UN) };
+    }
+}
+
+#[cfg(test)]
+mod lock_lifetime_tests {
+    use super::*;
+
+    #[test]
+    fn owner_drop_releases_lock_even_while_a_duplicate_descriptor_survives() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let workspace = Workspace::new(root.path()).unwrap();
+        let store = SessionStore::open(directory.path(), &workspace).unwrap();
+        let duplicate = store._lock.try_clone().unwrap();
+        assert!(SessionStore::open(directory.path(), &workspace).is_err());
+        drop(store);
+        let reopened = SessionStore::open(directory.path(), &workspace).unwrap();
+        drop(duplicate);
+        // Closing the stale descriptor must not release the new owner's lock.
+        assert!(SessionStore::open(directory.path(), &workspace).is_err());
+        drop(reopened);
+        assert!(SessionStore::open(directory.path(), &workspace).is_ok());
+    }
+}

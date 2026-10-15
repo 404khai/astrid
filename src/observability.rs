@@ -337,6 +337,20 @@ fn project(event: &ExecutionEvent, elapsed_us: u64) -> Record {
         PermissionsConfigured { .. } => "permissions_configured",
         CancellationRequested => "cancellation_requested",
         TurnStarted { .. } => "turn_started",
+        ModelRouteSelected { decision } => {
+            metadata = serde_json::to_value(decision).expect("route serializes");
+            for key in ["requested_model", "effective_model"] {
+                metadata[key] = serde_json::json!(
+                    metadata[key]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(256)
+                        .collect::<String>()
+                );
+            }
+            "model_route_selected"
+        }
         ModelCallStarted { .. } => "model_call_started",
         ModelFirstTextDelta => "model_first_text_delta",
         ModelTextDelta { .. } => "model_text_delta",
@@ -790,6 +804,7 @@ pub fn list_traces(directory: &Path) -> io::Result<Vec<PathBuf>> {
 
 #[derive(Debug, Default, Serialize)]
 pub struct CallSummary {
+    pub route: Option<serde_json::Value>,
     pub outcome: Option<String>,
     pub error_code: Option<String>,
     pub exit_code: Option<i64>,
@@ -870,6 +885,9 @@ impl Trace {
                     }
                     if let Some(id) = model_call_id {
                         let call = summary.models.entry(*id).or_default();
+                        if kind == "model_route_selected" {
+                            call.route = Some(metadata.clone());
+                        }
                         if kind == "model_call_started" {
                             call.start = Some(*elapsed_us);
                         }

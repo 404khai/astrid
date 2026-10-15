@@ -13,6 +13,7 @@ pub mod observability;
 pub mod openai;
 pub mod output;
 pub mod permissions;
+pub mod routing;
 pub mod runtime;
 pub mod session_store;
 pub mod tools;

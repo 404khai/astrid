@@ -28,7 +28,7 @@ use input::{Action, ApprovalInput};
 use state::Presentation;
 
 pub fn interactive_available() -> bool {
-    terminal::capable()
+    terminal::interactive()
 }
 pub fn welcome(identity: &Identity) -> io::Result<()> {
     identity::append_header(

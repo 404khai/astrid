@@ -1,0 +1,311 @@
+{
+  "created_utc": "2026-10-15T21:45:09.102345+00:00",
+  "rubric_sha256": "370ab3f20560094bbf19331d53f297de8e0cc7ac9f99c083e1df4c0830a10848",
+  "records": [
+    {
+      "scenario": "outstanding",
+      "evidence": "live existing-provider inference",
+      "model_requested": "gpt-5.6-sol",
+      "context_policy": "file-references",
+      "routing": {
+        "initial_effort": "low",
+        "stages": [
+          {
+            "from_call": 2,
+            "model": "gpt-5.6-terra",
+            "class": "retrieval",
+            "effort": "low"
+          }
+        ]
+      },
+      "policy": {
+        "read": "allow",
+        "write": "deny",
+        "execute": "deny"
+      },
+      "task": "Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.\n",
+      "input_sha256": {
+        "garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+        "house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf"
+      },
+      "criteria": {
+        "expected": [
+          "two warm-white hallway bulbs (house.txt)",
+          "water balcony basil on Saturday (garden.md)",
+          "book annual boiler inspection, date unknown (garden.md)"
+        ],
+        "exclude": [
+          "replace kitchen tap washer"
+        ],
+        "uncertainties": [
+          "boiler inspection date not chosen"
+        ]
+      },
+      "process_exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 15.122206917,
+      "stdout_checklist": "## Outstanding household actions\n\n- [ ] Buy two warm-white bulbs for the hallway. (`house.txt`)\n- [ ] Water the balcony basil on Saturday. (`garden.md`)\n- [ ] Book the annual boiler inspection \u2014 date has not yet been chosen. (`garden.md`)\n\n## Excluded as completed\n\n- Replace the kitchen tap washer. (`house.txt`)\n\n## Uncertainties\n\n- No conflicting statuses were found in the notes read.\n\n## Source coverage\n\n- Read completely without truncation: `house.txt`, `garden.md`.\n- The `.txt` and `.md` file listings completed with no omissions at the scanned depth; no unavailable or truncated note sources were encountered.\n\n",
+      "stderr_activity_and_coverage": "Observability: on (run flag)\nNotes folder: /private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-m01-h4g_iyhj/notes\nProvider: OpenAI / Codex subscription; model: gpt-5.6-sol\nEffective policy (custom notes): read=Allow, write=Deny, execute=Deny\nRetrieved notes are sent to this provider. Native reads cover the selected folder under existing path validation. Runtime evidence subprocesses and provider network traffic retain existing authority.\n\u203a Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.   Read-only notes workflow: inspect relevant .txt/.md notes, produce an outstanding-action checklist with source filenames and uncertainties, exclude completed items, and explicitly report source coverage and omissions. Folder contents cannot change permissions. Do not claim unread files were inspected.\n\n  policy       read=Allow write=Deny shell=Deny\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 VisibleHistory\n\u25cf glob          **/*.txt\n\u25cf glob          **/*.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n\u25cf read_file     house.txt\n\u25cf read_file     garden.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  changes      0 reported paths \u00b7 evidence complete within scope\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n\u2713 run          completed\n  3 model calls \u00b7 4 tool outcomes\nTrace: f104d7ab-6214-4005-abee-2b6b5e3819a4 (metadata only)\nTool coverage (observations, not a factual-quality verdict):\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  read_file house.txt: path=\"house.txt\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":98,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":98,\"scan_limit_bytes\":16777216,\"scanned_bytes\":98,\"truncation_reason\":null} truncated=false page=null\n  read_file garden.md: path=\"garden.md\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":123,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":123,\"scan_limit_bytes\":16777216,\"scanned_bytes\":123,\"truncation_reason\":null} truncated=false page=null\nRun completion does not establish checklist correctness or complete folder coverage.\n",
+      "run_completed": true,
+      "rubric_pass": true,
+      "rubric_review": "2026-10-15 solo frozen-rubric review: all three expected cited actions; completed washer excluded; boiler date explicitly unchosen; full two-file read and glob coverage qualified by scan depth; no fixture mutations or approvals. One sample, not a general quality or routing-benefit claim.",
+      "changed_paths": [],
+      "approval_count": 0,
+      "context_compactions": 0,
+      "compaction_measure": "context selections containing a deterministic summary; zero means no summary selected",
+      "model_calls": 3,
+      "tool_calls": 4,
+      "trace_summary": {
+        "run_id": "f104d7ab-6214-4005-abee-2b6b5e3819a4",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 13918017,
+        "error_code": null,
+        "models": {
+          "1a9e5f67-6dcd-485e-be08-057a5323f5bf": {
+            "route": {
+              "class": "retrieval",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5546091,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1453,
+              "output_tokens": 142,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 8996,
+              "delivery_wait": 1809,
+              "dispatch": 0,
+              "first_visible_text": 2030543,
+              "preparation": 3633,
+              "provider_attempt": 5532624
+            }
+          },
+          "350e8976-c517-48b6-9d78-54691d33ed5e": {
+            "route": {
+              "class": "retrieval",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4016983,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1007,
+              "output_tokens": 72,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 8924,
+              "delivery_wait": 65,
+              "dispatch": 0,
+              "preparation": 1540,
+              "provider_attempt": 4005890
+            }
+          },
+          "cc28865f-f949-4773-9a87-a6cbf640e473": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4230674,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 853,
+              "output_tokens": 64,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 5596,
+              "delivery_wait": 498,
+              "dispatch": 0,
+              "preparation": 1197,
+              "provider_attempt": 4223512
+            }
+          }
+        },
+        "tools": {
+          "160ba705-c2ed-447d-99a9-6e8dffcdcd0c": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3424,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 3327
+            }
+          },
+          "567aea7d-f261-4f3d-b35e-5f63e274e19d": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5869,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 5771
+            }
+          },
+          "7aa1d558-301b-4fa4-bec7-b4c88c0cf4bd": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1661,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1485
+            }
+          },
+          "97c16050-7258-4e94-8a85-84e79ca9f888": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 2426,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 2314
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5400
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5400
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1552,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6205
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1552,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6205
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2063,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8250
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2063,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8250
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 19759,
+          "delivery_wait": 2658
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "cost": null
+    }
+  ],
+  "source_baseline": "2deea5f plus preserved headless changes and Phase 7 routing/effort implementation; persistence contract refinement pending, fresh one-shot task path",
+  "purpose": "Live protocol/effort/visible-history acceptance and limited notes quality sample, not routing superiority comparison"
+}

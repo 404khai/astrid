@@ -18,6 +18,7 @@ use std::{
 use support::{Confirmation, Server, call, reply};
 fn config(options: Option<Options>) -> RunConfig {
     RunConfig {
+        routing: None,
         observability: options,
         model: "fixture".into(),
         task: "TASK-SENTINEL".into(),
@@ -377,6 +378,7 @@ async fn optional_usage_does_not_weaken_completion_barrier_and_off_has_no_metric
             .provider
             .generate(
                 &ModelRequest {
+                    options: Default::default(),
                     model: "fixture",
                     instructions: "",
                     messages: &[],
@@ -408,6 +410,7 @@ async fn optional_usage_does_not_weaken_completion_barrier_and_off_has_no_metric
             .provider
             .generate(
                 &ModelRequest {
+                    options: Default::default(),
                     model: "fixture",
                     instructions: "",
                     messages: &[]

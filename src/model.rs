@@ -18,6 +18,7 @@ pub enum Message {
 
 #[derive(Debug)]
 pub struct ModelRequest<'a> {
+    pub options: crate::routing::RequestOptions,
     pub model: &'a str,
     pub instructions: &'a str,
     pub messages: &'a [Message],
@@ -133,6 +134,10 @@ where
 /// A narrow seam for deterministic tests, not a universal provider abstraction.
 #[async_trait]
 pub trait ModelProvider: Send + Sync {
+    /// Explicit adapter-supported request features for an exact model identifier.
+    fn capabilities(&self, _model: &str) -> crate::routing::ModelCapability {
+        Default::default()
+    }
     /// Known backend identity for traces; unknown is represented as unavailable.
     fn provider_name(&self) -> Option<&'static str> {
         None

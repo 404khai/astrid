@@ -270,6 +270,19 @@ fn pty_child() {
         }
     }
     let _checkpoint = Checkpoint(root.join("termios.json"));
+    if scenario == "plain_composer" {
+        assert!(interactive_available());
+        assert!(!terminal::capable());
+        let mut composer = Composer::default();
+        assert_eq!(composer.compose("fixture").unwrap(), "hello plain");
+        assert_eq!(
+            composer
+                .choose("Mode", &["ask".into(), "auto".into()], "ask")
+                .unwrap(),
+            Some("auto".into())
+        );
+        return;
+    }
     if scenario == "conversations" {
         use astrid::model::{ModelError, ModelProvider, ModelRequest, ModelResponse, TextSink};
         struct NoAuth;
@@ -440,6 +453,7 @@ fn pty_child() {
             &tools,
             &mut permissions,
             astrid::runtime::RunConfig {
+                routing: None,
                 observability: None,
                 model: "fixture".into(),
                 task: "PTY fixture".into(),
@@ -784,4 +798,18 @@ fn pty_sessions_survive_restart_with_first_message_names_and_active_selection() 
     second.wait_for_screen("Message Astrid");
     second.send(b"/quit\r");
     assert!(second.finish().success());
+}
+
+#[test]
+fn pty_dumb_terminal_accepts_interactive_line_input() {
+    let root = tempfile::tempdir().unwrap();
+    let mut pty = Pty::new("plain_composer", root.path(), "dumb");
+    pty.wait_for("> ");
+    pty.master.write_all(b"hello plain\nauto\n").unwrap();
+    assert!(
+        pty.finish().success(),
+        "{}",
+        String::from_utf8_lossy(&pty.output)
+    );
+    assert!(!pty.output.contains(&27));
 }

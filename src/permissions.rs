@@ -35,6 +35,15 @@ impl Default for PermissionPolicy {
 }
 
 impl PermissionPolicy {
+    /// Native reads only; confirmation cannot override denied mutations or shell.
+    pub fn read_only() -> Self {
+        Self {
+            read: PermissionAction::Allow,
+            write: PermissionAction::Deny,
+            execute: PermissionAction::Deny,
+        }
+    }
+
     pub fn action(self, capability: Capability) -> PermissionAction {
         match capability {
             Capability::Read => self.read,

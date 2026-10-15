@@ -120,6 +120,18 @@ impl Presentation {
                 self.model_calls = *number;
                 self.state = "model";
             }
+            EventKind::ModelRouteSelected { decision } => {
+                self.model = single_line(&decision.effective_model);
+                if decision.reason != astrid::routing::RouteReason::FixedModel {
+                    self.line(
+                        &format!(
+                            "  route        {} · effort={:?} · {:?} · {:?}",
+                            self.model, decision.effective_effort, decision.reason, decision.replay
+                        ),
+                        Ink::Normal,
+                    );
+                }
+            }
             EventKind::ContextPrepared { snapshot } if self.show_context => {
                 for line in snapshot.inspection_lines() {
                     self.line(&line, Ink::Normal);

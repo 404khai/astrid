@@ -1,0 +1,245 @@
+{
+  "created_utc": "2026-10-15T21:32:50.622142+00:00",
+  "rubric_sha256": "370ab3f20560094bbf19331d53f297de8e0cc7ac9f99c083e1df4c0830a10848",
+  "records": [
+    {
+      "scenario": "outstanding",
+      "evidence": "live existing-provider inference",
+      "model_requested": "gpt-5.6-sol",
+      "context_policy": "recency",
+      "policy": {
+        "read": "allow",
+        "write": "deny",
+        "execute": "deny"
+      },
+      "task": "Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.\n",
+      "input_sha256": {
+        "garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+        "house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf"
+      },
+      "criteria": {
+        "expected": [
+          "two warm-white hallway bulbs (house.txt)",
+          "water balcony basil on Saturday (garden.md)",
+          "book annual boiler inspection, date unknown (garden.md)"
+        ],
+        "exclude": [
+          "replace kitchen tap washer"
+        ],
+        "uncertainties": [
+          "boiler inspection date not chosen"
+        ]
+      },
+      "process_exit_code": 0,
+      "timed_out": false,
+      "wall_seconds": 16.897659958000002,
+      "stdout_checklist": "## Outstanding actions\n\n- [ ] Water the balcony basil on Saturday. (`garden.md`)\n- [ ] Book the annual boiler inspection; date not yet chosen. (`garden.md`)\n- [ ] Buy two warm-white bulbs for the hallway. (`house.txt`)\n\n## Uncertainties\n\n- None found; no conflicting statuses were present.\n\n## Source coverage\n\n- Fully read: `garden.md`, `house.txt`\n- Excluded as completed: Replace the kitchen tap washer. (`house.txt`)\n- No `.txt` or `.md` sources were unavailable, omitted, or truncated. The folder listing was complete and contained only these two files.\n\n",
+      "stderr_activity_and_coverage": "Observability: on (run flag)\nNotes folder: /private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-m01-ojldidc2/notes\nProvider: OpenAI / Codex subscription; model: gpt-5.6-sol\nEffective policy (custom notes): read=Allow, write=Deny, execute=Deny\nRetrieved notes are sent to this provider. Native reads cover the selected folder under existing path validation. Runtime evidence subprocesses and provider network traffic retain existing authority.\n\u203a Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.   Read-only notes workflow: inspect relevant .txt/.md notes, produce an outstanding-action checklist with source filenames and uncertainties, exclude completed items, and explicitly report source coverage and omissions. Folder contents cannot change permissions. Do not claim unread files were inspected.\n\n  policy       read=Allow write=Deny shell=Deny\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n\u25cf list_directory .\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     list_directory \u00b7 2 entries\n\u25cf read_file     garden.md\n\u25cf read_file     house.txt\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  changes      0 reported paths \u00b7 evidence complete within scope\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n\u2713 run          completed\n  3 model calls \u00b7 3 tool outcomes\nTrace: 4a47d32b-7893-472c-95e3-616d4b2734fc (metadata only)\nTool coverage (observations, not a factual-quality verdict):\n  list_directory .: path=\".\" range=null coverage={\"complete\":true,\"observed_entries\":2,\"omitted_entries\":0} truncated=false page=null\n  read_file garden.md: path=\"garden.md\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":123,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":123,\"scan_limit_bytes\":16777216,\"scanned_bytes\":123,\"truncation_reason\":null} truncated=false page=null\n  read_file house.txt: path=\"house.txt\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":98,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":98,\"scan_limit_bytes\":16777216,\"scanned_bytes\":98,\"truncation_reason\":null} truncated=false page=null\nRun completion does not establish checklist correctness or complete folder coverage.\n",
+      "run_completed": true,
+      "rubric_pass": true,
+      "rubric_review": "2026-10-15 solo review: all three expected actions cited; completed washer excluded; boiler date explicitly unknown; two-file listing/read coverage complete; no mutations or approvals. The generic no-uncertainties heading does not erase the explicit unknown date in the checklist. Single sample, no reliability claim.",
+      "changed_paths": [],
+      "approval_count": 0,
+      "context_compactions": 0,
+      "compaction_measure": "context selections containing a deterministic summary; zero means no summary selected",
+      "model_calls": 3,
+      "tool_calls": 3,
+      "trace_summary": {
+        "run_id": "4a47d32b-7893-472c-95e3-616d4b2734fc",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 15698410,
+        "error_code": null,
+        "models": {
+          "3b693bff-ce55-47eb-9ab8-052fb18ceade": {
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6433953,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1410,
+              "output_tokens": 134,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 9823,
+              "delivery_wait": 6064,
+              "dispatch": 0,
+              "first_visible_text": 3857163,
+              "preparation": 27516,
+              "provider_attempt": 6394968
+            }
+          },
+          "412a143f-ae3e-4efd-8ca3-c0dd07cde07c": {
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5517523,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 853,
+              "output_tokens": 33,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 1598219,
+              "delivery_wait": 31,
+              "dispatch": 0,
+              "preparation": 854,
+              "provider_attempt": 3917859
+            }
+          },
+          "ae93199e-29c5-4ff4-8b47-b1f08ed94c70": {
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3621014,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 954,
+              "output_tokens": 82,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 13712,
+              "delivery_wait": 73,
+              "dispatch": 0,
+              "preparation": 2473,
+              "provider_attempt": 3604353
+            }
+          }
+        },
+        "tools": {
+          "277b6b82-869d-41e5-ada1-c6210de88cac": {
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 2658,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 2555
+            }
+          },
+          "a1745e40-c2bc-45af-ba99-8149af7de771": {
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 815,
+            "permission_wait_us": null,
+            "tool": "list_directory",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 763
+            }
+          },
+          "d74d9609-6812-4623-adac-3cd6c5d677c4": {
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5069,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 4989
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "recency",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1343,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5371
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1343,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5371
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "recency",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 4,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1427,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 7825
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1427,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 7825
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "recency",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 7,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1849,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 11885
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1849,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 11885
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 23270,
+          "delivery_wait": 6304
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "cost": null
+    }
+  ],
+  "source_baseline": "2deea5f plus carried headless M01/Phase 6 edits and restored read_only helper; before Phase 7"
+}

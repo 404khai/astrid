@@ -1,9 +1,26 @@
+# Historical direction notice — 2026-10-15
+
+Desktop-first sequencing is superseded. M02 is paused; GPUI is the future
+Phase 11 direction pending design. Use [canonical roadmap](../roadmap.md) for current scope. The original proposal below is retained as history.
+
 # Personal-agent roadmap reconciliation
 
+Current navigation (2026-10-12): [canonical roadmap](../roadmap.md) and
+[checkpoint](../CURRENT.md). This document retains the historical audit and
+native delivery proposal; use the canonical roadmap for current sequencing.
+
 Date: 2026-10-10
-Status: Proposed delivery sequence; product direction established by maintainer
+Status: Historical delivery proposal; desktop direction superseded
 Audit baseline: `cdebe18` on `experiment/mobile`, initially clean worktree
 Implementation authorization: Planning/documentation only; Phase 4 remains active
+
+Latest direction (2026-10-10): Tauri 2 replaces the native SwiftUI/AppKit desktop
+choice. ADR 0013's native/helper direction is withdrawn; ADR 0014 proposes a new
+boundary. See the [current architecture assessment](desktop-tauri-reconciliation.md)
+for the revised milestones, personal workflow and external-environment research.
+The native delivery recommendations below are historical. Foundation closure and
+other implemented guarantees are unchanged; no successor implementation is
+authorized by either assessment.
 
 Decision update (2026-10-10): the maintainer approved administrative closure of
 Phases 2–4 conditional on verified criteria and accurately documented limitations;

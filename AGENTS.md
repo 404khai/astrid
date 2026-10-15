@@ -1,5 +1,65 @@
 # AGENTS.md — Astrid
 
+## Current implementation transition — 2026-10-15
+
+Phase 6 closed with explicit limitations after the delegated main-based evidence
+review and configuration comparison (203 passed, 0 failed, 1 ignored; fmt/clippy
+passed). Phase 7 is now active under the maintainer's new-thread authorization.
+ADR 0015 visible-history handoff and its fresh-one-shot/inspection-only
+compatibility refinement were explicitly approved in this thread. Preserve
+private idle-session schema, permissions and original continuation; no Phase 8.
+The Phase 6 markers below describe earlier checkpoints. See docs/CURRENT.md.
+
+## New branch/thread authorization — 2026-10-15
+
+The maintainer requested: “New branch based on main, not worktree, work on phase6
+Closure recommendation, then phase7 from @AGENTS.md, new thread”. This authorizes
+Phase 6 closure review and disposition based on verified evidence, then Phase 7
+planning and implementation after exit criteria and consequential contracts are
+resolved. Do not treat the earlier “no Phase 7 authorization” entries as current
+restrictions; they are historical. Do not declare closure before the review.
+
+Branch: `feat/phase-6-closure-phase-7-routing`, created directly from fetched
+`origin/main` at `2deea5f`, same checkout; no worktree. The M02 branch/PR remains
+preserved. Original tracked modifications were copied byte-for-byte onto the new
+branch; untracked Phase 6/M01/planning/user files were retained. Recovery stash
+and snapshot details are in the checkpoint. The new main baseline excludes the
+M02 host/adapter commit; prior 213-test evidence belongs to the combined desktop
+checkout and must be revalidated here. Reconcile small M01/Phase 6 prerequisites
+without importing/resuming the desktop implementation.
+
+Phase 7: deterministic observable routing, provider-aware supported reasoning
+effort, direct inference distinguished from coding-agent harness delegation.
+Preserve permissions, events, private continuation and idle session contracts.
+No ML routing, speculative spawning, groups, scheduler, GPUI, daemon, local
+inference or Phalanx work. Phases 5/13 Deferred; M02 Paused; ADR 0014 Superseded.
+
+
+## Maintainer direction revision — 2026-10-15
+
+This dated revision supersedes the earlier desktop-first delivery order and
+Tauri-specific requirements below, which remain historical records. M02 is
+**Paused**, incomplete and unaccepted. Preserve its source, experiments, draft
+PR #13 and dirty checkout; do not resume desktop implementation. ADR 0014 was
+accepted on 2026-10-14 and is now Superseded by this maintainer direction.
+GPUI is the selected future desktop direction, pending Phase 11 investigation
+and a scoped design. No GPUI implementation or replacement desktop ADR is authorized.
+The CLI is the primary development and validation client; Rust runtime authority
+and Astrid's personal-agent identity remain unchanged.
+
+The active phase is **Phase 6 — Evaluation**, authorized by the maintainer's
+2026-10-15 instruction to reconcile prerequisites, plan, then implement. Phases
+0–4 foundations and M01 remain accepted with their recorded limitations. Phase 4
+is now a historical marker, not an active-scope restriction. Phase 5 is explicitly
+**Deferred**, incomplete; Phase 13 is deferred alongside it. Follow original IDs:
+6 → 7 → 8 → 9 → 10 → 11 → 12, with evidence review and separate transition
+authorization. Phase 7 includes observable deterministic routing and supported
+provider-aware reasoning effort; direct inference and delegated coding-agent
+harnesses remain distinct. No routing, workers, GPUI or successor code is authorized
+by this task. See [Phase 6 plan](docs/plans/phase-6.md) and
+[current checkpoint](docs/CURRENT.md).
+
+
 ## 1. Project
 
 Astrid is an inference-aware personal AI agent runtime that autonomously carries
@@ -33,22 +93,26 @@ The maintainer established these priorities, in order:
 
 1. Autonomous personal tasks under explicit user-defined permissions and boundaries.
 2. A reliable headless Rust runtime shared by all clients.
-3. A native macOS experience using SwiftUI and AppKit.
+3. A Tauri 2 desktop experience, targeting macOS initially.
 4. Background execution independent of GUI lifecycle.
 5. Accessible thin clients, particularly low-memory Android devices.
 6. Device capabilities, remote execution and authenticated cross-device operation.
 7. Personal context and memory under user control.
 8. Coding and ADE functionality as a capability, not the defining purpose.
 
-Native macOS uses SwiftUI for primary views, AppKit for windows, panels, menu bar,
-shortcuts and desktop behavior, and Rust for execution/authoritative state. Prefer
-a bundled helper and versioned local protocol subject to a documented transport
-and lifecycle decision. Do not introduce Tauri, Electron or a web desktop shell
-without explicit authorization. Preserve the CLI as an independent client.
+The maintainer's subsequent architecture-reconciliation instruction selects
+Tauri 2, Rust authoritative runtime execution and web desktop presentation. This
+supersedes SwiftUI/AppKit as the primary desktop UI and withdraws ADR 0013's
+native/helper implementation direction. AppKit may support narrow macOS-specific
+integrations where needed. Preserve the CLI as an independent client and a
+reasonable Windows/Linux path. Do not assume a helper remains justified simply
+because the earlier native plan used one; ADR 0014 proposes the new host boundary.
 
-Keep window management in the Mac client so a future floating Astrid panel can
-reuse application state. Screen reading and desktop control require separately
-scoped authorization; displaying a panel does not grant those capabilities.
+Keep window management in the desktop adapter so a future floating animated
+Astrid mascot/conversation surface can reuse application state. Evaluate transparent
+and topmost windows, positioning, shortcuts and pointer behavior before promising
+cross-platform overlays. Screen reading and desktop control require separately
+scoped authorization; displaying the mascot does not grant those capabilities.
 
 Preserve Expo/React Native for the mobile interface. Use native Kotlin modules
 when authorized Android overlays, device capabilities or services require them.
@@ -66,11 +130,15 @@ and foreground-window lifetime. Do not claim durable background execution before
 implementation and verification. Preserve accepted guarantees and functioning
 subsystems; add boundaries when concrete capabilities require them.
 
-See [the roadmap reconciliation](docs/plans/personal-agent-roadmap.md) for the
-audit and proposed delivery order. Original phase numbers remain historical
-references; a proposal does not close incomplete foundational phases or change
-the current-phase marker. The maintainer's immediate request is planning before
-implementation, beginning with a scoped native Mac milestone.
+See [the current assessment](docs/plans/desktop-tauri-reconciliation.md) for the
+audit, Tauri boundary, proposed delivery order and Noodle environment research.
+Astrid is its own harness: model inference, delegated coding-agent harnesses,
+external execution environments and presentation clients are distinct integrations.
+Do not integrate Noodle or build the complete floating assistant during assessment.
+Original phase numbers remain historical references; a proposal does not close
+incomplete foundational phases or change the current-phase marker. The maintainer's
+immediate request is architecture assessment before implementation, beginning with
+a scoped Tauri desktop milestone.
 
 ---
 
@@ -1281,6 +1349,13 @@ Astrid can execute a model through Phalanx while receiving whatever inference te
 
 # 14. Agent Working Procedure
 
+Start a session with [docs/CURRENT.md](docs/CURRENT.md), then read the active plan
+in [docs/roadmap.md](docs/roadmap.md). The canonical roadmap preserves historical
+phase IDs and records authorization separately from implementation and acceptance.
+Its delivery order does not change this file's current phase or authorize successor
+code. Update the checkpoint and active milestone with actual validation before
+ending work; preserve historical decisions and reviews.
+
 Use [docs/development.md](docs/development.md) for the repeatable phase-review,
 grilling, ticket, and ADR workflow. Proposed plans and ADRs do not authorize a
 phase transition; the current phase below remains authoritative.
@@ -1359,11 +1434,18 @@ It is not sacred.
 
 # 17. Current Phase
 
-Current phase:
+Current phase (revised 2026-10-15 after evidence closure):
 
 ```text
-Phase 4 — Trace and Inference Observability
+Phase 7 — Model Routing
 ```
+
+Phase 6 is closed with explicit limitations; current closure review and
+authorized Phase 7 evidence are in docs/CURRENT.md. Earlier scope statements
+below preserve their dated history. No Phase 8 transition is authorized.
+
+Phase 5 is Deferred, not complete. Earlier Phase 4 restrictions and M02
+authorizations below are historical and superseded by the revision at the top.
 
 Phase 3 was authorized by the maintainer on 2026-10-07 with the instruction to
 critique its plan using an adversarial model, then begin implementation. This
@@ -1385,14 +1467,58 @@ and 4 provided their existing exit criteria were verified and limitations accura
 documented. The current phase reviews and docs/reviews/foundation-closure.md
 record that evidence and the closure disposition without claiming unverified work.
 The maintainer separately accepted ADR 0013 with its native layout, privacy,
-authority, lifetime and local-only clarifications. Mac A implementation remains
-Not Started and requires separate authorization. Prepare its smallest implementation
-plan and genuine blockers in a new thread, using references/desktop as the primary
-UI layout specification. These decisions do not change the Phase 4 marker.
+authority, lifetime and local-only clarifications, then explicitly withdrew the
+native SwiftUI/AppKit/helper direction in the subsequent Tauri 2 assessment request.
+ADR 0013 preserves that history as Superseded; ADR 0014 is Proposed for the changed
+host, authority and lifecycle contract. Desktop implementation remains Not Started
+and requires separate authorization. The current assessment and proposed delivery
+sequence do not change the Phase 4 marker or reopen foundation closure.
 
-Unless the user explicitly changes this value, implementation should remain within Phase 4.
+Historical restriction (superseded 2026-10-15): implementation previously remained
+within Phase 4 except for authorized extensions. Current authorized implementation
+is Phase 6, following the direction revision above; no Phase 7 advancement yet.
+
+## Authorized M01 personal-task extension — 2026-10-12
+
+The maintainer explicitly authorized M01 implementation and requested a new thread
+on a new branch in the existing checkout, without a worktree. This authorizes
+M01-01 through M01-03 in [the M01 plan](docs/milestones/01-personal-tasks.md):
+generalized task guidance, a read-only notes workflow through the headless runtime
+and CLI, deterministic permission/coverage/cancellation tests, and the minimum
+evaluation baseline using synthetic notes. Record live versus mocked evidence
+separately. Use existing provider authentication; no new paid infrastructure or
+privilege is authorized.
+
+Preserve directory-bound sessions, idle snapshot schemas, existing permission
+preset meanings, coding behavior and accepted ADRs 0001–0012. The historical
+Phase 4 marker and foundation closure remain unchanged. This extension does not
+authorize M02, accept ADR 0014, introduce background recovery, or enable automatic
+advancement to later milestones. Stop at M01 acceptance or a genuine consequential
+decision, updating the milestone and CURRENT.md with actual evidence.
 
 ---
+
+## Authorized M02 desktop extension — 2026-10-13
+
+The maintainer requested a new implementation thread and a new branch in the
+existing checkout, without a worktree, to work on M02. This authorizes the scoped
+[M02 desktop plan](docs/milestones/02-desktop.md), beginning with source/contract
+review and macOS Liquid Glass feasibility. Use `feat/m02-tauri-desktop`.
+Inspect the supplied Figma design exports in `references/`, particularly
+`astrid_first_screen.png`, `astrid_pod_interface.png` and `astrid_pod_settings.png`.
+The macOS Tauri application should have Liquid Glass. Verify current supported
+native APIs and Tauri integration, platform availability, accessibility and
+visual behavior before making implementation claims; a CSS blur or vibrancy
+effect alone must not be reported as native Liquid Glass. Keep any required
+AppKit integration narrow and within the desktop adapter.
+
+ADR 0014 remains Proposed: this instruction authorizes M02 work but does not
+independently accept its host/IPC/lifecycle contract. Resolve that concrete
+decision before dependent host implementation; continue independent design and
+feasibility work while it is pending. Preserve Rust runtime authority, CLI
+independence, privacy, permission boundaries and accepted ADRs. Do not implement
+M03, a daemon, remote trust, group execution, desktop control or the complete
+floating assistant. The historical Phase 4 marker remains unchanged.
 
 # 18. Definition of Success
 
@@ -1870,3 +1996,15 @@ and selection across launches. Snapshots include tool data/provider continuation
 are separate from metadata traces, and never persist permissions or replay tools.
 Background workers and mid-run checkpoint recovery remain outside this extension.
 The current phase remains Phase 4.
+
+## M02 host contract accepted — 2026-10-14
+
+After the specific ADR 0014 recommendation and its window/quit/privacy contract
+were presented, the maintainer instructed “So what’s the way forward start
+implementation”. This accepts ADR 0014 option 1 and authorizes dependent M02-01
+through M02-04 execution within the already scoped desktop extension. Prior
+Proposed/pending entries above remain history. Rust authority, CLI independence,
+private bounded IPC, one selected locked store/run, close/reopen continuity and
+explicit quit cancellation/cleanup/idle save are binding. M02-00 accessibility
+and material acceptance checks still require actual evidence. No later milestone,
+daemon, recovery, remote trust or desktop observation/control is authorized.

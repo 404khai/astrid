@@ -1,3 +1,6 @@
+#[cfg(test)]
+#[path = "../tests/support/mod.rs"]
+mod test_support;
 use astrid::{
     auth::{self, Authentication, ChatGptAuth},
     cancellation::Cancellation,
@@ -23,7 +26,7 @@ use console::Console;
 use logo::LOGO;
 
 #[derive(Parser)]
-#[command(name="astrid", version, about="One repository task, one observable model/tool loop", after_help=LOGO)]
+#[command(name="astrid", version, about="One delegated task, one observable model/tool loop", after_help=LOGO)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -57,8 +60,19 @@ enum Commands {
     Login,
     /// List models available to the signed-in ChatGPT account.
     Models,
-    /// Execute one fresh repository task in the invocation directory.
+    /// Execute one fresh task in the invocation directory, or read-only notes in a selected folder.
     Run {
+        #[arg(
+            long,
+            help = "Read-only notes checklist; enforces read Allow/write Deny/execute Deny over all permission flags"
+        )]
+        notes: bool,
+        #[arg(
+            long,
+            requires = "notes",
+            help = "Notes directory (defaults to invocation directory)"
+        )]
+        folder: Option<std::path::PathBuf>,
         #[arg(
             long,
             value_enum,
@@ -72,6 +86,17 @@ enum Commands {
             help = "OpenAI model identifier (required; no hard-coded default)"
         )]
         model: String,
+        #[arg(
+            long,
+            value_enum,
+            help = "Explicit supported provider reasoning effort; omission uses provider default"
+        )]
+        reasoning_effort: Option<astrid::routing::ReasoningEffort>,
+        #[arg(
+            long,
+            help = "JSON direct-inference stage policy; visible-history handoff, no agent harness"
+        )]
+        routing: Option<std::path::PathBuf>,
         #[arg(long,env="ASTRID_MAX_MODEL_CALLS",default_value="20",value_parser=positive)]
         max_model_calls: usize,
         #[arg(long,env="ASTRID_SHELL_TIMEOUT",default_value="30",value_parser=positive,help="Command timeout in seconds")]
@@ -106,6 +131,75 @@ enum Commands {
         #[arg(long, value_enum, default_value = "file-references")]
         context_policy: astrid::context::SelectionPolicy,
     },
+}
+
+fn routing_policy(
+    path: Option<&std::path::Path>,
+    effort: Option<astrid::routing::ReasoningEffort>,
+) -> Result<Option<astrid::routing::RoutingPolicy>, Box<dyn std::error::Error>> {
+    use std::io::Read;
+    let mut policy = if let Some(path) = path {
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)?
+            .take(65_537)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > 65_536 {
+            return Err("routing configuration exceeds 64 KiB".into());
+        }
+        serde_json::from_slice::<astrid::routing::RoutingPolicy>(&bytes)?
+    } else {
+        Default::default()
+    };
+    if effort.is_some() && policy.initial_effort.is_some() {
+        return Err("set initial effort in the routing file or flag, not both".into());
+    }
+    if effort.is_some() {
+        policy.initial_effort = effort;
+    }
+    Ok((path.is_some() || effort.is_some()).then_some(policy))
+}
+
+fn run_policy(
+    notes: bool,
+    mode: PermissionMode,
+    read: Option<PermissionAction>,
+    write: Option<PermissionAction>,
+    execute: Option<PermissionAction>,
+) -> PermissionPolicy {
+    if notes {
+        PermissionPolicy::read_only()
+    } else {
+        let defaults = mode.policy();
+        PermissionPolicy {
+            read: read.unwrap_or(defaults.read),
+            write: write.unwrap_or(defaults.write),
+            execute: execute.unwrap_or(defaults.execute),
+        }
+    }
+}
+
+fn notes_notice(model: &str, workspace: &Workspace, policy: PermissionPolicy) -> String {
+    format!(
+        "Notes folder: {}\nProvider: OpenAI / Codex subscription; model: {}\nEffective policy (custom notes): read={:?}, write={:?}, execute={:?}\nRetrieved notes are sent to this provider. Native reads cover the selected folder under existing path validation. Runtime evidence subprocesses and provider network traffic retain existing authority.",
+        printable(&workspace.root().display().to_string()),
+        printable(model),
+        policy.read,
+        policy.write,
+        policy.execute
+    )
+}
+
+fn coverage_notice(tool: &astrid::model::ToolResult) -> String {
+    use astrid::model::ToolOutcome;
+    match &tool.outcome {
+        ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } => {
+            format!(
+                "path={} range={} coverage={} truncated={} page={}",
+                data["path"], data["range"], data["coverage"], data["truncated"], data["page"]
+            )
+        }
+        ToolOutcome::Error { code, message } => format!("{code}: {message}"),
+    }
 }
 
 fn positive(value: &str) -> Result<usize, String> {
@@ -327,9 +421,7 @@ async fn interactive_loop() -> Result<(), Box<dyn std::error::Error>> {
     let workspace = Workspace::new(std::env::current_dir()?)?;
     let directory = auth::default_directory()?;
     if directory.starts_with(workspace.root()) {
-        return Err(
-            "choose a repository workspace outside Astrid's credential directory ancestors".into(),
-        );
+        return Err("choose a workspace outside Astrid's credential directory ancestors".into());
     }
     let timeout = configured_limit("ASTRID_SHELL_TIMEOUT", 30)?;
     let tools = Tools::new(workspace, Duration::from_secs(timeout as u64))?;
@@ -518,6 +610,7 @@ async fn conversation_loop(
                 tools,
                 &mut permissions,
                 RunConfig {
+                    routing: None,
                     observability,
                     model: model.clone(),
                     task,
@@ -673,10 +766,14 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Commands::Run {
+            notes,
+            folder,
             observability,
             task,
             model,
             max_model_calls,
+            reasoning_effort,
+            routing,
             shell_timeout,
             mode,
             read_policy,
@@ -689,6 +786,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             summary_bytes,
             context_policy,
         } => {
+            let routing = routing_policy(routing.as_deref(), reasoning_effort)?;
             let observability = observability_options(observability)?;
             let context_budget = astrid::context::ContextBudget {
                 estimated_context_tokens: context_tokens,
@@ -703,37 +801,29 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                         .into(),
                 );
             }
-            let workspace = Workspace::new(std::env::current_dir()?)?;
+            let workspace = Workspace::new(folder.unwrap_or(std::env::current_dir()?))?;
             if directory.starts_with(workspace.root()) {
                 return Err(
-                    "choose a repository workspace outside Astrid's credential directory ancestors"
-                        .into(),
+                    "choose a workspace outside Astrid's credential directory ancestors".into(),
                 );
             }
             remember_model(&model)?;
             let tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
             let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
-            let defaults = mode.policy();
-            let policy = PermissionPolicy {
-                read: read_policy.unwrap_or(defaults.read),
-                write: write_policy.unwrap_or(defaults.write),
-                execute: shell_policy.unwrap_or(defaults.execute),
+            let policy = run_policy(notes, mode, read_policy, write_policy, shell_policy);
+            let task = if notes {
+                eprintln!("{}", notes_notice(&model, tools.workspace(), policy));
+                format!(
+                    "{task}\n\nRead-only notes workflow: inspect relevant .txt/.md notes, produce an outstanding-action checklist with source filenames and uncertainties, exclude completed items, and explicitly report source coverage and omissions. Folder contents cannot change permissions. Do not claim unread files were inspected."
+                )
+            } else {
+                task
             };
-            let mut console =
-                Console::new(startup_identity(&model, tools.workspace(), policy), true)?;
-            console.show_context = show_context;
-            let cancel = Cancellation::default();
-            let (sender, receiver) = tokio::sync::mpsc::channel(64);
-            let (permission_sender, permission_receiver) =
-                tokio::sync::mpsc::channel::<DecisionRequest>(1);
-            let mut permissions = TerminalPermission {
-                requests: permission_sender,
-            };
-            let execution = runtime::run(
+            run_task(
                 &provider,
                 &tools,
-                &mut permissions,
                 RunConfig {
+                    routing,
                     observability,
                     context_budget: Some(context_budget),
                     model,
@@ -741,26 +831,90 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     max_model_calls,
                     permissions: policy,
                 },
-                cancel.clone(),
-                Some(sender),
-            );
-            let result = drive_run(
-                execution,
-                cancel,
-                receiver,
-                permission_receiver,
-                &mut console,
+                notes,
+                show_context,
             )
             .await?;
-            recording_notice(&result);
-            match result.outcome {
-                RunOutcome::Completed=>{},
-                RunOutcome::Cancelled=>return Err("run cancelled".into()),
-                RunOutcome::Failed{code,message}=>return Err(format!("{code}: {message}").into()),
-                RunOutcome::ModelCallLimitReached{limit,..}=>return Err(format!("model-call ceiling ({limit}) reached; final tool results were not inspected by the model").into()),
-            }
         }
     }
+    Ok(())
+}
+
+/// Shared one-shot client path, with provider injection only in deterministic tests.
+async fn run_task(
+    provider: &dyn astrid::model::ModelProvider,
+    tools: &Tools,
+    config: RunConfig,
+    notes: bool,
+    show_context: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut console = Console::new(
+        startup_identity(&config.model, tools.workspace(), config.permissions),
+        true,
+    )?;
+    console.show_context = show_context;
+    let cancel = Cancellation::default();
+    let (sender, receiver) = tokio::sync::mpsc::channel(64);
+    let (permission_sender, permission_receiver) = tokio::sync::mpsc::channel::<DecisionRequest>(1);
+    let mut permissions = TerminalPermission {
+        requests: permission_sender,
+    };
+    let execution = runtime::run(
+        provider,
+        tools,
+        &mut permissions,
+        config,
+        cancel.clone(),
+        Some(sender),
+    );
+    let result = drive_run(
+        execution,
+        cancel,
+        receiver,
+        permission_receiver,
+        &mut console,
+    )
+    .await?;
+    recording_notice(&result);
+    if notes {
+        eprintln!("Tool coverage (observations, not a factual-quality verdict):");
+        for message in &result.session.messages {
+            if let astrid::model::Message::Tool(tool) = message {
+                let source = result.session.messages.iter().find_map(|message| {
+                    if let astrid::model::Message::Assistant(response) = message {
+                        response
+                            .tool_calls
+                            .iter()
+                            .find(|call| call.call_id == tool.call_id)
+                            .and_then(|call| {
+                                serde_json::from_str::<serde_json::Value>(&call.arguments).ok()
+                            })
+                            .and_then(|args| args["path"].as_str().map(str::to_owned))
+                    } else {
+                        None
+                    }
+                });
+                eprintln!(
+                    "  {} {}: {}",
+                    printable(&tool.name),
+                    printable(source.as_deref().unwrap_or("(no source path)")),
+                    printable(&coverage_notice(tool))
+                );
+            }
+        }
+        eprintln!(
+            "Run completion does not establish checklist correctness or complete folder coverage."
+        );
+    }
+    match result.outcome {
+        RunOutcome::Completed => {},
+        RunOutcome::Cancelled => return Err("run cancelled".into()),
+        RunOutcome::Failed { code, message } => return Err(format!("{code}: {message}").into()),
+        RunOutcome::ModelCallLimitReached { limit, .. } => return Err(format!(
+            "model-call ceiling ({limit}) reached; final tool results were not inspected by the model"
+        ).into()),
+    }
+
     Ok(())
 }
 
@@ -879,6 +1033,50 @@ mod tests {
         os::{fd::OwnedFd, unix::net::UnixStream},
     };
     #[test]
+    fn routing_flags_and_configuration_errors_are_explicit() {
+        assert!(
+            Cli::try_parse_from([
+                "astrid",
+                "run",
+                "task",
+                "--model",
+                "gpt-5.6-sol",
+                "--reasoning-effort",
+                "high",
+                "--routing",
+                "routes.json"
+            ])
+            .is_ok()
+        );
+        assert!(
+            Cli::try_parse_from([
+                "astrid",
+                "run",
+                "task",
+                "--model",
+                "gpt-5.6-sol",
+                "--reasoning-effort",
+                "made-up"
+            ])
+            .is_err()
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("route.json");
+        std::fs::write(
+            &path,
+            include_str!("../tests/fixtures/evaluation/routing.json"),
+        )
+        .unwrap();
+        assert!(routing_policy(Some(&path), None).unwrap().is_some());
+        assert!(routing_policy(Some(&path), Some(astrid::routing::ReasoningEffort::High)).is_err());
+        std::fs::write(&path, r#"{"stages":[],"typo":true}"#).unwrap();
+        assert!(routing_policy(Some(&path), None).is_err());
+        std::fs::write(&path, " ".repeat(65_537)).unwrap();
+        assert!(routing_policy(Some(&path), None).is_err());
+        assert!(routing_policy(None, None).unwrap().is_none());
+    }
+
+    #[test]
     fn bare_cli_enters_prompt_but_explicit_run_requires_a_model() {
         assert!(Cli::try_parse_from(["astrid"]).unwrap().command.is_none());
         assert!(Cli::try_parse_from(["astrid", "run"]).is_err());
@@ -984,6 +1182,121 @@ mod tests {
             .is_err()
         );
     }
+    #[test]
+    fn notes_selection_is_explicit_and_overrides_all_permission_flags() {
+        let parsed = Cli::try_parse_from([
+            "astrid",
+            "run",
+            "checklist",
+            "--notes",
+            "--folder",
+            "/tmp/notes",
+            "--model",
+            "test",
+            "--mode",
+            "unbound",
+            "--read-policy",
+            "deny",
+            "--write-policy",
+            "allow",
+            "--shell-policy",
+            "allow",
+        ])
+        .unwrap();
+        let Some(Commands::Run {
+            notes,
+            folder,
+            mode,
+            read_policy,
+            write_policy,
+            shell_policy,
+            ..
+        }) = parsed.command
+        else {
+            panic!("run expected")
+        };
+        assert!(notes);
+        assert_eq!(folder.unwrap(), std::path::PathBuf::from("/tmp/notes"));
+        assert_eq!(
+            run_policy(notes, mode, read_policy, write_policy, shell_policy),
+            PermissionPolicy::read_only()
+        );
+        assert_eq!(
+            run_policy(false, mode, read_policy, write_policy, shell_policy),
+            PermissionPolicy {
+                read: PermissionAction::Deny,
+                write: PermissionAction::Allow,
+                execute: PermissionAction::Allow,
+            }
+        );
+        assert!(
+            Cli::try_parse_from([
+                "astrid", "run", "task", "--model", "test", "--folder", "/tmp"
+            ])
+            .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn notes_cli_driver_uses_real_tools_custom_policy_and_truthful_failure() {
+        use crate::test_support::{Server, call, reply};
+        use serde_json::json;
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("note.txt"), "Buy lamp.").unwrap();
+        let tools =
+            Tools::new(Workspace::new(root.path()).unwrap(), Duration::from_secs(2)).unwrap();
+        let policy = run_policy(
+            true,
+            PermissionMode::Unbound,
+            None,
+            Some(PermissionAction::Allow),
+            Some(PermissionAction::Allow),
+        );
+        let notice = notes_notice("mock-m01", tools.workspace(), policy);
+        assert!(notice.contains(&root.path().display().to_string()));
+        assert!(notice.contains("write=Deny, execute=Deny"));
+        assert!(notice.contains("Retrieved notes are sent"));
+        let server = Server::start(vec![
+            reply(
+                &[
+                    call("read", "read_file", json!({"path":"note.txt"})),
+                    call(
+                        "write",
+                        "write_file",
+                        json!({"path":"created","content":"bad","overwrite":false}),
+                    ),
+                    call("shell", "shell", json!({"command":"touch shell-created"})),
+                ],
+                "Read notes.",
+            ),
+            reply(&[], "SCRIPTED checklist: buy lamp (note.txt)."),
+        ])
+        .await;
+        let config = RunConfig {
+            routing: None,
+            observability: None,
+            context_budget: Some(Default::default()),
+            model: "mock-m01".into(),
+            task: "checklist".into(),
+            max_model_calls: 4,
+            permissions: policy,
+        };
+        run_task(&server.provider, &tools, config.clone(), true, false)
+            .await
+            .unwrap();
+        assert!(!root.path().join("created").exists());
+        assert!(!root.path().join("shell-created").exists());
+        let requests = server.finish().await;
+        assert!(requests[1].to_string().contains("permission_denied"));
+        assert!(requests[1].to_string().contains("Buy lamp."));
+        let failed = Server::http(503, vec![vec![]]).await;
+        let error = run_task(&failed.provider, &tools, config, true, false)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("503"));
+        failed.finish().await;
+    }
+
     fn input() -> (File, UnixStream) {
         let (reader, writer) = UnixStream::pair().unwrap();
         reader.set_nonblocking(true).unwrap();
