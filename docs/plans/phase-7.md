@@ -84,3 +84,12 @@ regressions pass. Six routed acceptance tests and ten evaluation execution cases
 pass. Earlier pending entries above are historical slice checkpoints. Implementation
 is complete and solo review recommends closure with the stated limitations. Stop;
 no automatic Phase 8 advancement.
+
+## PR publication — 2026-10-15
+
+[PR #14](https://github.com/404khai/astrid/pull/14), implementation `ef1dbb8`, targets
+`main` from the existing branch. An exported exact staged snapshot passes 211/0/1,
+fmt and strict clippy; 208 local documentation targets resolve. Paused desktop code
+and unrelated local artifacts are excluded. Compact CLI context usage is a
+recommended follow-up, with estimated budget/provider usage/model capacity kept
+explicit; it is not implemented by this PR. No Phase 8 transition is inferred.

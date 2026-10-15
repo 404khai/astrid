@@ -1,3 +1,33 @@
+# Publication checkpoint — 2026-10-15
+
+Opened [PR #14](https://github.com/404khai/astrid/pull/14) against `main` from the
+existing `feat/phase-6-closure-phase-7-routing` branch. Implementation commit:
+`ef1dbb8` (72 explicitly scoped files). No branch/worktree change or force push.
+The PR includes carried headless notes/terminal prerequisites and supporting
+history/evaluation records; desktop source, experiments, personal household notes,
+reference images, build output and the local product brief remain outside it.
+Recovery stash and handoff snapshot remain preserved.
+
+Validated an exported copy of the exact staged code/test tree independently of
+excluded local artifacts: `cargo test --locked` **211 passed, 0 failed, 1 ignored**;
+fmt and strict all-target clippy passed. All 208 checked local Markdown targets
+resolved in that snapshot; staged source hashes match the Phase 7 validation record.
+This publication-only checkpoint adds no runtime change or new live inference.
+
+Maintainer reported missing compact context usage. Current detailed inspection is
+`astrid run ... --show-context`; no percentage/footer meter is implemented.
+Recommended next scoped follow-up: an always-visible context budget meter with
+explicit estimate/unknown labels, provider-reported last-call input tokens when
+available, and a model-window percentage only with verified capacity/accounting.
+Existing non-opaque JSON bytes/4 estimates and configured budgets must not be
+presented as exact full model-window occupancy. Follow with controlled routed vs
+single-model quality comparisons and separately decide provenance before resumable
+routing. This note does not authorize Phase 8 or a persistence-schema migration.
+
+Earlier uncommitted/publication-pending statements below are historical.
+
+---
+
 # Current checkpoint — Phase 7 implemented and reviewed, 2026-10-15
 
 Phase 6 is **Closed with explicit limitations** under the maintainer's delegated
