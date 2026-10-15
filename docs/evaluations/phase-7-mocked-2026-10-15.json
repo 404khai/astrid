@@ -1,0 +1,265 @@
+{
+  "baseline": "2deea5f plus preserved headless work and Phase 7 edits",
+  "checks": {
+    "duplicate_route_rejected": true,
+    "event_replay_matches": true,
+    "mutations": 0,
+    "permission_denials": 2,
+    "private_original_history_retained": true,
+    "private_reasoning_excluded": true,
+    "whole_exchange_visible_handoff": true
+  },
+  "configuration": {
+    "initial_effort": "low",
+    "stages": [
+      {
+        "class": "coding",
+        "effort": "high",
+        "from_call": 2,
+        "model": "gpt-5.6-terra"
+      }
+    ]
+  },
+  "evidence": "scripted inference / real tools; model quality unscored",
+  "initial_model": "gpt-5.6-sol",
+  "request_bytes": [
+    4877,
+    5669,
+    6394
+  ],
+  "runner_sha256": "c7afd11d14e5ae7e021057f79d4c3e38006582df817afd81cb6d7bafe778d2d0",
+  "task_quality": null,
+  "trace_summary": {
+    "complete": true,
+    "contexts": [
+      {
+        "budget": {
+          "estimated_context_tokens": 65536,
+          "max_request_bytes": 20000,
+          "max_summary_bytes": 4096,
+          "policy": "file_references",
+          "response_reserve_tokens": 4096
+        },
+        "evicted_items": 0,
+        "retained_items": 2,
+        "snapshot": {
+          "non_opaque_json_size_token_heuristic": 1220,
+          "provider_input_tokens": null,
+          "serialized_request_bytes": 4877
+        },
+        "summary_bytes": null
+      },
+      {
+        "snapshot": {
+          "non_opaque_json_size_token_heuristic": 1220,
+          "provider_input_tokens": null,
+          "serialized_request_bytes": 4877
+        }
+      },
+      {
+        "budget": {
+          "estimated_context_tokens": 65536,
+          "max_request_bytes": 20000,
+          "max_summary_bytes": 4096,
+          "policy": "file_references",
+          "response_reserve_tokens": 4096
+        },
+        "evicted_items": 0,
+        "retained_items": 4,
+        "snapshot": {
+          "non_opaque_json_size_token_heuristic": 1418,
+          "provider_input_tokens": null,
+          "serialized_request_bytes": 5669
+        },
+        "summary_bytes": null
+      },
+      {
+        "snapshot": {
+          "non_opaque_json_size_token_heuristic": 1418,
+          "provider_input_tokens": null,
+          "serialized_request_bytes": 5669
+        }
+      },
+      {
+        "budget": {
+          "estimated_context_tokens": 65536,
+          "max_request_bytes": 20000,
+          "max_summary_bytes": 4096,
+          "policy": "file_references",
+          "response_reserve_tokens": 4096
+        },
+        "evicted_items": 0,
+        "retained_items": 7,
+        "snapshot": {
+          "non_opaque_json_size_token_heuristic": 1599,
+          "provider_input_tokens": null,
+          "serialized_request_bytes": 6394
+        },
+        "summary_bytes": null
+      },
+      {
+        "snapshot": {
+          "non_opaque_json_size_token_heuristic": 1599,
+          "provider_input_tokens": null,
+          "serialized_request_bytes": 6394
+        }
+      }
+    ],
+    "cost": null,
+    "decode_tokens_per_second": null,
+    "error_code": null,
+    "model": "gpt-5.6-sol",
+    "models": {
+      "03228443-16da-4ee5-a843-18b1c677cfae": {
+        "error_code": null,
+        "exit_code": null,
+        "inclusive_runtime_us": 4397846,
+        "outcome": "model_call_completed",
+        "permission_wait_us": null,
+        "route": {
+          "class": "general",
+          "effective_effort": "low",
+          "effective_model": "gpt-5.6-sol",
+          "provider": "openai_codex_subscription",
+          "reason": "configured_initial",
+          "replay": "visible_history",
+          "requested_effort": "low",
+          "requested_model": "gpt-5.6-sol"
+        },
+        "timings_us": {
+          "authentication": 7,
+          "delivery_wait": 13752,
+          "dispatch": 0,
+          "first_visible_text": 67691,
+          "preparation": 17258,
+          "provider_attempt": 4357090
+        },
+        "tool": null,
+        "usage": {
+          "cached_tokens": null,
+          "input_tokens": null,
+          "invalid": false,
+          "output_tokens": null
+        }
+      },
+      "2f01fa27-d6dd-41a3-89fe-f1342891ca3c": {
+        "error_code": null,
+        "exit_code": null,
+        "inclusive_runtime_us": 16077,
+        "outcome": "model_call_completed",
+        "permission_wait_us": null,
+        "route": {
+          "class": "coding",
+          "effective_effort": "high",
+          "effective_model": "gpt-5.6-terra",
+          "provider": "openai_codex_subscription",
+          "reason": {
+            "configured_stage": {
+              "from_call": 2
+            }
+          },
+          "replay": "visible_history",
+          "requested_effort": "high",
+          "requested_model": "gpt-5.6-terra"
+        },
+        "timings_us": {
+          "authentication": 7,
+          "delivery_wait": 194,
+          "dispatch": 0,
+          "first_visible_text": 5652,
+          "preparation": 1667,
+          "provider_attempt": 13925
+        },
+        "tool": null,
+        "usage": {
+          "cached_tokens": null,
+          "input_tokens": null,
+          "invalid": false,
+          "output_tokens": null
+        }
+      },
+      "472da6c0-08ce-488f-a015-ac09ce94cfd5": {
+        "error_code": null,
+        "exit_code": null,
+        "inclusive_runtime_us": 136140,
+        "outcome": "model_call_completed",
+        "permission_wait_us": null,
+        "route": {
+          "class": "coding",
+          "effective_effort": "high",
+          "effective_model": "gpt-5.6-terra",
+          "provider": "openai_codex_subscription",
+          "reason": {
+            "configured_stage": {
+              "from_call": 2
+            }
+          },
+          "replay": "visible_history",
+          "requested_effort": "high",
+          "requested_model": "gpt-5.6-terra"
+        },
+        "timings_us": {
+          "authentication": 4,
+          "delivery_wait": 1009,
+          "dispatch": 0,
+          "first_visible_text": 6735,
+          "preparation": 1587,
+          "provider_attempt": 134114
+        },
+        "tool": null,
+        "usage": {
+          "cached_tokens": null,
+          "input_tokens": null,
+          "invalid": false,
+          "output_tokens": null
+        }
+      }
+    },
+    "outcome": "run_completed",
+    "provider": "openai_codex_subscription",
+    "run_elapsed_us": 5177340,
+    "run_id": "4a28b97f-a5ce-4908-aff2-d047cf3801ea",
+    "runtime_timings_us": {
+      "context_selection": 26579,
+      "delivery_wait": 49633
+    },
+    "tools": {
+      "2e1ac772-d48e-4032-8f0f-45463e1894e7": {
+        "error_code": "permission_denied",
+        "exit_code": null,
+        "inclusive_runtime_us": null,
+        "outcome": "tool_call_denied",
+        "permission_wait_us": null,
+        "route": null,
+        "timings_us": {},
+        "tool": "shell",
+        "usage": null
+      },
+      "623b7528-ff62-4841-a713-d295ac8a6efd": {
+        "error_code": null,
+        "exit_code": null,
+        "inclusive_runtime_us": 2251,
+        "outcome": "tool_call_completed",
+        "permission_wait_us": null,
+        "route": null,
+        "timings_us": {
+          "tool_execution": 2094
+        },
+        "tool": "read_file",
+        "usage": null
+      },
+      "75875567-23fd-4471-9e61-497c951d331a": {
+        "error_code": "permission_denied",
+        "exit_code": null,
+        "inclusive_runtime_us": null,
+        "outcome": "tool_call_denied",
+        "permission_wait_us": null,
+        "route": null,
+        "timings_us": {},
+        "tool": "write_file",
+        "usage": null
+      }
+    },
+    "true_ttft_us": null
+  }
+}

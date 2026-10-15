@@ -16,6 +16,10 @@ use std::{
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static HOOK: Once = Once::new();
 
+pub(super) fn interactive() -> bool {
+    io::stdin().is_terminal() && io::stderr().is_terminal()
+}
+
 pub(super) fn capable() -> bool {
     supports_inline(
         io::stdin().is_terminal(),

@@ -5,7 +5,21 @@ changes. AGENTS.md controls scope; accepted ADRs control architectural contracts
 code and tests establish what actually exists. A planning document does not
 advance the active phase.
 
+Active scope: Phase 7, authorized after Phase 6 closure with limitations on
+2026-10-15. ADR 0015 handoff/one-shot compatibility contract accepted. Phases 5/13
+deferred; M02 paused; GPUI design deferred to Phase 11. See [Phase 7 plan](plans/phase-7.md).
+
 Start here for the current phase:
+
+- [Current checkpoint](CURRENT.md): active planning slice, authorization gates,
+  last verified baseline and exact next action.
+- [Canonical roadmap](roadmap.md): current delivery order, historical phase ledger
+  and nearest milestone plans. Earlier assessments below are supporting evidence.
+
+- [Tauri desktop/personal-agent assessment](plans/desktop-tauri-reconciliation.md):
+  historical Tauri decision and evidence; superseded by the 2026-10-15 direction.
+- [Noodle execution-environment research](research/noodle-execution-environments.md):
+  pinned Computer/Browser/Hub source evaluation; no integrations authorized.
 
 - [Phase 2–4 foundation closure audit](reviews/foundation-closure.md): current
   validation, explicit debt dispositions and the 2026-10-10 administrative closure decision.

@@ -1,12 +1,31 @@
+Direction history update — 2026-10-15: this ADR remains Superseded. Its Tauri
+successor ADR 0014 is also now Superseded. GPUI is selected for future Phase 11
+design, with no framework capability claims or renewed native/helper contract.
+See [direction record](../reviews/direction-revision-2026-10-15.md).
+
 # ADR 0013: Native Mac client and bundled Rust helper boundary
 
 Date: 2026-10-10
-Status: Accepted
+Status: Superseded — native UI/helper direction withdrawn by maintainer
 Implementation: Not Started
-Decision evidence: Maintainer's explicit "Decision: Phase closure and ADR 0013"
-on 2026-10-10 accepts the architectural direction with the clarifications below.
-Implementation authorization: Pending; acceptance does not advance the active phase
+Historical decision evidence: Maintainer's explicit "Decision: Phase closure and ADR 0013"
+on 2026-10-10 accepted the direction; the subsequent Tauri instruction withdraws it.
+Implementation authorization: Native/helper direction withdrawn; replacement proposed
 Related: [roadmap reconciliation](../plans/personal-agent-roadmap.md), ADRs 0002–0004, 0009, 0012
+
+## Supersession update — 2026-10-10
+
+The latest maintainer instruction selects Tauri 2 and explicitly supersedes
+SwiftUI/AppKit as the primary desktop UI. The native client/private-pipe helper
+implementation direction below is no longer approved. Its earlier acceptance is
+preserved as history, not current authorization. Applicable runtime ownership,
+permissions, event ordering, cancellation, privacy and idle persistence guarantees
+remain in force under their existing ADRs.
+
+[ADR 0014](0014-tauri-desktop-runtime-boundary.md) proposes the replacement Tauri
+host/IPC/lifecycle boundary; it is **Proposed**, not Accepted. This withdrawal and
+assessment do not authorize implementation or change the Phase 4 marker. The
+remaining sections record the historical native decision.
 
 ## Context
 

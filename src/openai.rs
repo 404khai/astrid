@@ -89,20 +89,58 @@ impl OpenAiProvider {
         })
     }
 
-    fn body(request: &ModelRequest<'_>) -> Value {
+    fn body(request: &ModelRequest<'_>) -> Result<Value, ModelError> {
+        if request.options.effort.is_some_and(|effort| {
+            !Self::model_capability(request.model)
+                .reasoning_efforts
+                .contains(&effort)
+        }) {
+            return Err(ModelError::Provider(
+                "explicit reasoning effort is unsupported for this model".into(),
+            ));
+        }
         let mut input = Vec::new();
         for message in request.messages {
             match message {
                 Message::User(text) => input.push(json!({"role":"user","content":text})),
                 Message::Summary(text) => input.push(json!({"role":"user","content":text})),
-                Message::Assistant(response) => input.extend(response.continuation.0.iter().cloned()),
+                Message::Assistant(response) => {
+                    if request.options.replay == crate::routing::ReplayMode::VisibleHistory {
+                        if !response.text.is_empty() {
+                            input.push(json!({"role":"assistant","content":[{"type":"output_text","text":response.text}]}));
+                        }
+                        for call in &response.tool_calls {
+                            input.push(json!({"type":"function_call","call_id":call.call_id,"name":call.name,"namespace":"astrid","arguments":call.arguments}));
+                        }
+                    } else {
+                        input.extend(response.continuation.0.iter().cloned());
+                    }
+                },
                 Message::Tool(result) => input.push(json!({"type":"function_call_output","call_id":result.call_id,"output":serde_json::to_string(&result.outcome).expect("JSON tool outcome is serializable")})),
             }
         }
         // Subscription-backed Responses accepts tools grouped in namespaces.
-        json!({"model":request.model,"instructions":request.instructions,"input":input,
+        let mut body = json!({"model":request.model,"instructions":request.instructions,"input":input,
             "store":false,"stream":true,"include":["reasoning.encrypted_content"],
-            "tools":[{"type":"namespace","name":"astrid","description":"Astrid workspace tools", "tools":tools::definitions()}]})
+            "tools":[{"type":"namespace","name":"astrid","description":"Astrid workspace tools", "tools":tools::definitions()}]});
+        if let Some(effort) = request.options.effort {
+            body["reasoning"] = json!({"effort":effort});
+        }
+        Ok(body)
+    }
+
+    fn model_capability(model: &str) -> crate::routing::ModelCapability {
+        use crate::routing::ReasoningEffort::*;
+        // Exact identifiers checked against official model pages, 2026-10-15.
+        // Unknown aliases/snapshots never inherit effort support by prefix matching.
+        crate::routing::ModelCapability {
+            visible_history: true,
+            reasoning_efforts: if matches!(model, "gpt-5.6-sol" | "gpt-5.6-terra") {
+                vec![Disabled, Low, Medium, High, Xhigh, Max]
+            } else {
+                vec![]
+            },
+        }
     }
 
     fn snapshot(body: &Value, request: &ModelRequest<'_>) -> ContextSnapshot {
@@ -133,7 +171,13 @@ impl OpenAiProvider {
                 summary_positions.insert(position);
             }
             position += match message {
-                Message::Assistant(response) => response.continuation.0.len(),
+                Message::Assistant(response) => {
+                    if request.options.replay == crate::routing::ReplayMode::VisibleHistory {
+                        usize::from(!response.text.is_empty()) + response.tool_calls.len()
+                    } else {
+                        response.continuation.0.len()
+                    }
+                }
                 _ => 1,
             };
         }
@@ -200,6 +244,9 @@ fn serialized_bytes(value: &Value) -> usize {
 
 #[async_trait]
 impl ModelProvider for OpenAiProvider {
+    fn capabilities(&self, model: &str) -> crate::routing::ModelCapability {
+        Self::model_capability(model)
+    }
     fn provider_name(&self) -> Option<&'static str> {
         Some("openai_codex_subscription")
     }
@@ -207,7 +254,7 @@ impl ModelProvider for OpenAiProvider {
         &self,
         request: &ModelRequest<'_>,
     ) -> Result<Option<ContextSnapshot>, ModelError> {
-        Ok(Some(Self::snapshot(&Self::body(request), request)))
+        Ok(Some(Self::snapshot(&Self::body(request)?, request)))
     }
     async fn generate(
         &self,
@@ -216,7 +263,7 @@ impl ModelProvider for OpenAiProvider {
     ) -> Result<ModelResponse, ModelError> {
         let enabled = text.telemetry_enabled();
         let started = enabled.then(Instant::now);
-        let body = Self::body(request);
+        let body = Self::body(request)?;
         let snapshot = Self::snapshot(&body, request);
         if let Some(start) = started {
             text.telemetry(crate::observability::Telemetry::timing(

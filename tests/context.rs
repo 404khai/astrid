@@ -66,6 +66,7 @@ async fn snapshot_matches_sent_unicode_json_and_keeps_opaque_continuation_privat
         .provider
         .generate(
             &ModelRequest {
+                options: Default::default(),
                 model: "test-model",
                 instructions: "system\n🦀",
                 messages: &messages,

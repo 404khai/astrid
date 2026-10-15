@@ -5,7 +5,10 @@ use super::{
     widgets,
 };
 use crossterm::event::{self, Event};
-use std::{io, time::Duration};
+use std::{
+    io::{self, Write},
+    time::Duration,
+};
 
 #[derive(Default)]
 pub struct Composer {
@@ -36,10 +39,42 @@ impl Composer {
         models: Option<&[String]>,
         title: Option<&str>,
     ) -> io::Result<Option<String>> {
-        if !terminal::capable() {
+        if !terminal::interactive() {
             return Err(io::Error::other(
-                "interactive startup requires usable terminal input and output; use astrid run \"task\" --model <model>",
+                "interactive input requires terminal stdin and stderr; use astrid run \"task\" --model <model>",
             ));
+        }
+        if !terminal::capable() {
+            // Canonical line input needs neither ANSI support nor viewport geometry.
+            if let Some(header) = &self.header {
+                super::welcome(header)?;
+            }
+            if !self.notice.is_empty() {
+                eprintln!("{}", super::printable(&self.notice));
+            }
+            if let Some(title) = title {
+                eprintln!("{}", super::printable(title));
+            }
+            if let Some(options) = models {
+                for option in options {
+                    eprintln!("  {}", super::printable(option));
+                }
+            }
+            eprint!("> ");
+            io::stderr().flush()?;
+            let mut line = String::new();
+            if io::stdin().read_line(&mut line)? == 0 {
+                return Ok(if models.is_some() {
+                    None
+                } else {
+                    Some("/quit".into())
+                });
+            }
+            let line = line.trim_end_matches(['\r', '\n']).to_owned();
+            if let Some(options) = models {
+                return Ok(options.iter().find(|option| **option == line).cloned());
+            }
+            return Ok(Some(line));
         }
         let size = terminal::size().unwrap_or((80, 24));
         let header_height = self.header.as_ref().map_or(0, |id| {

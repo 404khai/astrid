@@ -2,11 +2,11 @@
 
 An inference-aware personal AI agent runtime for delegated tasks across applications,
 devices, and compute environments. The Rust harness is its execution foundation;
-coding is its first implemented capability. The CLI remains supported, and native
-macOS using SwiftUI/AppKit is the next recommended application milestone.
-See the [roadmap reconciliation](docs/plans/personal-agent-roadmap.md) for the
-current audit, proposed milestones and implementation gates. Background execution
-and connected device capabilities are not implemented yet.
+coding is its first implemented capability. The CLI is the primary development
+and validation client. Desktop implementation is paused; GPUI is the selected
+future direction pending Phase 11 investigation and design. See the
+[current checkpoint](docs/CURRENT.md) and [engineering roadmap](docs/roadmap.md).
+Independent background execution and connected-device capabilities remain future work.
 
 Development planning: [phase review and delivery process](docs/development.md),
 [Phase 1 review](docs/reviews/phase-1.md), and
@@ -74,6 +74,94 @@ not a prerequisite and is not automatically selected as a fallback.
 The model must be supplied with `--model` or `ASTRID_MODEL`; there is no default
 model in the architecture. Account entitlement requires successful inference,
 not merely a model appearing in a catalog. ChatGPT plan limits still apply.
+
+## Evaluation baseline
+
+Phase 6 compares two existing context policies across five scripted-provider/real-tool
+tasks and keeps separate live notes
+quality evidence. See the [plan](docs/plans/phase-6.md) and [review](docs/reviews/phase-6.md).
+
+```sh
+ASTRID_EVAL_REPORT=/tmp/astrid-evaluation.json cargo test --locked --test evaluation -- --nocapture
+```
+
+Bare `astrid` uses the rich composer when supported and plain line input otherwise.
+In plain mode, enter one line at a time and type a listed choice exactly; `/quit`
+exits. Piped stdin still uses the explicit `astrid run` interface.
+
+## Direct-inference routing
+
+For one explicit task, `--reasoning-effort low` requests a validated provider effort.
+Omission keeps the provider default; unavailable/default effort is not reported as
+an observed setting. Currently explicit efforts are verified for exact
+`gpt-5.6-sol` and `gpt-5.6-terra` identifiers: `none`, `low`, `medium`, `high`,
+`xhigh`, `max`. Unknown identifiers or unsupported efforts fail before dispatch.
+Account/model access remains subject to provider errors.
+
+```sh
+astrid run "Inspect the sources and explain the result" --model gpt-5.6-sol \
+  --routing tests/fixtures/evaluation/routing.json --observability on
+```
+
+Multi-stage routing is limited to fresh one-shot `run` tasks. Its returned history
+is inspection-only: saving, serializing or continuing that session fails explicitly.
+Single-model and effort-only idle sessions retain their existing schema/continuation.
+Resumable routing needs a future provenance contract.
+
+The JSON policy sets initial effort and ordered stages, each with `from_call`,
+`model`, caller-supplied `class` and optional `effort`. The example switches to
+Terra at model call 2 after the preceding tool batch finishes. A final response
+ends the run; unused stages do not generate extra calls. Classes label intended
+work, not measured model competence. Paths are relative to the current directory;
+notes tasks can use `--notes --folder` as usual.
+
+Multi-stage requests rebuild visible conversation/tool exchanges without private
+reasoning; the original private response data remains in the in-memory result.
+Each core route event records model/effort, reason, provider and replay mode.
+`astrid trace <run-id>` attaches route metadata to per-call timing, usage and
+terminal outcome. Effective values describe the validated request; server-resolved
+identity/default effort and subscription cost remain unavailable. Completion does
+not grade task quality. See [Phase 7 plan](docs/plans/phase-7.md) and
+[ADR 0015](docs/adr/0015-visible-history-routing.md) for the compatibility boundary.
+This is direct Responses inference, with Astrid executing its own tools. It does
+not launch Codex or delegate to another coding-agent harness.
+
+## Read-only household notes
+
+```sh
+astrid run "Make a checklist of outstanding household actions" \
+  --notes --folder /path/to/notes --model <model-slug>
+```
+
+The selected directory can be outside Git. `--folder` requires `--notes` and
+otherwise notes mode uses the invocation directory. Before inference, the CLI
+shows the canonical folder, provider/model and effective custom policy:
+read Allow, write Deny, execute Deny. Notes mode overrides `--mode` and all
+per-capability flags; note text cannot elevate authority. Retrieved notes go to
+the selected provider. Reads retain existing folder/path validation; trusted
+runtime evidence subprocesses and provider network access retain their existing
+boundaries.
+
+The model is guided to cite source filenames, exclude completed actions and
+preserve uncertainty. Streamed tool activity and the terminal coverage report
+show observed ranges, truncation and missing-source errors separately from the
+checklist. A completed run does not independently prove a correct or exhaustive
+checklist. Ctrl-C cancels the run; provider failures and cancellation exit nonzero.
+This is a fresh one-shot workflow; interactive coding modes, directory-bound
+sessions and their idle snapshots retain existing behavior.
+
+[M01 evidence](docs/milestones/01-personal-tasks.md#completion-evidence) separates
+scripted runtime tests from live factual-quality evaluation. To repeat the live
+synthetic baseline using existing auth (no new infrastructure):
+
+```sh
+cargo build --locked
+python3 scripts/evaluate_m01.py --model <model-slug> --output /tmp/m01-live.json
+```
+
+Review the output against the frozen rubric before assigning a factual-quality
+pass; the script records completion and metrics separately and leaves grading
+pending.
 
 ## Run configuration
 

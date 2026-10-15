@@ -1,0 +1,973 @@
+{
+  "evidence": "deterministic execution baseline; model quality unscored",
+  "records": [
+    {
+      "config": {
+        "context_budget": {
+          "estimated_context_tokens": 65536,
+          "max_request_bytes": 524288,
+          "max_summary_bytes": 4096,
+          "policy": "file_references",
+          "response_reserve_tokens": 4096
+        },
+        "max_model_calls": 6,
+        "model": "scripted-phase-6",
+        "permissions": {
+          "execute": "allow",
+          "read": "allow",
+          "write": "allow"
+        }
+      },
+      "context_compactions": 0,
+      "criterion": "Read and repair GREETING.txt; actual cargo test --offline exits 0 and reports 2 passed; repaired bytes match.",
+      "evidence": "scripted inference / real tools",
+      "fixture_sha256": {
+        "AGENTS.md": "090b243ffa0b574cb1c84de819a3023c0d492873df4c16c9d5b803377030b158",
+        "Cargo.toml": "a20d8c22c15792b311b8da85b2073a1943719ba7ca360eaa51bb28ee8fbd9436",
+        "GREETING.txt": "543df89fec85b1c280e5be7bc6a33e31203503cd6edb3084312de4db5a9b436c",
+        "src/lib.rs": "7394b9744a854607e7b73672456f166fc3866fc95dfaa31f3e2aa2c958eef0cd"
+      },
+      "model_calls": 3,
+      "run_outcome": "Completed",
+      "task": "coding-repair",
+      "task_success": true,
+      "tool_dispatches": 3,
+      "tool_outcomes": 3,
+      "tool_requests": 3,
+      "trace_summary": {
+        "complete": true,
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 3,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1318,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5270
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1318,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5270
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1539,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6154
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1539,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6154
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2060,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8238
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2060,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8238
+            }
+          }
+        ],
+        "cost": null,
+        "decode_tokens_per_second": null,
+        "error_code": null,
+        "model": "scripted-phase-6",
+        "models": {
+          "498c07d8-2677-4b71-b3fb-b837445b8f5a": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 51731,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 8,
+              "delivery_wait": 75,
+              "dispatch": 0,
+              "first_visible_text": 25962,
+              "preparation": 11716,
+              "provider_attempt": 39666
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          },
+          "4ae8eb8b-0e39-48c3-ae33-0d1f8e14c2f5": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 47502,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 5,
+              "delivery_wait": 1125,
+              "dispatch": 0,
+              "first_visible_text": 1910,
+              "preparation": 734,
+              "provider_attempt": 46652
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          },
+          "548b5531-07fd-497f-aee3-c57df3919981": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 25891,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 3,
+              "delivery_wait": 87,
+              "dispatch": 0,
+              "first_visible_text": 4281,
+              "preparation": 599,
+              "provider_attempt": 25149
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          }
+        },
+        "outcome": "run_completed",
+        "provider": "openai_codex_subscription",
+        "run_elapsed_us": 2887751,
+        "run_id": "a480da53-7fb6-4ccd-b586-d50e261056d2",
+        "runtime_timings_us": {
+          "context_selection": 17750,
+          "delivery_wait": 2157
+        },
+        "tools": {
+          "4ed72abb-b73c-476b-b5fc-4aa77d34f236": {
+            "error_code": null,
+            "exit_code": 0,
+            "inclusive_runtime_us": 2595952,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 2595410
+            },
+            "tool": "shell",
+            "usage": null
+          },
+          "85b9c0f5-b9b0-44e9-a699-0ba3f536724a": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 299,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 272
+            },
+            "tool": "read_file",
+            "usage": null
+          },
+          "9c6cd75b-4a1b-45af-9ca8-4f382ab1e8a4": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 8245,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 7523
+            },
+            "tool": "edit_file",
+            "usage": null
+          }
+        },
+        "true_ttft_us": null
+      },
+      "wall_us": 2907386
+    },
+    {
+      "config": {
+        "context_budget": {
+          "estimated_context_tokens": 65536,
+          "max_request_bytes": 524288,
+          "max_summary_bytes": 4096,
+          "policy": "file_references",
+          "response_reserve_tokens": 4096
+        },
+        "max_model_calls": 6,
+        "model": "scripted-phase-6",
+        "permissions": {
+          "execute": "deny",
+          "read": "allow",
+          "write": "deny"
+        }
+      },
+      "context_compactions": 0,
+      "criterion": "Both frozen outstanding notes reach provider completely; source bytes unchanged. Mock final answer is not quality scored.",
+      "evidence": "scripted inference / real tools",
+      "fixture_sha256": {
+        "garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+        "house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf"
+      },
+      "model_calls": 2,
+      "run_outcome": "Completed",
+      "task": "notes-retrieval",
+      "task_success": true,
+      "tool_dispatches": 2,
+      "tool_outcomes": 2,
+      "tool_requests": 2,
+      "trace_summary": {
+        "complete": true,
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1239,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4954
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1239,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4954
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1766,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 7063
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1766,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 7063
+            }
+          }
+        ],
+        "cost": null,
+        "decode_tokens_per_second": null,
+        "error_code": null,
+        "model": "scripted-phase-6",
+        "models": {
+          "6210e80a-c027-4cee-989a-818909259eae": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 98349,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 11,
+              "delivery_wait": 111,
+              "dispatch": 0,
+              "first_visible_text": 8320,
+              "preparation": 1752,
+              "provider_attempt": 96355
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          },
+          "dfe2f381-6488-44d9-b784-c907a1eae58e": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 11791,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 9,
+              "delivery_wait": 22,
+              "dispatch": 0,
+              "first_visible_text": 3782,
+              "preparation": 1836,
+              "provider_attempt": 9709
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          }
+        },
+        "outcome": "run_completed",
+        "provider": "openai_codex_subscription",
+        "run_elapsed_us": 177413,
+        "run_id": "ae8910c5-7361-49e1-977f-5b7f3b5ac512",
+        "runtime_timings_us": {
+          "context_selection": 7308,
+          "delivery_wait": 2629
+        },
+        "tools": {
+          "a28dbb06-adaf-4e7f-bf2a-79c8985fba20": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 600,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 536
+            },
+            "tool": "read_file",
+            "usage": null
+          },
+          "de4ff6e9-a8d3-421e-abeb-fb294ecb8ad5": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 828,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 663
+            },
+            "tool": "read_file",
+            "usage": null
+          }
+        },
+        "true_ttft_us": null
+      },
+      "wall_us": 186357
+    },
+    {
+      "config": {
+        "context_budget": {
+          "estimated_context_tokens": 65536,
+          "max_request_bytes": 524288,
+          "max_summary_bytes": 4096,
+          "policy": "file_references",
+          "response_reserve_tokens": 4096
+        },
+        "max_model_calls": 6,
+        "model": "scripted-phase-6",
+        "permissions": {
+          "execute": "deny",
+          "read": "allow",
+          "write": "deny"
+        }
+      },
+      "context_compactions": 0,
+      "criterion": "Read-only policy rejects write and shell despite approving handler; neither starts nor mutates files.",
+      "evidence": "scripted inference / real tools",
+      "fixture_sha256": {},
+      "model_calls": 2,
+      "run_outcome": "Completed",
+      "task": "permission-denial",
+      "task_success": true,
+      "tool_dispatches": 0,
+      "tool_outcomes": 2,
+      "tool_requests": 2,
+      "trace_summary": {
+        "complete": true,
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1234,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4936
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1234,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4936
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1450,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5798
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1450,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5798
+            }
+          }
+        ],
+        "cost": null,
+        "decode_tokens_per_second": null,
+        "error_code": null,
+        "model": "scripted-phase-6",
+        "models": {
+          "4576ef47-7fc8-4cc6-8556-f6257ac3e03e": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 407109,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 13,
+              "delivery_wait": 1653,
+              "dispatch": 0,
+              "first_visible_text": 34144,
+              "preparation": 354624,
+              "provider_attempt": 50448
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          },
+          "b79ec23d-f46c-4c3c-a1d8-609fd5987c2f": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 187433,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 7,
+              "delivery_wait": 353,
+              "dispatch": 0,
+              "first_visible_text": 4306,
+              "preparation": 1022,
+              "provider_attempt": 185964
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          }
+        },
+        "outcome": "run_completed",
+        "provider": "openai_codex_subscription",
+        "run_elapsed_us": 687703,
+        "run_id": "bc429faa-7704-41c0-b769-b7c1c0d04d83",
+        "runtime_timings_us": {
+          "context_selection": 9881,
+          "delivery_wait": 52469
+        },
+        "tools": {
+          "071f5c2e-a2b7-49d5-92e6-23dfabcf2123": {
+            "error_code": "permission_denied",
+            "exit_code": null,
+            "inclusive_runtime_us": null,
+            "outcome": "tool_call_denied",
+            "permission_wait_us": null,
+            "timings_us": {},
+            "tool": "write_file",
+            "usage": null
+          },
+          "deba8d6f-c8d6-4e44-a2cd-3a644115bf6b": {
+            "error_code": "permission_denied",
+            "exit_code": null,
+            "inclusive_runtime_us": null,
+            "outcome": "tool_call_denied",
+            "permission_wait_us": null,
+            "timings_us": {},
+            "tool": "shell",
+            "usage": null
+          }
+        },
+        "true_ttft_us": null
+      },
+      "wall_us": 698717
+    },
+    {
+      "config": {
+        "context_budget": {
+          "estimated_context_tokens": 65536,
+          "max_request_bytes": 524288,
+          "max_summary_bytes": 4096,
+          "policy": "file_references",
+          "response_reserve_tokens": 4096
+        },
+        "max_model_calls": 6,
+        "model": "scripted-phase-6",
+        "permissions": {
+          "execute": "deny",
+          "read": "allow",
+          "write": "deny"
+        }
+      },
+      "context_compactions": 0,
+      "criterion": "Cancel after first read; second tool is skipped, no side-effect file and no fabricated final answer.",
+      "evidence": "scripted inference / real tools",
+      "fixture_sha256": {
+        "note.txt": "c4c40fd13c356d51b7f8ad1920558b441527ae473d14eae09c9c965cf1b9b50b"
+      },
+      "model_calls": 1,
+      "run_outcome": "Cancelled",
+      "task": "cancellation",
+      "task_success": true,
+      "tool_dispatches": 1,
+      "tool_outcomes": 2,
+      "tool_requests": 2,
+      "trace_summary": {
+        "complete": true,
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1233,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4930
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1233,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4930
+            }
+          }
+        ],
+        "cost": null,
+        "decode_tokens_per_second": null,
+        "error_code": null,
+        "model": "scripted-phase-6",
+        "models": {
+          "843ba408-41c3-4e9b-ac90-2206b19e726c": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 46692,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 8,
+              "delivery_wait": 83,
+              "dispatch": 0,
+              "first_visible_text": 2813,
+              "preparation": 847,
+              "provider_attempt": 45697
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          }
+        },
+        "outcome": "run_cancelled",
+        "provider": "openai_codex_subscription",
+        "run_elapsed_us": 72489,
+        "run_id": "fdbb4df4-b437-4233-9335-fd495453a1fc",
+        "runtime_timings_us": {
+          "context_selection": 1875,
+          "delivery_wait": 166
+        },
+        "tools": {
+          "450c3fe4-6913-4902-a3b7-211e826ceed0": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 297,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 247
+            },
+            "tool": "read_file",
+            "usage": null
+          },
+          "e2cbc54d-a6fa-4df8-90ac-1adf20b702ff": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": null,
+            "outcome": "tool_call_skipped",
+            "permission_wait_us": null,
+            "timings_us": {},
+            "tool": "write_file",
+            "usage": null
+          }
+        },
+        "true_ttft_us": null
+      },
+      "wall_us": 76144
+    },
+    {
+      "config": {
+        "context_budget": {
+          "estimated_context_tokens": 100000,
+          "max_request_bytes": 28000,
+          "max_summary_bytes": 1200,
+          "policy": "file_references",
+          "response_reserve_tokens": 1000
+        },
+        "max_model_calls": 6,
+        "model": "scripted-phase-6",
+        "permissions": {
+          "execute": "deny",
+          "read": "allow",
+          "write": "deny"
+        }
+      },
+      "context_compactions": 2,
+      "criterion": "Four measured requests fit 28000-byte ceiling, old exchanges removed with incomplete summary; original task and latest read remain.",
+      "evidence": "scripted inference / real tools",
+      "fixture_sha256": {
+        "latest.rs": "5e1e2bcac305958b27077ca136f35f0abae7cf38c9af678f7d220ed0cb51d4f8",
+        "noise.rs": "bf32ea1ebe554217429377ae473766edfc3f1af44f41e1bef9ece4ab3f22c397",
+        "target.rs": "7b12bcd8dafefb8d19ce359652c77b92b282351dd5f78e3070fcc7324c9d83bd"
+      },
+      "model_calls": 4,
+      "run_outcome": "Completed",
+      "task": "context-compaction",
+      "task_success": true,
+      "tool_dispatches": 3,
+      "tool_outcomes": 3,
+      "tool_requests": 3,
+      "trace_summary": {
+        "complete": true,
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 100000,
+              "max_request_bytes": 28000,
+              "max_summary_bytes": 1200,
+              "policy": "file_references",
+              "response_reserve_tokens": 1000
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1242,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4967
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1242,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 4967
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 100000,
+              "max_request_bytes": 28000,
+              "max_summary_bytes": 1200,
+              "policy": "file_references",
+              "response_reserve_tokens": 1000
+            },
+            "evicted_items": 0,
+            "retained_items": 4,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 6261,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 25042
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 6261,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 25042
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 100000,
+              "max_request_bytes": 28000,
+              "max_summary_bytes": 1200,
+              "policy": "file_references",
+              "response_reserve_tokens": 1000
+            },
+            "evicted_items": 2,
+            "retained_items": 4,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 6133,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 24529
+            },
+            "summary_bytes": 650
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 6133,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 24529
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 100000,
+              "max_request_bytes": 28000,
+              "max_summary_bytes": 1200,
+              "policy": "file_references",
+              "response_reserve_tokens": 1000
+            },
+            "evicted_items": 2,
+            "retained_items": 6,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 6354,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 25416
+            },
+            "summary_bytes": 650
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 6354,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 25416
+            }
+          }
+        ],
+        "cost": null,
+        "decode_tokens_per_second": null,
+        "error_code": null,
+        "model": "scripted-phase-6",
+        "models": {
+          "58a0df17-f61e-4305-854a-f9d49be0f9f4": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 16375,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 4,
+              "delivery_wait": 112,
+              "dispatch": 0,
+              "first_visible_text": 2591,
+              "preparation": 3003,
+              "provider_attempt": 13247
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          },
+          "76770ff5-3bdc-4084-8b7e-61455c737911": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 8015,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 4,
+              "delivery_wait": 31,
+              "dispatch": 0,
+              "first_visible_text": 3139,
+              "preparation": 3322,
+              "provider_attempt": 4543
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          },
+          "bcc4931d-0982-453d-a4fd-73f18dbe77e4": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 16480,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 4,
+              "delivery_wait": 62,
+              "dispatch": 0,
+              "first_visible_text": 2538,
+              "preparation": 3130,
+              "provider_attempt": 13247
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          },
+          "e03adef2-06c4-4c15-bde7-c5c56f5f1489": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 11670,
+            "outcome": "model_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "authentication": 4,
+              "delivery_wait": 158,
+              "dispatch": 0,
+              "first_visible_text": 1998,
+              "preparation": 604,
+              "provider_attempt": 10913
+            },
+            "tool": null,
+            "usage": {
+              "cached_tokens": null,
+              "input_tokens": null,
+              "invalid": false,
+              "output_tokens": null
+            }
+          }
+        },
+        "outcome": "run_completed",
+        "provider": "openai_codex_subscription",
+        "run_elapsed_us": 113821,
+        "run_id": "cd5859b7-c29c-4682-b88e-ba0a005640a1",
+        "runtime_timings_us": {
+          "context_selection": 38536,
+          "delivery_wait": 524
+        },
+        "tools": {
+          "23562b8b-d9d1-4e7b-8c82-8194bbe77ca9": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1668,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 1636
+            },
+            "tool": "read_file",
+            "usage": null
+          },
+          "a6753a85-41bd-4ba8-9514-fc4fc7f11a1b": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 276,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 233
+            },
+            "tool": "read_file",
+            "usage": null
+          },
+          "b7571961-9df9-4c9b-96b3-e3a82fb6e95a": {
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1908,
+            "outcome": "tool_call_completed",
+            "permission_wait_us": null,
+            "timings_us": {
+              "tool_execution": 1860
+            },
+            "tool": "read_file",
+            "usage": null
+          }
+        },
+        "true_ttft_us": null
+      },
+      "wall_us": 119387
+    }
+  ],
+  "rubric_sha256": "ac65c4fb0f025036acf37c0d38414dd1d8a11c41f5bd13ad9199096dff003088",
+  "runner_sha256": "e954a247ab823767c3adedd9ed614fda9d834ab98d8d897b65708874e7e7d4be",
+  "schema": 1,
+  "suite": "phase-6-v1"
+}

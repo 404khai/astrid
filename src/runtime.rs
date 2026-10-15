@@ -19,6 +19,8 @@ use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub struct RunConfig {
+    /// Multi-stage policy is fresh-run only; returned history cannot be saved/resumed.
+    pub routing: Option<crate::routing::RoutingPolicy>,
     /// None disables optional telemetry/recording without suppressing core events.
     pub observability: Option<crate::observability::Options>,
     pub model: String,
@@ -30,7 +32,7 @@ pub struct RunConfig {
 }
 #[derive(Debug, thiserror::Error)]
 #[error(
-    "model, task, positive model-call ceiling, valid context budget and observability limits are required"
+    "model, task, positive model-call ceiling, valid context budget, supported routing/effort and observability limits are required"
 )]
 pub struct ConfigurationError;
 impl RunConfig {
@@ -68,7 +70,7 @@ pub enum RunOutcome {
         uninspected_tool_results: bool,
     },
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Session {
     pub id: SessionId,
@@ -76,8 +78,32 @@ pub struct Session {
     pub context: crate::context::ContextLedger,
     pub selection: Option<crate::context::ContextSelection>,
     workspace: std::path::PathBuf,
+    /// Never serialized: mixed private history lacks persistent model provenance.
+    #[serde(skip)]
+    inspection_only: bool,
+}
+impl Serialize for Session {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if self.inspection_only {
+            return Err(serde::ser::Error::custom(
+                "routed history is inspection-only; snapshot persistence requires a separately versioned provenance contract",
+            ));
+        }
+        use serde::ser::SerializeStruct;
+        // Preserve the existing idle snapshot schema and field ordering exactly.
+        let mut stored = serializer.serialize_struct("Session", 5)?;
+        stored.serialize_field("id", &self.id)?;
+        stored.serialize_field("messages", &self.messages)?;
+        stored.serialize_field("context", &self.context)?;
+        stored.serialize_field("selection", &self.selection)?;
+        stored.serialize_field("workspace", &self.workspace)?;
+        stored.end()
+    }
 }
 impl Session {
+    pub fn inspection_only(&self) -> bool {
+        self.inspection_only
+    }
     pub fn new(workspace: &crate::workspace::Workspace) -> Self {
         Self {
             id: SessionId::default(),
@@ -85,6 +111,7 @@ impl Session {
             context: Default::default(),
             selection: None,
             workspace: workspace.root().to_owned(),
+            inspection_only: false,
         }
     }
     /// Validate restored state, preserving a terminal incomplete tool batch for
@@ -93,6 +120,9 @@ impl Session {
         &self,
         workspace: &crate::workspace::Workspace,
     ) -> Result<(), String> {
+        if self.inspection_only {
+            return Err("routed history is inspection-only and cannot be persisted".into());
+        }
         if self.workspace != workspace.root() {
             return Err("stored session belongs to another workspace".into());
         }
@@ -366,6 +396,13 @@ pub async fn run(
     events: Option<mpsc::Sender<ExecutionEvent>>,
 ) -> Result<RunResult, ConfigurationError> {
     config.validate()?;
+    if config
+        .routing
+        .as_ref()
+        .is_some_and(|p| !p.valid(&config.model, config.max_model_calls, provider))
+    {
+        return Err(ConfigurationError);
+    }
     Ok(run_owned(
         provider,
         tools,
@@ -379,6 +416,7 @@ pub async fn run(
 }
 
 /// Execute another task in an owned, workspace-bound session.
+/// Multi-stage routing and inspection-only routed history are rejected explicitly.
 /// Incomplete terminal tool batches are rejected, never retried or replayed.
 pub async fn run_in_session(
     provider: &dyn ModelProvider,
@@ -389,7 +427,21 @@ pub async fn run_in_session(
     events: Option<mpsc::Sender<ExecutionEvent>>,
     session: Session,
 ) -> Result<RunResult, SessionStartError> {
-    let error = if let Err(error) = config.validate() {
+    let route_valid = config
+        .routing
+        .as_ref()
+        .is_none_or(|p| p.valid(&config.model, config.max_model_calls, provider));
+    let error = if session.inspection_only {
+        Some("routed history is inspection-only and cannot be continued".into())
+    } else if config
+        .routing
+        .as_ref()
+        .is_some_and(|p| !p.stages.is_empty())
+    {
+        Some("multi-stage routing requires a fresh one-shot run".into())
+    } else if !route_valid {
+        Some(ConfigurationError.to_string())
+    } else if let Err(error) = config.validate() {
         Some(error.to_string())
     } else if session.workspace != tools.workspace().root() {
         Some("workspace differs from the session workspace".into())
@@ -422,6 +474,10 @@ async fn run_owned(
     events: Option<mpsc::Sender<ExecutionEvent>>,
     mut session: Session,
 ) -> RunResult {
+    session.inspection_only = config
+        .routing
+        .as_ref()
+        .is_some_and(|p| !p.stages.is_empty());
     session.messages.push(Message::User(config.task.clone()));
     session.selection = None;
     let run_id = RunId::default();
@@ -632,11 +688,20 @@ async fn drive(
             e.emit(EventKind::TurnCancelled).await;
             return RunOutcome::Cancelled;
         }
+        let decision =
+            crate::routing::select(provider, &config.model, config.routing.as_ref(), number);
+        let request_provider = crate::routing::RequestProvider {
+            inner: provider,
+            options: crate::routing::RequestOptions {
+                effort: decision.effective_effort,
+                replay: decision.replay,
+            },
+        };
         let prepared = if let Some(budget) = &config.context_budget {
             let selection_started = e.timing_start();
             let selection = crate::context::select(
-                provider,
-                &config.model,
+                &request_provider,
+                &decision.effective_model,
                 &instructions,
                 &session.messages,
                 &session.context,
@@ -687,8 +752,13 @@ async fn drive(
         e.model = Some(ModelCallId::default());
         *model_count += 1;
         e.emit(EventKind::ModelCallStarted { number }).await;
+        e.emit(EventKind::ModelRouteSelected {
+            decision: decision.clone(),
+        })
+        .await;
         let request = ModelRequest {
-            model: &config.model,
+            options: Default::default(),
+            model: &decision.effective_model,
             instructions: &instructions,
             messages: prepared
                 .as_ref()
@@ -704,7 +774,7 @@ async fn drive(
             );
             tokio::select! {biased;
                 _=cancel.cancelled()=>None,
-                response=provider.generate(&request,&mut sink)=>Some(response),
+                response=request_provider.generate(&request,&mut sink)=>Some(response),
             }
         };
         let response = match response {

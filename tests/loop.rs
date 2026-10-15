@@ -533,6 +533,7 @@ async fn text_sink_failure_prevents_tool_dispatch() {
     let server = Server::start(vec![reply(&[write], "text")]).await;
     let messages = [Message::User("task".into())];
     let request = ModelRequest {
+        options: Default::default(),
         model: "test",
         instructions: "instructions",
         messages: &messages,

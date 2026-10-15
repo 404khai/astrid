@@ -36,6 +36,7 @@ fn state_path(directory: &Path) -> std::path::PathBuf {
 }
 fn config(task: &str) -> RunConfig {
     RunConfig {
+        routing: None,
         observability: None,
         model: "fixture".into(),
         task: task.into(),

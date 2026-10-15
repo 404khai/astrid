@@ -15,6 +15,7 @@ use support::{Confirmation, Server, call, reply};
 
 fn config(task: &str, mode: PermissionMode) -> RunConfig {
     RunConfig {
+        routing: None,
         observability: None,
         model: "fixture".into(),
         task: task.into(),

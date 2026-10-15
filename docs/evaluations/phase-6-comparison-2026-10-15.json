@@ -1,0 +1,53 @@
+{
+  "question": "Can the frozen suite compare context-policy configurations while keeping execution and quality evidence distinct?",
+  "design": "Same frozen fixtures/rubric/model/task, file_references baseline vs recency candidate. Live n=1 each; non-contemporaneous runs. Deterministic execution tasks n=5 each, includes pressure/compaction. No superiority hypothesis.",
+  "controlled_difference": "Context selection policy only; carried agent prompt and notes behavior unchanged; headless helper restores identical permission semantics.",
+  "limitations": [
+    "Live task fits both budgets, so selection policies retain all items. Live timing/token differences cannot be attributed to policy; no routing/model-quality ranking.",
+    "Old live baseline ran in combined desktop checkout; runtime task path is headless. New candidate uses main-based checkout; no clean revision comparison claim.",
+    "Scripted success scores execution contracts only.",
+    "Cost, true TTFT and decode throughput unavailable."
+  ],
+  "live": [
+    {
+      "policy": "file_references",
+      "rubric_pass": true,
+      "wall_seconds": 27.039786208,
+      "model_calls": 3,
+      "tool_calls": 3,
+      "context_compactions": 0,
+      "usage": {
+        "input_tokens": 3219,
+        "output_tokens": 374,
+        "cached_tokens": 0
+      },
+      "cost": null
+    },
+    {
+      "policy": "recency",
+      "rubric_pass": true,
+      "wall_seconds": 16.897659958000002,
+      "model_calls": 3,
+      "tool_calls": 3,
+      "context_compactions": 0,
+      "usage": {
+        "input_tokens": 3217,
+        "output_tokens": 249,
+        "cached_tokens": 0
+      },
+      "cost": null
+    }
+  ],
+  "deterministic_report": "phase-6-policy-comparison-2026-10-15.json",
+  "conclusion": "Comparison mechanism demonstrated with observed metrics and separately graded live outputs. Both configurations pass this limited sample; evidence does not prefer either policy.",
+  "pressure_selection_evidence": {
+    "test": "context::tests::selection_compares_recency_and_file_relevance_without_reading_more_files",
+    "observation": "Same fixed history/budget: recency retains noise.rs, file_references retains target.rs; both retain latest.rs and admit exact request. Deterministic selection behavior, no model quality score."
+  },
+  "current_source_sha256": {
+    "src/agent.rs": "f657e8c4e6fd8cd5a6337aed3412d01030f96eb38dd90320e6fe67fbfa0d4e2d",
+    "scripts/evaluate_m01.py": "3689f96088b1e958f731be2acb3f577a9517f910c16b673ff1935d1895e4257b",
+    "tests/evaluation.rs": "b6fdbed1ab010686d52b7d3f6b1e5af907c58029efae2ea6489e3636cfe03db6",
+    "tests/fixtures/evaluation/rubric.json": "ac65c4fb0f025036acf37c0d38414dd1d8a11c41f5bd13ad9199096dff003088"
+  }
+}

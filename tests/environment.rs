@@ -54,6 +54,7 @@ impl ModelProvider for Script {
 }
 fn config(policy: PermissionPolicy) -> RunConfig {
     RunConfig {
+        routing: None,
         observability: None,
         context_budget: None,
         model: "fixture".into(),

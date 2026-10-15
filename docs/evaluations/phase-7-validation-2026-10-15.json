@@ -1,0 +1,47 @@
+{
+  "created_utc": "2026-10-15T22:00:12.813132+00:00",
+  "branch": "feat/phase-6-closure-phase-7-routing",
+  "head": "2deea5fd0c3509a32e93758a01e0fa088b05de81",
+  "scope": "Uncommitted main-based headless M01/Phase 6/Phase 7 work; paused M02 not imported; unrelated user artifacts preserved",
+  "evidence": "local deterministic regression and static checks; live quality recorded separately",
+  "commands": {
+    "cargo test --locked": {
+      "passed": 211,
+      "failed": 0,
+      "ignored": 1,
+      "test_groups": 22
+    },
+    "cargo fmt --check": "passed",
+    "cargo clippy --locked --all-targets -- -D warnings": "passed"
+  },
+  "source_sha256": {
+    "src/routing.rs": "632529aeac0c89af3e8eb8de785fc4491423381b7a81597c7da51888f70bf4d5",
+    "src/runtime.rs": "f921770847577a8bd68c7848ba9f19cf08858ebf724410a7072fd80f538e64bd",
+    "src/model.rs": "5b62eb690c7e3adf634b8eb287af17a448199e1a5ad4af4c4469a44e67dcc324",
+    "src/openai.rs": "2080081b64ae9e6824a3600f157a5007f8ebc85e758641626a31d385284f9106",
+    "src/context.rs": "7c9c10fc3097ff6bccda67331a85bbbd4da8a19121a65f2eef0c36b21664c4b2",
+    "src/events.rs": "2eac8e2ba76716d246dfe164755f061b922470601ced2a0169073bf9c7529e7c",
+    "src/observability.rs": "dcd76b6685413812b0f1ab11a68f663df02115889b653082d4c5defbf7e5635f",
+    "src/permissions.rs": "e27c7bfbab78f3568ca58613391f2b4314ca49c06110f7e97f4aa80e35fbec4c",
+    "src/session_store.rs": "55cec8144cae51ffc3b4093dee9b1dd678dac74da59aa3efc8584dda9b8184f5",
+    "src/main.rs": "36d4013b654ffb03180560de4565c4f9233c2ad3f9de7c2cd0a55a66363777be",
+    "src/console/state.rs": "df2a3372d1e06503db897103287fe149ad555fd98fc9dc3dba3cb23a3f53ac4e",
+    "tests/routing.rs": "c7afd11d14e5ae7e021057f79d4c3e38006582df817afd81cb6d7bafe778d2d0",
+    "tests/runtime.rs": "43b0670335cb23b559fff8cfc03816e385d13119565ffa3e0bc0ff661a347ced",
+    "tests/evaluation.rs": "d6ca95cdbe4ee2bf29239668adcde68aebe6b67dc23e4f642ddaac22b403889a",
+    "scripts/evaluate_m01.py": "fd19b1780b03a472660cdb29eb043ad156822b139db8a8f5b6d6319ff0a7f810"
+  },
+  "test_log_sha256": "90247cb9fb66264773241d7626efe0c13b0996edb78085269013fc18c1af688d",
+  "clippy_log_sha256": "6dd933f2eec3afb4bcb237f5b979b6fa5df2324cd12cc5a9e6d700d009f511de",
+  "limits": [
+    "One-shot multi-stage routing; returned history inspection-only; no snapshot migration",
+    "Exact Sol/Terra effort support only; defaults/server resolution/cost not invented",
+    "Scripted execution success is not quality; live sample is one notes task",
+    "Phase 8 unauthorized; M02 Paused; 5/13 Deferred"
+  ],
+  "documentation": {
+    "local_file_targets_checked": 177,
+    "missing": [],
+    "git_diff_check": "passed"
+  }
+}

@@ -86,6 +86,9 @@ pub enum EventKind {
     ModelCallStarted {
         number: usize,
     },
+    ModelRouteSelected {
+        decision: crate::routing::RouteDecision,
+    },
     ContextPrepared {
         snapshot: crate::context::ContextSnapshot,
     },
@@ -184,6 +187,8 @@ pub struct ModelState {
     pub turn_id: TurnId,
     pub first_text: bool,
     pub context: Option<crate::context::ContextSnapshot>,
+    #[serde(default)]
+    pub route: Option<crate::routing::RouteDecision>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolState {
@@ -381,6 +386,7 @@ impl ExecutionState {
                 require(e.turn_id.is_some() && e.tool_call_id.is_none())?
             }
             EventKind::ModelCallStarted { .. }
+            | EventKind::ModelRouteSelected { .. }
             | EventKind::ContextPrepared { .. }
             | EventKind::ModelFirstTextDelta
             | EventKind::ModelTextDelta { .. }
@@ -598,8 +604,24 @@ impl ExecutionState {
                         turn_id: turn()?,
                         first_text: false,
                         context: None,
+                        route: None,
                     },
                 );
+            }
+            EventKind::ModelRouteSelected { decision } => {
+                let m = self.models.get_mut(&model()?).expect("known model");
+                require(
+                    m.status == Status::Running
+                        && m.route.is_none()
+                        && m.context.is_none()
+                        && !m.first_text,
+                )?;
+                require(
+                    !decision.effective_model.trim().is_empty()
+                        && decision.requested_model == decision.effective_model
+                        && decision.requested_effort == decision.effective_effort,
+                )?;
+                m.route = Some(decision.clone());
             }
             EventKind::ContextPrepared { snapshot } => {
                 if self.turns[&turn()?].context_selected {

@@ -24,6 +24,7 @@ use tokio::sync::{Notify, mpsc};
 
 fn config(budget: ContextBudget) -> RunConfig {
     RunConfig {
+        routing: None,
         observability: None,
         model: "test-model".into(),
         task: "repair target.rs".into(),

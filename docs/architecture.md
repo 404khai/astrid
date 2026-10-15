@@ -1,5 +1,13 @@
 # Runtime architecture
 
+Direction update (2026-10-15): M02 Tauri implementation is paused, ADR 0014
+Superseded. GPUI is the selected future direction pending Phase 11 feasibility
+and design; no new host/IPC/lifecycle contract is inferred. This main-based branch
+contains the headless runtime and `src/file_lookup.rs`; it excludes the desktop
+host and adapters. The [M02 host](https://github.com/404khai/astrid/blob/8baf6af/src/host.rs)
+and desktop adapters remain preserved on the paused M02 branch/draft PR #13.
+Historical host app lifetime does not establish service survival or recovery. See [pause audit](reviews/direction-revision-2026-10-15.md).
+
 Phase 3 adds an explicit context subsystem. Session retains original messages
 and a source ledger with stable item IDs, history indices, model/tool provenance,
 and addition reasons. Operating and repository guidance have separate source
@@ -310,3 +318,41 @@ rejection. `Sessions` owns names derived from first tasks, menu selection and
 save timing; atomic storage, private permissions, per-workspace writer locks and
 byte limits are library policy. Session content never enters metadata-only traces.
 Corrupt or unsupported stores are rejected without silent replacement. See ADR 0012.
+
+## Historical M02 desktop boundary — 2026-10-14 (absent from this branch)
+
+ADR 0014 was accepted for the scoped embedded application-lifetime host, then
+superseded on 2026-10-15. The following describes preserved M02 source at `8baf6af`,
+not an implementation included in this main-based branch.
+`astrid::host::Host` owns one active polled runtime run and one existing workspace
+SessionStore writer independently of renderer/window lifetime. Tauri commands
+resolve the exact bundled main origin and typed intentions; the native picker
+selects folders, existing Rust permissions authorize tools, and versioned private
+projections disclose bounded omissions without exporting continuation/credentials.
+Close hides; explicit quit cancels, awaits terminal cleanup and attempts idle save.
+No daemon, recovery or remote trust follows. CLI stays an independent runtime client.
+See [M02 evidence and limits](reviews/m02-desktop.md) and
+[desktop commands](https://github.com/404khai/astrid/blob/8baf6af/apps/desktop/README.md). Narrow AppKit native material lives
+only in the desktop adapter; runtime/model code has no platform presentation types.
+
+## Phase 7 direct-inference boundary — 2026-10-15
+
+The sequential runtime can select caller-configured model stages between complete
+tool exchanges. Adapter capabilities validate explicit effort for exact supported
+models; no silent downgrade/fallback occurs. The same bound request options drive
+context selection, byte accounting and dispatch. Core `ModelRouteSelected` events
+project into CLI output and metadata traces alongside per-call terminal outcomes,
+observed timing and available usage. Effective model/effort means dispatch config;
+server resolution, omitted default effort and subscription cost stay unavailable.
+
+Multi-stage routing uses a visible-history view of user/assistant text and complete
+typed tool exchanges, excluding provider-private continuation. Original in-memory
+private messages are retained. It is fresh one-shot only: the result's Session is
+inspection-only, rejecting serialization, snapshot save and continuation. Existing
+native/effort-only sessions retain their snapshot version/fields and continuation.
+See [ADR 0015](adr/0015-visible-history-routing.md) and [plan](plans/phase-7.md).
+Resumable routing awaits a separate provenance/migration decision.
+
+This routes direct Responses inference inside Astrid's own harness. It does not
+launch or delegate to an external coding-agent harness, introduce a worker, or
+change workspace permissions. No desktop, local backend, daemon or Phase 8 work.

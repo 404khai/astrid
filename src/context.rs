@@ -496,6 +496,7 @@ pub(crate) async fn select(
             return Err(ContextError::Cancelled);
         }
         let measured = provider.measure_request(&ModelRequest {
+            options: Default::default(),
             model,
             instructions,
             messages,
@@ -740,6 +741,7 @@ mod tests {
     fn bytes(provider: &dyn ModelProvider, messages: &[Message]) -> usize {
         provider
             .measure_request(&ModelRequest {
+                options: Default::default(),
                 model: "test",
                 instructions: "operating",
                 messages,
@@ -946,6 +948,7 @@ mod tests {
     fn response_reserve_and_wire_ceiling_are_separate_local_limits() {
         let snapshot = provider()
             .measure_request(&ModelRequest {
+                options: Default::default(),
                 model: "test",
                 instructions: "operating",
                 messages: &[Message::User("task".into())],

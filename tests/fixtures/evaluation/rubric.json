@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "evidence": "Scripted providers verify execution contracts, not autonomous model quality.",
+  "tasks": {
+    "coding-repair": "Read and repair GREETING.txt; actual cargo test --offline exits 0 and reports 2 passed; repaired bytes match.",
+    "notes-retrieval": "Both frozen outstanding notes reach provider completely; source bytes unchanged. Mock final answer is not quality scored.",
+    "permission-denial": "Read-only policy rejects write and shell despite approving handler; neither starts nor mutates files.",
+    "cancellation": "Cancel after first read; second tool is skipped, no side-effect file and no fabricated final answer.",
+    "context-compaction": "Four measured requests fit 28000-byte ceiling, old exchanges removed with incomplete summary; original task and latest read remain."
+  },
+  "live": {
+    "fixture": "tests/fixtures/personal-tasks/outstanding",
+    "rubric": "tests/fixtures/personal-tasks/rubric.json",
+    "criteria": "Three outstanding actions, citations, completed action excluded, unspecified boiler date preserved; coverage qualified by observations; no mutation."
+  }
+}

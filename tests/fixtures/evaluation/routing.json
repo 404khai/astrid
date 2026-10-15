@@ -1,0 +1,6 @@
+{
+  "initial_effort": "low",
+  "stages": [
+    {"from_call": 2, "model": "gpt-5.6-terra", "class": "retrieval", "effort": "low"}
+  ]
+}

@@ -25,6 +25,7 @@ use tokio::sync::{Notify, mpsc};
 
 fn config(limit: usize) -> RunConfig {
     RunConfig {
+        routing: None,
         observability: None,
         context_budget: None,
         model: "test-model".into(),
@@ -822,16 +823,23 @@ async fn cancelled_stalled_context_publication_never_enters_authentication() {
             result = &mut execution => panic!("unexpected completion: {result:?}"),
             event = receiver.recv() => history.push(event.unwrap()),
         }
-        if matches!(history.last().unwrap().kind, EventKind::TurnStarted { .. }) {
+        if matches!(
+            history.last().unwrap().kind,
+            EventKind::ModelCallStarted { .. }
+        ) {
             break;
         }
     }
-    // ModelCallStarted fills the single slot; ContextPrepared waits for delivery.
-    tokio::select! {
-        biased;
-        result = &mut execution => panic!("unexpected completion: {result:?}"),
-        () = entered.notified() => {},
-    }
+    // ModelRouteSelected fills the single slot; ContextPrepared waits for delivery.
+    tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::select! {
+            biased;
+            result = &mut execution => panic!("unexpected completion: {result:?}"),
+            () = entered.notified() => {},
+        }
+    })
+    .await
+    .expect("provider preparation should reach the stalled delivery boundary");
     assert_eq!(auth.0.load(std::sync::atomic::Ordering::SeqCst), 0);
     cancel.cancel();
     let drain = async {
@@ -970,7 +978,7 @@ async fn illegal_transitions_and_duplicate_terminal_events_leave_state_unchanged
 
 #[tokio::test]
 async fn cancellation_during_backpressured_text_keeps_sequence_lossless() {
-    for stop_after_model_start in [false, true] {
+    for stop_after_first_marker in [false, true] {
         let root = tempfile::tempdir().unwrap();
         let provider = Streaming {
             entered: Arc::new(Notify::new()),
@@ -992,11 +1000,12 @@ async fn cancellation_during_backpressured_text_keeps_sequence_lossless() {
         let mut history = Vec::new();
         loop {
             tokio::select! {result=&mut execution=>panic!("unexpected completion: {result:?}"),event=receiver.recv()=>history.push(event.unwrap())}
-            if matches!(
-                history.last().unwrap().kind,
-                EventKind::ModelCallStarted { .. }
-            ) || (!stop_after_model_start
-                && matches!(history.last().unwrap().kind, EventKind::TurnStarted { .. }))
+            if matches!(history.last().unwrap().kind, EventKind::ModelFirstTextDelta)
+                || (!stop_after_first_marker
+                    && matches!(
+                        history.last().unwrap().kind,
+                        EventKind::ModelRouteSelected { .. }
+                    ))
             {
                 break;
             }
