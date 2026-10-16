@@ -18,3 +18,7 @@ pub mod runtime;
 pub mod session_store;
 pub mod tools;
 pub mod workspace;
+
+pub mod batch_manifest;
+pub mod batch_trace;
+pub mod scheduler;

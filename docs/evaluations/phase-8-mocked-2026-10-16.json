@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "kind": "deterministic_acceptance",
+  "quality_claim": null,
+  "rubric_sha256": "13ee4d4a68b2a480959e41945382b1f9be6d84ffa1022de096c3103033c58d65",
+  "commands": [
+    "cargo test --locked --test scheduler",
+    "cargo test --locked --test batch_cli",
+    "cargo test --locked --bin astrid batch_cli::tests"
+  ],
+  "covered_in_final_full_run": true,
+  "scheduler_tests": 22,
+  "actual_cli_subprocess_tests": 4,
+  "cli_driver_tests": 4,
+  "notes_and_code": {
+    "fixtures": [
+      "tests/fixtures/personal-tasks/outstanding",
+      "tests/fixtures/greeting"
+    ],
+    "model_calls_each": 5,
+    "native_reads_each": 2,
+    "inference_overlap": "barrier, never elapsed-time comparison",
+    "dependent_transfer": "exact source envelopes, originals retained",
+    "code_test_execution": "not performed by workers; test declarations inspected only"
+  },
+  "failure_safety": [
+    "pre-auth graph/config/bounds rejection",
+    "hard read-only/Ask denial",
+    "malicious dependency path/mutation attempts",
+    "protected compaction and explicit overflow",
+    "publication failure retains child fact",
+    "failure descendants vs unrelated work",
+    "root/task cancellation and late terminal race",
+    "panic/loss with unknown counts",
+    "cleanup failure precedence",
+    "real auth contention/serialized synthetic refresh",
+    "real subprocess SIGINT with held auth lock",
+    "projection saturation/disconnection",
+    "metadata privacy/reader corruption/shared quotas",
+    "routed-child evidence and visible-only transfer"
+  ]
+}

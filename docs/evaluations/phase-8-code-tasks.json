@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "max_model_calls": 12,
+  "timeout_seconds": 300,
+  "tasks": [
+    {
+      "model": "gpt-5.6-sol",
+      "max_model_calls": 4,
+      "timeout_seconds": 120,
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "key": "source",
+      "instruction": "Read src/lib.rs to explain greeting behavior with precise source attribution. Do not edit or execute anything."
+    },
+    {
+      "model": "gpt-5.6-sol",
+      "max_model_calls": 4,
+      "timeout_seconds": 120,
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "key": "tests",
+      "instruction": "Read the test declarations in src/lib.rs. Report what they assert with source attribution; distinguish declared tests from tests actually executed. Do not execute anything."
+    },
+    {
+      "model": "gpt-5.6-sol",
+      "max_model_calls": 4,
+      "timeout_seconds": 120,
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "key": "review",
+      "depends_on": [
+        "source",
+        "tests"
+      ],
+      "instruction": "Reconcile source and test inspections with attribution and uncertainty. Preserve both originals; this review is unverified. Never claim unexecuted tests passed."
+    }
+  ]
+}

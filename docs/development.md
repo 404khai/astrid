@@ -5,7 +5,14 @@ changes. AGENTS.md controls scope; accepted ADRs control architectural contracts
 code and tests establish what actually exists. A planning document does not
 advance the active phase.
 
-Active scope: Phase 7, authorized after Phase 6 closure with limitations on
+Active implementation: [Phase 8](plans/phase-8.md), explicitly authorized with
+accepted ADRs 0017–0019 on 2026-10-16; implementation/review complete on
+`feat/task-scheduler-workers`, pending maintainer acceptance with explicit limitations.
+See the [implementation review](reviews/phase-8.md). No Phase 9 transition. Phase 7 review recommends closure with limitations;
+separate administrative acceptance is not inferred. Use descriptive branch/PR
+names without phase-number prefixes; reference phase/tickets in descriptions.
+
+Previous implementation baseline: Phase 7, authorized after Phase 6 closure with limitations on
 2026-10-15, with context/comparison/resumability follow-ups authorized 2026-10-16.
 ADR 0015 visible handoff remains binding; accepted ADR 0016 supersedes its one-shot
 restriction and ADR 0012’s v1-only format. Phases 5/13 deferred; M02 paused; GPUI

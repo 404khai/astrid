@@ -1,3 +1,196 @@
+# Scheduler PR publication — 2026-10-16
+
+Opened [PR #16](https://github.com/404khai/astrid/pull/16), **Add bounded read-only task
+scheduling and workers**, from `feat/task-scheduler-workers` against `main` at the
+maintainer's request. Implementation commit: `be701c13`, 33 explicitly scoped files.
+Same checkout; no branch/worktree change or unrelated assets included. Recovery
+snapshots/stash and private sessions remain preserved. No merge or successor work.
+
+Publication verified all 86 pinned source hashes against the exact Git index and
+clean scoped whitespace. Prior exact-source validation remains 255 Rust passed,
+0 failed, 1 ignored; 2 Python passed; fmt/strict all-target Clippy passed. This
+publication adds no runtime code, tests or inference. Original live evidence and
+its 1/3 complete child-trace coverage remain unchanged. [Guide](scheduler.md),
+[review](reviews/phase-8.md), [plan](plans/phase-8.md). Historical checkpoints below.
+
+---
+
+# Scheduler and workers — implementation and review complete, 2026-10-16
+
+P8-01–05 Done on `feat/task-scheduler-workers`, main baseline `16d755c4`, same
+checkout. Bounded static DAG, exclusive owned fresh workers, hard read-only grant
+intersection, independent cancellation/deadlines, attributed committed-result edges,
+protected mandatory inputs, deterministic source bundle, checked batch lifecycle,
+separate metadata traces/shared quotas and `astrid batch run/trace` are implemented.
+The auth orphan wait was reproduced first and fixed with cancellable nonblocking
+exclusive acquisition plus explicit guard unlock; account/credential validation
+and private idle-session v2/original continuation remain intact.
+
+Final validation: **255 Rust passed, 0 failed, 1 ignored**; **2 Python passed**;
+fmt, strict all-target clippy and whitespace passed. [Pinned source/commands](evaluations/phase-8-validation-2026-10-16.json),
+[deterministic acceptance](evaluations/phase-8-mocked-2026-10-16.json),
+[guide](scheduler.md), [plan](plans/phase-8.md), [solo exit review](reviews/phase-8.md).
+
+One frozen bounded live notes batch passed separate solo factual grading: 29.000902 s,
+6 model calls/4 tools, original results retained, fixture bytes unchanged.
+[Original live evidence](evaluations/phase-8-live-2026-10-16.json). Batch metadata
+complete, child coverage 1 complete/2 unavailable; missing recording causes were
+not retained by that earlier CLI. No cause is invented or second live batch spent.
+Whole-batch usage/cost remain unknown. Final explicit reports retain writer diagnostics
+without persisting arbitrary errors/content into metadata. No speed/quality superiority.
+
+Review recommends **close with explicit limitations**; maintainer acceptance pending.
+The maintainer explicitly authorized this Phase 8 transition; no separate Phase 7
+administrative acceptance is invented. Stop here: no automatic Phase 9. Work is
+uncommitted, no broad staging/PR, branch/worktree switch or unrelated artifacts.
+Recovery `/Users/admin/Developer/astrid-scheduler-handoff-5c3hdhrj`, earlier stash
+“preserve tracked changes before main-based phase6 closure and phase7 handoff” and
+`/Users/admin/Developer/astrid-phase7-handoff-ejp1viwq` remain preserved. M02 stays
+Paused/unaccepted, ADR 0014 Superseded, Phases 5/13 Deferred. Historical evidence follows.
+
+---
+
+# Scheduler metadata checkpoint — 2026-10-16
+
+P8-01–04 complete on `feat/task-scheduler-workers`, same preserved checkout.
+Batch lifecycle has checked replay, child outcome/recording coverage and separate
+optional metadata traces. Flat generated `batch-<UUID>` names share existing total
+store quotas and writer exclusion with unchanged schema-1 run traces. Existing
+run lists/statistics exclude batch aggregates. `astrid batch trace [id]` inspects
+metadata without authentication or recovery claims. Result text, labels, paths,
+content digests, arbitrary errors and private continuation stay out of traces.
+
+Full validation: **246 Rust passed, 0 failed, 1 ignored**; fmt and strict all-target
+clippy passed. [Pinned evidence](evaluations/phase-8-slice-3.json), [plan](plans/phase-8.md),
+[solo review](reviews/phase-8.md). P8-05 In progress: bounded manifest execution,
+CLI acceptance, one frozen bounded live scenario and final review. No live
+inference yet. No staging/commit, branch/worktree change or Phase 9. Recovery
+snapshots/stash and unrelated files retained. Historical checkpoints follow.
+
+---
+
+# Scheduler dependency and cleanup checkpoint — 2026-10-16
+
+P8-01–03 complete on `feat/task-scheduler-workers`, same preserved checkout.
+Static DAG admission, all-required dependencies, ordered attributed bounded final
+text and deterministic original-result bundle are implemented. Unverified synthesis
+cannot replace sources. Failures skip descendants; unrelated work continues.
+Task/root cancellation, deadlines, panic, actual compaction and real auth-lock
+contention/refresh are covered; cleanup failure keeps failure precedence.
+
+New full validation: **237 Rust passed, 0 failed, 1 ignored**; fmt and strict
+all-target clippy passed. [Pinned evidence](evaluations/phase-8-slice-2.json),
+[solo review](reviews/phase-8.md), [plan](plans/phase-8.md). No live inference.
+P8-04 In progress: checked metadata inspection and separate optional batch trace
+family under shared store quotas. Run schema/idle v2 remain unchanged. No branch,
+worktree, staging or commit; recovery snapshots/stash and unrelated files preserved.
+No Phase 9. Historical checkpoints follow.
+
+---
+
+# Scheduler implementation checkpoint — 2026-10-16
+
+P8-01 complete on `feat/task-scheduler-workers`, same checkout; no branch/worktree
+change, staging or commit. Auth blocking-lock orphan reproduced with synthetic
+fixtures and fixed without removing exclusive account locks. Headless owned
+read-only tasks have barrier-proven overlap, separate sessions/tokens, bounded
+admission/results/lifecycle, independent event drains and explicit projection
+detach. Existing run events, trace schema and idle v2 remain unchanged.
+
+New validation: `cargo test --locked` **224 passed, 0 failed, 1 ignored**;
+fmt, strict all-target clippy and whitespace passed. [Pinned evidence](evaluations/phase-8-slice-1.json),
+[solo review](reviews/phase-8.md), [active plan](plans/phase-8.md). No live inference.
+P8-02 In progress: add validated dependencies and bounded attributed final-text
+transfer, preserving original results and mandatory context. Accepted ADRs and
+implementation authorization remain in force; no Phase 9 advancement. Recovery
+snapshots/stash and unrelated files remain preserved. Historical handoff below.
+
+---
+
+# Implementation thread handoff — 2026-10-16
+
+Maintainer approved ADRs 0017–0019 and instructed “I approve begin implementation,
+new thread, new branch.” Phase 8 implementation is authorized. [Plan](plans/phase-8.md),
+accepted ADRs [0017](adr/0017-bounded-task-dag.md),
+[0018](adr/0018-worker-authority-and-results.md),
+[0019](adr/0019-batch-events-and-traces.md). P8-01 is Ready for the requested new
+implementation thread; subsequent tickets retain their dependencies. Phase 7
+closure remains recommended with limitations; no separate administrative acceptance
+is fabricated or required to repeat the maintainer's explicit transition.
+
+Branch `feat/task-scheduler-workers`, created directly from freshly fetched
+`origin/main` at `16d755c4f04c70d07eed23e9302f725176f3960f` in the same checkout;
+no worktree. All ten pre-existing planning files preserved byte-for-byte across
+switch before these authorization edits. Unrelated untracked artifacts retained.
+New recovery snapshot: `/Users/admin/Developer/astrid-scheduler-handoff-5c3hdhrj` (manifest.json, tracked.patch, files/).
+Keep earlier recovery stash and `/Users/admin/Developer/astrid-phase7-handoff-ejp1viwq`.
+
+Naming preference added to AGENTS: use descriptive branch/PR titles, normally omit
+phase numbers; phase/ticket references belong in descriptions/plans/evidence.
+No Rust implementation, new tests or live inference during this handoff. Prior
+baseline remains 218 Rust passed/0 failed/1 ignored, 2 Python passed, fmt/strict
+clippy; do not call those Phase 8 validation. Handoff checks passed: 390 local Markdown targets resolve, accepted ADR/Ready ticket
+statuses verified, new-document whitespace clean and source hashes unchanged.
+`git diff --check` passed; no new runtime tests claimed.
+
+New thread: inspect CURRENT/AGENTS/plan and accepted ADRs, reproduce the concrete
+auth-lock cancellation concern with synthetic fixtures, then implement two owned
+read-only workers with barrier-proven overlap. Continue authorized slices with
+required tests/fmt/strict clippy and checkpoint updates. Preserve private idle v2,
+existing run events/traces, permissions and original continuation. No concurrent
+writes/shell, worktrees, retries/durable leases, daemon/desktop, harness adapter,
+Phase 9 or later scope. M02 Paused/unaccepted; 5/13 Deferred.
+
+Earlier planning-only checkpoints below preserve history and are superseded by
+this explicit authorization. Work remains uncommitted; do not broadly stage assets.
+
+---
+
+# Phase 8 planning checkpoint — 2026-10-16
+
+Maintainer authorized planning for scheduler/workers: dependencies, ownership,
+cancellation, permissions and result reconciliation. [Plan](plans/phase-8.md),
+[readiness review](reviews/phase-8-readiness.md). Documentation only; no scheduler
+source, new tests or live inference. Existing checkout/branch retained at `395af2c3`;
+no worktree, staging or commit. Unrelated user files and recovery data preserved.
+
+[PR #15](https://github.com/404khai/astrid/pull/15) is merged at `16d755c4` (verified
+through GitHub). Phase 7 exit evidence supports closure with limitations; no separate
+administrative closure/Phase 8 implementation approval is inferred from that merge
+or this planning instruction. Prior exact-source validation remains 218 Rust passed,
+0 failed, 1 ignored; 2 Python passed; fmt/strict clippy passed. Not a new rerun.
+
+Completed planning ticket P8-00: source audit, prior-phase exit/debt review, proposed
+state/authority/cancellation/reconciliation contracts, five implementation tickets
+P8-01–05 plus the planning ticket, failure matrix and
+validation criteria. All implementation tickets remain Draft.
+
+Three consequential proposals await maintainer resolution:
+[ADR 0017](adr/0017-bounded-task-dag.md) bounded static process-local DAG, exclusive
+one-attempt ownership, scoped cancellation and continued unrelated work;
+[ADR 0018](adr/0018-worker-authority-and-results.md) read-only grant intersection,
+declared visible-result transfers and source-preserving reconciliation;
+[ADR 0019](adr/0019-batch-events-and-traces.md) explicit projection detach on overflow,
+bounded returned lifecycle log and separate metadata-only correlation traces.
+No recommendation is silently accepted. Auth blocking-lock lifetime and independent
+child event draining are concrete implementation prerequisites to test.
+
+Proposed first slice: two independently owned read-only tasks overlap headlessly,
+with deterministic barrier evidence, then a dependent reconciliation task. No shared
+private history or stdin approvals, writes/shell, worktrees, retry/lease/durable
+scheduler, harness adapter or daemon. Session v2 and existing run traces stay intact.
+M02 Paused/unaccepted; 5/13 Deferred. Next: review contracts, record Phase 7 disposition
+and separate implementation authorization before P8-01 can become Ready.
+
+Planning validation passed: 385 local Markdown file targets resolve against tracked
+plus scoped planning files; all three ADRs remain Proposed and all five implementation
+tickets Draft. Source hashes match prior Phase 7 evidence; tracked source/tests/scripts
+unchanged. New-document whitespace and `git diff --check` passed. No cargo/live
+rerun for documentation-only work. Earlier publication and implementation checkpoints
+below are historical.
+
+---
+
 # Publication checkpoint — 2026-10-16
 
 Opened [PR #15](https://github.com/404khai/astrid/pull/15) against `main` from

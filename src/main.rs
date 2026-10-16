@@ -19,6 +19,7 @@ use std::{
     process::ExitCode, sync::Arc, time::Duration,
 };
 
+mod batch_cli;
 mod console;
 mod logo;
 mod sessions;
@@ -43,7 +44,33 @@ enum SettingsCommand {
     },
 }
 #[derive(Subcommand)]
+enum BatchCommand {
+    /// Execute a bounded caller-authored DAG with fresh read-only workers.
+    Run {
+        manifest: std::path::PathBuf,
+        #[arg(long)]
+        folder: Option<std::path::PathBuf>,
+        #[arg(long, default_value_t = 2, value_parser = positive)]
+        concurrency: usize,
+        #[arg(long, value_enum)]
+        observability: Option<Switch>,
+        #[arg(long, value_enum, default_value = "allow")]
+        read_policy: PermissionAction,
+        /// Emit the complete bounded source bundle and lifecycle as JSON after join.
+        #[arg(long)]
+        json: bool,
+    },
+    /// List or inspect metadata-only batch correlation; never resume a job.
+    Trace { batch_id: Option<String> },
+}
+
+#[derive(Subcommand)]
 enum Commands {
+    /// Inspect bounded read-only task batches.
+    Batch {
+        #[command(subcommand)]
+        command: BatchCommand,
+    },
     /// Show or update optional observability settings.
     Settings {
         #[command(subcommand)]
@@ -681,6 +708,90 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         None => return interactive_loop().await,
     };
     match command {
+        Commands::Batch {
+            command:
+                BatchCommand::Run {
+                    manifest,
+                    folder,
+                    concurrency,
+                    observability,
+                    read_policy,
+                    json,
+                },
+        } => {
+            let manifest = astrid::batch_manifest::Manifest::load(&manifest)?;
+            let workspace = Workspace::new(folder.unwrap_or(std::env::current_dir()?))?;
+            if directory.starts_with(workspace.root()) {
+                return Err(
+                    "choose a workspace outside Astrid's credential directory ancestors".into(),
+                );
+            }
+            let options = observability_options(observability)?;
+            let parent = PermissionPolicy {
+                read: read_policy,
+                ..PermissionPolicy::read_only()
+            };
+            let spec = manifest.into_spec(concurrency, parent, options);
+            let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
+            spec.validate(&provider)?;
+            eprintln!(
+                "Read-only batch: {} tasks, concurrency {}; folder {}. Direct model inference uses each task's configured provider model. Retrieved content is sent to that provider. Shared reads are not a snapshot. Results print after owned work joins.",
+                spec.tasks.len(),
+                spec.concurrency,
+                printable(&workspace.root().display().to_string())
+            );
+            let tools = Tools::new(workspace, Duration::from_secs(1))?;
+            let result = batch_cli::drive(&provider, &tools, spec, async {
+                if let Err(error) = tokio::signal::ctrl_c().await {
+                    eprintln!(
+                        "Cancellation signal unavailable: {}; requesting cleanup",
+                        printable(&error.to_string())
+                    );
+                }
+            })
+            .await?;
+            batch_cli::render(&result, json, &mut io::stdout().lock())?;
+            batch_cli::check_outcome(result.outcome)?;
+        }
+        Commands::Batch {
+            command: BatchCommand::Trace { batch_id },
+        } => {
+            let store = directory.join("traces");
+            if let Some(id) = batch_id {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&astrid::batch_trace::read(&store, &id)?)?
+                );
+            } else {
+                let paths = astrid::batch_trace::list(&store)?;
+                if paths.is_empty() {
+                    println!("No retained batch traces. Observability defaults to off.");
+                }
+                for path in paths {
+                    let id = path
+                        .file_stem()
+                        .and_then(|v| v.to_str())
+                        .and_then(|v| v.strip_prefix("batch-"))
+                        .ok_or("invalid batch trace name")?;
+                    match astrid::batch_trace::read(&store, id) {
+                        Ok(trace) => println!(
+                            "{}  {}  {:?}  {} tasks; child coverage is separate",
+                            trace.batch,
+                            if trace.complete {
+                                "complete"
+                            } else {
+                                "incomplete"
+                            },
+                            trace.state.outcome,
+                            trace.state.tasks.len()
+                        ),
+                        Err(error) => {
+                            eprintln!("{}: {}", printable(id), printable(&error.to_string()))
+                        }
+                    }
+                }
+            }
+        }
         Commands::Settings { command } => {
             let path = directory.join("settings.json");
             let (mut settings, mut exists) = observability::Settings::load_with_source(&path)?;

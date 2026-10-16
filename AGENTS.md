@@ -1,5 +1,36 @@
 # AGENTS.md — Astrid
 
+## Phase 8 implementation authorization and naming — 2026-10-16
+
+Maintainer approved the proposed ADRs 0017–0019 and instructed: “I approve begin
+implementation, new thread, new branch.” Phase 8 implementation is authorized under
+those accepted contracts, beginning with P8-01 and progressing in validated slices
+through docs/plans/phase-8.md. Current branch: `feat/task-scheduler-workers`, created
+directly from fetched `origin/main` at `16d755c4` in the existing checkout; no
+worktree. Continue in the requested new implementation thread. Phase 7 closure
+remains recommended with limitations; this explicit transition does not invent a
+separate administrative acceptance. Earlier planning-only/no-Phase-8 entries below
+are historical and superseded within this authorized scope. Preserve private v2
+sessions, permissions, original continuation, recovery data and unrelated files.
+No Phase 9, concurrent writes/shell, desktop, daemon or later-phase implementation.
+
+Going forward, prefer descriptive topic names for branches and PR titles; phase
+numbers are not required and should normally be omitted. Phase/ticket references
+may remain in PR descriptions, plans and evidence. Do not add a phase-number prefix
+merely to identify the work.
+
+## Phase 8 planning authorization — 2026-10-16
+
+Maintainer requested: “begin work on Plan Phase 8 — Scheduler and Workers: task
+dependencies, ownership, cancellation, permissions and result reconciliation”.
+This authorizes repository review and a concrete plan/decision proposals, not
+scheduler implementation. PR #15 is merged; Phase 7 closure remains recommended
+with limitations, without inventing a separate acceptance. Current implementation
+phase remains Phase 7 until a recorded transition. See docs/plans/phase-8.md and
+docs/reviews/phase-8-readiness.md. ADRs 0017–0019 are Proposed, not Accepted.
+Preserve the existing checkout, private v2/session/permission contracts and recovery
+data. No worktree, desktop, Phase 9 or later-phase implementation is authorized.
+
 ## Authorized Phase 7 follow-ups — 2026-10-16
 
 PR #14 merged at `6608e26b`. Maintainer requested a new branch and implementation
@@ -1446,15 +1477,16 @@ It is not sacred.
 
 # 17. Current Phase
 
-Current phase (revised 2026-10-15 after evidence closure):
+Current phase (revised 2026-10-16 after explicit implementation authorization):
 
 ```text
-Phase 7 — Model Routing
+Phase 8 — Scheduler and Workers
 ```
 
 Phase 6 is closed with explicit limitations; current closure review and
-authorized Phase 7 evidence are in docs/CURRENT.md. Earlier scope statements
-below preserve their dated history. No Phase 8 transition is authorized.
+authorized Phase 7 evidence are in docs/CURRENT.md. Phase 8 implementation is now
+explicitly authorized under accepted ADRs 0017–0019; see docs/plans/phase-8.md.
+Earlier scope statements preserve their dated history. No Phase 9 advancement.
 
 Phase 5 is Deferred, not complete. Earlier Phase 4 restrictions and M02
 authorizations below are historical and superseded by the revision at the top.

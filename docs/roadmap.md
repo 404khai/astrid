@@ -5,6 +5,12 @@ See [current handoff](CURRENT.md) and the new AGENTS authorization entry.
 
 # Astrid canonical engineering roadmap
 
+2026-10-16 latest scope: maintainer accepted ADRs 0017–0019 and authorized
+[Phase 8 implementation](plans/phase-8.md) in a new thread and new branch
+`feat/task-scheduler-workers` from main `16d755c4`. PR #15 is merged. Phase 7 closure
+remains recommended with limitations; no separate administrative acceptance is
+invented. Earlier planning-only/no-Phase-8 entries are historical. No Phase 9 scope.
+
 2026-10-16: Authorized Phase 7 follow-ups on a new main-based branch:
 [context meter → quality comparisons → resumable routing](plans/phase-7-followups.md).
 V2 provenance/migration contract explicitly approved in the implementation thread.
@@ -20,8 +26,8 @@ The CLI is the primary client; the Rust runtime remains authoritative and indepe
 | 0–4 | Foundations retained; 2–4 administratively closed with limitations; see [closure](reviews/foundation-closure.md) |
 | 5 — Local inference | Deferred explicitly, not completed; no exit-criteria claim |
 | 6 — Evaluation | Closed with explicit limitations after main-based comparison/review; [plan](plans/phase-6.md), [review](reviews/phase-6.md) |
-| 7 — Model routing | Initial routing and authorized [follow-ups](plans/phase-7-followups.md) implemented; [current review](reviews/phase-7-followups.md), accepted ADR 0016 v2 resumability; closure recommended with limitations; no Phase 8 authorization |
-| 8 — Scheduler and workers | Pending separate authorization; explicit ownership and communication |
+| 7 — Model routing | Initial routing and [follow-ups](plans/phase-7-followups.md) implemented; PR #15 merged, [review](reviews/phase-7-followups.md), accepted ADR 0016 v2 resumability; closure recommended with limitations; explicit Phase 8 implementation transition authorized |
+| 8 — Scheduler and workers | Implemented under accepted ADRs 0017–0019; [plan](plans/phase-8.md), [implementation review](reviews/phase-8.md); closure with explicit limitations recommended, maintainer acceptance pending; no Phase 9 transition |
 | 9 — Git worktree isolation | Pending; coding worker isolation, not general task requirement |
 | 10 — MCP and external tools | Pending; adapter preserves native runtime semantics |
 | 11 — Interface | Pending; GPUI selected direction, separately evaluate and scope desktop |

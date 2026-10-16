@@ -361,3 +361,32 @@ and [follow-up plan](plans/phase-7-followups.md).
 This routes direct Responses inference inside Astrid's own harness. It does not
 launch or delegate to an external coding-agent harness, introduce a worker, or
 change workspace permissions. No desktop, local backend, daemon or Phase 8 work.
+
+
+## Scheduler and worker boundary — 2026-10-16
+
+The earlier Phase 7 no-worker statement describes that historical slice. Under
+accepted ADRs 0017–0019, `scheduler` now composes fresh sequential child runs in a
+bounded caller-authored static DAG. One coordinator owns assignment, dependency
+publication, cancellation and terminal state. Each worker has a fresh private
+session/context/token and a denying approval handler; parent/task grants intersect
+with a hard read-only tool ceiling. Child streams drain independently of the new
+fallible lifecycle projection. Ownership is retained until execution/collector join.
+
+Only attributed bounded committed final text travels along declared edges, rendered
+as untrusted task data in a protected original User task. Deterministic source
+results/statuses survive separately from unverified reconciliation. There is no
+parent/sibling/private-history replay, dynamic spawning, retry or task persistence.
+The CLI parses a bounded manifest and renders only after join; JSON output is an
+explicit source bundle, not automatic session/trace content retention.
+
+`batch_trace` uses a separate metadata schema/family under flat generated
+`batch-<UUID>` names. Both families use the same bounded writer, root lock and total
+store byte/file quotas; existing schema-1 run records/readers and idle-v2 snapshots
+remain unchanged. Child trace coverage and batch recording/delivery are separate.
+Statistics enumerate child run records once, excluding batch aggregates. Missing
+measurements remain unavailable. Auth waits use nonblocking exclusive attempts and
+an explicit unlock guard, retaining credential refresh/account validation locking.
+See [user/API contract](scheduler.md), [plan](plans/phase-8.md) and
+[review/evidence](reviews/phase-8.md). No Phase 9, mutation/shell, background service
+or desktop implementation follows.

@@ -64,6 +64,7 @@ pub fn default_directory() -> Result<PathBuf, AuthError> {
 pub struct ChatGptAuth {
     directory: PathBuf,
     client: reqwest::Client,
+    token_endpoint: String,
 }
 
 impl ChatGptAuth {
@@ -71,6 +72,7 @@ impl ChatGptAuth {
         Ok(Self {
             directory,
             client: client()?,
+            token_endpoint: TOKEN_ENDPOINT.into(),
         })
     }
 }
@@ -185,23 +187,36 @@ fn load(path: &Path) -> Result<Option<Credentials>, AuthError> {
     Ok(Some(credentials))
 }
 
-async fn lock(directory: &Path) -> Result<File, AuthError> {
-    let path = directory.join("auth.lock");
-    tokio::task::spawn_blocking(move || {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .mode(0o600)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(path)?;
-        file.lock()?;
-        Ok::<_, io::Error>(file)
-    })
-    .await
-    .map_err(|_| AuthError::Invalid("credential lock failed".into()))?
-    .map_err(AuthError::Io)
+// Explicit unlock also releases ownership when a concurrent fork temporarily
+// retains a duplicate descriptor. Closing that stale descriptor cannot unlock a
+// subsequent owner's separately opened lock.
+struct AccountLock(File);
+impl Drop for AccountLock {
+    fn drop(&mut self) {
+        let _ = self.0.unlock();
+    }
+}
+async fn lock(directory: &Path) -> Result<AccountLock, AuthError> {
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(directory.join("auth.lock"))?;
+    // Never send an uninterruptible lock wait to the blocking pool. Dropping
+    // this future drops its descriptor, including during contention. Exclusive
+    // ownership still covers credential load, refresh, validation and save.
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(AccountLock(file)),
+            Err(std::fs::TryLockError::WouldBlock) => {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Err(std::fs::TryLockError::Error(error)) => return Err(error.into()),
+        }
+    }
 }
 
 fn require_plan(scopes: &[String]) -> Result<(), AuthError> {
@@ -217,9 +232,10 @@ fn require_plan(scopes: &[String]) -> Result<(), AuthError> {
 
 async fn token_request(
     client: &reqwest::Client,
+    endpoint: &str,
     form: &[(&str, &str)],
 ) -> Result<TokenResponse, AuthError> {
-    let response = client.post(TOKEN_ENDPOINT).form(form).send().await?;
+    let response = client.post(endpoint).form(form).send().await?;
     if !response.status().is_success() {
         // Do not echo credential-containing request URLs or token endpoint bodies.
         return Err(AuthError::Invalid(format!(
@@ -300,6 +316,7 @@ impl Authentication for ChatGptAuth {
         if saved.expires_at <= now()?.saturating_add(60) {
             let tokens = token_request(
                 &self.client,
+                &self.token_endpoint,
                 &[
                     ("grant_type", "refresh_token"),
                     ("client_id", &saved.client_id),
@@ -505,6 +522,7 @@ pub async fn login(
     let client = client()?;
     let tokens = token_request(
         &client,
+        TOKEN_ENDPOINT,
         &[
             ("grant_type", "authorization_code"),
             ("client_id", &client_id),
@@ -562,6 +580,184 @@ pub async fn login(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn contended_auth_wait_drops_without_owned_orphan() {
+        let directory = tempfile::tempdir().unwrap();
+        let held = lock(directory.path()).await.unwrap();
+        let mut waiting = Box::pin(lock(directory.path()));
+        assert!(futures_util::poll!(&mut waiting).is_pending());
+        drop(waiting);
+        // The held account lock remains exclusive; cancellation did not unlock it.
+        let probe = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(directory.path().join("auth.lock"))
+            .unwrap();
+        assert!(matches!(
+            probe.try_lock(),
+            Err(std::fs::TryLockError::WouldBlock)
+        ));
+        drop(held);
+        probe.try_lock().unwrap();
+        drop(probe);
+        let auth = ChatGptAuth::new(directory.path().to_owned()).unwrap();
+        // Synthetic unexpired credentials exercise concurrent users without network.
+        save(
+            &directory.path().join("credentials.json"),
+            &Credentials {
+                issuer: ISSUER.into(),
+                client_id: "synthetic".into(),
+                subject: "fixture".into(),
+                email: None,
+                ext_agent_host_id: "synthetic".into(),
+                id_token: "synthetic".into(),
+                access_token: "synthetic".into(),
+                refresh_token: "synthetic".into(),
+                scopes: vec!["resource.invoke".into(), "chatgpt.tokens.use.direct".into()],
+                expires_at: now().unwrap() + 3600,
+            },
+        )
+        .unwrap();
+        let (a, b) = tokio::join!(auth.bearer_token(), auth.bearer_token());
+        assert_eq!(a.unwrap().as_str(), "synthetic");
+        assert_eq!(b.unwrap().as_str(), "synthetic");
+    }
+
+    #[tokio::test]
+    async fn simultaneous_synthetic_refresh_is_serialized_and_saved_once() {
+        let directory = tempfile::tempdir().unwrap();
+        protected_directory(directory.path()).unwrap();
+        save(
+            &directory.path().join("credentials.json"),
+            &Credentials {
+                issuer: ISSUER.into(),
+                client_id: "synthetic".into(),
+                subject: "fixture".into(),
+                email: None,
+                ext_agent_host_id: "synthetic".into(),
+                id_token: "synthetic".into(),
+                access_token: "expired".into(),
+                refresh_token: "synthetic-refresh".into(),
+                scopes: vec!["resource.invoke".into(), "chatgpt.tokens.use.direct".into()],
+                expires_at: 1,
+            },
+        )
+        .unwrap();
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let mut auth = ChatGptAuth::new(directory.path().to_owned()).unwrap();
+        auth.token_endpoint = format!("http://{}/token", listener.local_addr().unwrap());
+        let serve = async {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = vec![];
+            let mut buffer = [0u8; 4096];
+            loop {
+                let count = socket.read(&mut buffer).await.unwrap();
+                assert!(count > 0);
+                bytes.extend_from_slice(&buffer[..count]);
+                if let Some(end) = bytes.windows(4).position(|s| s == b"\r\n\r\n") {
+                    let header = std::str::from_utf8(&bytes[..end]).unwrap();
+                    let length: usize = header
+                        .lines()
+                        .filter_map(|line| line.split_once(':'))
+                        .find(|(key, _)| key.eq_ignore_ascii_case("content-length"))
+                        .unwrap()
+                        .1
+                        .trim()
+                        .parse()
+                        .unwrap();
+                    if bytes.len() >= end + 4 + length {
+                        break;
+                    }
+                }
+                assert!(bytes.len() < 8192);
+            }
+            let body = r#"{"access_token":"refreshed-synthetic","refresh_token":"rotated-synthetic","token_type":"bearer","expires_in":3600}"#;
+            socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).as_bytes()).await.unwrap();
+            // Dropping the listener makes any unintended second refresh fail.
+            drop(listener);
+        };
+        let (a, b, ()) = tokio::time::timeout(Duration::from_secs(5), async {
+            tokio::join!(auth.bearer_token(), auth.bearer_token(), serve)
+        })
+        .await
+        .unwrap();
+        assert_eq!(a.unwrap().as_str(), "refreshed-synthetic");
+        assert_eq!(b.unwrap().as_str(), "refreshed-synthetic");
+        let saved = load(&directory.path().join("credentials.json"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.subject, "fixture");
+        assert_eq!(saved.refresh_token, "rotated-synthetic");
+    }
+
+    #[tokio::test]
+    async fn account_guard_unlocks_despite_duplicate_and_stale_close_preserves_new_owner() {
+        let directory = tempfile::tempdir().unwrap();
+        let first = lock(directory.path()).await.unwrap();
+        let duplicate = first.0.try_clone().unwrap();
+        drop(first);
+        let second = tokio::time::timeout(Duration::from_secs(1), lock(directory.path()))
+            .await
+            .unwrap()
+            .unwrap();
+        drop(duplicate);
+        let probe = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(directory.path().join("auth.lock"))
+            .unwrap();
+        assert!(matches!(
+            probe.try_lock(),
+            Err(std::fs::TryLockError::WouldBlock)
+        ));
+        drop(second);
+        probe.try_lock().unwrap();
+    }
+
+    // Reproduces the previous implementation: aborting the async owner does not
+    // abort a blocking lock wait. The fixture releases the held lock and awaits
+    // the blocking closure's cleanup acknowledgement.
+    #[tokio::test]
+    async fn legacy_blocking_wait_survives_async_owner() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("auth.lock");
+        let held = File::create(&path).unwrap();
+        held.lock().unwrap();
+        let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+        let (done_tx, mut done_rx) = tokio::sync::oneshot::channel();
+        let waiter = tokio::spawn(async move {
+            tokio::task::spawn_blocking(move || {
+                let file = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(path)
+                    .unwrap();
+                assert!(matches!(
+                    file.try_lock(),
+                    Err(std::fs::TryLockError::WouldBlock)
+                ));
+                entered_tx.send(()).unwrap();
+                file.lock().unwrap();
+                drop(file);
+                let _ = done_tx.send(());
+            })
+            .await
+            .unwrap();
+        });
+        entered_rx.await.unwrap();
+        waiter.abort();
+        assert!(waiter.await.unwrap_err().is_cancelled());
+        assert!(matches!(
+            done_rx.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        ));
+        drop(held);
+        tokio::time::timeout(Duration::from_secs(2), done_rx)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
     #[test]
     fn host_ids_use_stable_supported_uuid_uris() {
         let host = uuid::Uuid::new_v4().urn().to_string();
