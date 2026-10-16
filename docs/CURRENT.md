@@ -1,3 +1,20 @@
+# Scheduler PR publication — 2026-10-16
+
+Opened [PR #16](https://github.com/404khai/astrid/pull/16), **Add bounded read-only task
+scheduling and workers**, from `feat/task-scheduler-workers` against `main` at the
+maintainer's request. Implementation commit: `be701c13`, 33 explicitly scoped files.
+Same checkout; no branch/worktree change or unrelated assets included. Recovery
+snapshots/stash and private sessions remain preserved. No merge or successor work.
+
+Publication verified all 86 pinned source hashes against the exact Git index and
+clean scoped whitespace. Prior exact-source validation remains 255 Rust passed,
+0 failed, 1 ignored; 2 Python passed; fmt/strict all-target Clippy passed. This
+publication adds no runtime code, tests or inference. Original live evidence and
+its 1/3 complete child-trace coverage remain unchanged. [Guide](scheduler.md),
+[review](reviews/phase-8.md), [plan](plans/phase-8.md). Historical checkpoints below.
+
+---
+
 # Scheduler and workers — implementation and review complete, 2026-10-16
 
 P8-01–05 Done on `feat/task-scheduler-workers`, main baseline `16d755c4`, same

@@ -410,3 +410,12 @@ Recommendation: close with explicit limitations; maintainer acceptance pending.
 Stop at authorized Phase 8. No Phase 9, worktree, mutation/shell worker, daemon,
 desktop or later-phase work. Work remains uncommitted, without broad staging or PR;
 recovery snapshots/stash, private v2/continuation and unrelated files retained.
+
+## Publication — 2026-10-16
+
+Maintainer requested a PR. [PR #16](https://github.com/404khai/astrid/pull/16) is open
+against main from the requested topic branch; implementation commit `be701c13`.
+Only 33 scoped files were staged. All 86 pinned source hashes matched the index;
+publication adds no runtime code or new inference. Required exact-source checks
+above remain the validation evidence. No merge, phase transition or unrelated
+artifacts included; recovery data remains preserved.
