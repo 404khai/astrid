@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "frozen_before_live": "2026-10-16",
+  "purpose": "Bounded scheduler protocol and independently graded result acceptance; no speed or model-quality comparison",
+  "notes": {
+    "fixture": "tests/fixtures/personal-tasks/outstanding",
+    "graph": "house and garden independently inspect their named source; checklist depends on both in that order",
+    "rubric": [
+      "House result attributes outstanding actions to house.txt and distinguishes done work",
+      "Garden result attributes outstanding actions to garden.md and distinguishes done work",
+      "Checklist retains both source attributions and does not invent dates or completion",
+      "Original source results remain separately available regardless of synthesis quality",
+      "No task tool write/edit/shell executes; fixture bytes remain unchanged"
+    ]
+  },
+  "code": {
+    "fixture": "tests/fixtures/greeting",
+    "graph": "source and tests inspect independently; review depends on both",
+    "rubric": [
+      "Source inspection identifies greeting behavior using source attribution",
+      "Test inspection distinguishes actual tests from unverified expectations",
+      "Review reports uncertainty and retains both originals",
+      "No mutation or shell execution"
+    ]
+  },
+  "live_ceiling": {
+    "batches": 1,
+    "tasks": 3,
+    "concurrency": 2,
+    "model_calls_per_task": 4,
+    "reserved_batch_calls": 12,
+    "task_seconds": 120,
+    "batch_seconds": 300
+  },
+  "grading": "Solo rubric grading, separate from deterministic runtime acceptance; unknown cost and server throughput remain unavailable"
+}

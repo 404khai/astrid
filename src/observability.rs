@@ -561,12 +561,31 @@ fn lock_store(directory: &Path) -> io::Result<StoreLock> {
         return Err(io::Error::other("invalid store lock"));
     }
     if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-        return Err(io::Error::other(format!(
-            "trace store lock: {}",
-            io::Error::last_os_error()
-        )));
+        let error = io::Error::last_os_error();
+        return Err(io::Error::new(
+            error.kind(),
+            format!("trace store lock: {error}"),
+        ));
     }
     Ok(StoreLock(file))
+}
+fn writer_lock(options: &Options, stopped: &AtomicBool) -> io::Result<StoreLock> {
+    let start = Instant::now();
+    loop {
+        if stopped.load(Ordering::Acquire) {
+            return Err(io::Error::other("recording stopped"));
+        }
+        match lock_store(&options.directory) {
+            Err(e)
+                if e.kind() == io::ErrorKind::WouldBlock
+                    && start.elapsed()
+                        < options.finalize_timeout.min(Duration::from_millis(50)) =>
+            {
+                std::thread::sleep(Duration::from_millis(1))
+            }
+            result => return result,
+        }
+    }
 }
 fn store_size(directory: &Path) -> io::Result<u64> {
     let mut bytes = 0u64;
@@ -592,10 +611,30 @@ fn write_trace(
     stopped: &AtomicBool,
     created: &AtomicBool,
 ) -> io::Result<()> {
+    write_family(
+        options,
+        &run_id.to_string(),
+        receiver,
+        stopped,
+        created,
+        |record| matches!(record, Record::Footer { complete: true, .. }),
+    )
+}
+
+/// Both trace families use exactly this admission, lock and total-store quota.
+/// Names are generated IDs (never caller labels or paths).
+pub(crate) fn write_family<R: Serialize>(
+    options: &Options,
+    name: &str,
+    receiver: mpsc::Receiver<R>,
+    stopped: &AtomicBool,
+    created: &AtomicBool,
+    is_footer: impl Fn(&R) -> bool,
+) -> io::Result<()> {
     private_directory(&options.directory)?;
-    let partial = options.directory.join(format!("{run_id}.partial"));
+    let partial = options.directory.join(format!("{name}.partial"));
     let mut file = {
-        let _lock = lock_store(&options.directory)?;
+        let _lock = writer_lock(options, stopped)?;
         if store_size(&options.directory)? >= options.max_store_bytes {
             return Err(io::Error::other("trace store full"));
         }
@@ -620,7 +659,7 @@ fn write_trace(
         if bytes.len() > MAX_RECORD || run_bytes + bytes.len() as u64 > options.max_run_bytes {
             return Err(io::Error::other("trace record/run limit"));
         }
-        let _lock = lock_store(&options.directory)?;
+        let _lock = writer_lock(options, stopped)?;
         if store_size(&options.directory)?.saturating_add(bytes.len() as u64)
             > options.max_store_bytes
         {
@@ -628,7 +667,7 @@ fn write_trace(
         }
         file.write_all(&bytes)?;
         run_bytes += bytes.len() as u64;
-        footer = matches!(record, Record::Footer { complete: true, .. });
+        footer = is_footer(&record);
     }
     if !footer || stopped.load(Ordering::Acquire) {
         return Err(io::Error::other("trace incomplete"));
@@ -638,8 +677,8 @@ fn write_trace(
         return Err(io::Error::other("recording stopped"));
     }
     // Publish completion atomically; incomplete prefixes retain the .partial suffix.
-    let _lock = lock_store(&options.directory)?;
-    let final_path = options.directory.join(format!("{run_id}.jsonl"));
+    let _lock = writer_lock(options, stopped)?;
+    let final_path = options.directory.join(format!("{name}.jsonl"));
     // link creates the final name without replacing any existing file.
     fs::hard_link(&partial, &final_path)?;
     fs::remove_file(&partial)?;
@@ -766,7 +805,7 @@ pub fn read_trace(directory: &Path, id: &str) -> io::Result<Trace> {
         records,
     })
 }
-fn check_directory(directory: &Path) -> io::Result<()> {
+pub(crate) fn check_directory(directory: &Path) -> io::Result<()> {
     let metadata = fs::symlink_metadata(directory)?;
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
         return Err(io::Error::other("trace store must be a real directory"));
@@ -793,6 +832,9 @@ pub fn list_traces(directory: &Path) -> io::Result<Vec<PathBuf>> {
         if path
             .extension()
             .is_some_and(|v| v == "jsonl" || v == "partial")
+            && !path
+                .file_stem()
+                .is_some_and(|s| s.to_string_lossy().starts_with("batch-"))
         {
             paths.push(path);
         }
@@ -1077,6 +1119,35 @@ mod tests {
             f.write_all(b"\n").unwrap();
         }
     }
+    #[test]
+    fn simultaneous_first_use_directory_creation_is_idempotent() {
+        let root = tempfile::tempdir().unwrap();
+        for round in 0..8 {
+            let directory = root.path().join(format!("round-{round}/traces"));
+            let barrier = std::sync::Barrier::new(8);
+            let outcomes = std::thread::scope(|scope| {
+                let handles: Vec<_> = (0..8)
+                    .map(|_| {
+                        let directory = &directory;
+                        let barrier = &barrier;
+                        scope.spawn(move || {
+                            barrier.wait();
+                            private_directory(directory)
+                        })
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|h| h.join().unwrap())
+                    .collect::<Vec<_>>()
+            });
+            assert!(
+                outcomes.iter().all(Result::is_ok),
+                "first-use recorder creation: {outcomes:?}"
+            );
+        }
+    }
+
     #[test]
     fn reader_rejects_schema_gaps_suffixes_symlinks_and_unsafe_ids() {
         let root = tempfile::tempdir().unwrap();

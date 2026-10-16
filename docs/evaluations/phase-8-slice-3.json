@@ -1,0 +1,28 @@
+{
+  "baseline": "16d755c4f04c70d07eed23e9302f725176f3960f",
+  "slice": [
+    "P8-04"
+  ],
+  "rust": {
+    "passed": 246,
+    "failed": 0,
+    "ignored": 1
+  },
+  "commands": {
+    "cargo test --locked": "passed",
+    "cargo fmt --check": "passed",
+    "cargo clippy --locked --all-targets -- -D warnings": "passed"
+  },
+  "source_sha256": {
+    "src/auth.rs": "04d6f1f0cb04e6c2cce344b550eb53f2b07c01d43f0cb697dc3579bc3ba0d828",
+    "src/lib.rs": "a7e97bc0635ed84a6045971a125aac68f3444db03fdf2b964f7da863bad4210a",
+    "src/scheduler.rs": "053b2a10826e805047d216b3c52a55b51cd891a455973ea30ee8f3a7b245791e",
+    "src/batch_trace.rs": "54f973a6e9ba5db9b0a00810c05fb6b5bf28a2aea64af9ce2fec1202aef4c567",
+    "src/observability.rs": "435c141b9122d598d231bac2b534ffc5bcf3f69c9fd529a34333dd3f8ef98663",
+    "src/main.rs": "4f9452daf5904e1afa1e68be56752894e8a2f863617a1cfb1fe6b41462f361f2",
+    "tests/scheduler.rs": "64ef9d138cce618804bdad0e53781215e364c5d8d76213380955ae0e051eeec7",
+    "tests/batch_cli.rs": "f1aa9012600087ecbf2d854ac1e80ab8f089aeaffd0af4d3973a1fd0db893261"
+  },
+  "live_inference": false,
+  "review": "solo"
+}

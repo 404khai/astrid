@@ -1,0 +1,564 @@
+{
+  "schema": 1,
+  "kind": "bounded_live_acceptance",
+  "date": "2026-10-16",
+  "baseline": "16d755c4f04c70d07eed23e9302f725176f3960f",
+  "command": "target/debug/astrid batch run docs/evaluations/phase-8-notes-tasks.json --folder tests/fixtures/personal-tasks/outstanding --concurrency 2 --observability on --json",
+  "limits": {
+    "batches": 1,
+    "tasks": 3,
+    "concurrency": 2,
+    "task_calls": 4,
+    "reserved_calls": 12,
+    "task_seconds": 120,
+    "batch_seconds": 300
+  },
+  "model_request": "gpt-5.6-sol",
+  "reasoning_effort": "low",
+  "server_model_resolution": null,
+  "source_and_fixture_sha256_at_live": {
+    "tests/fixtures/personal-tasks/outstanding/house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf",
+    "tests/fixtures/personal-tasks/outstanding/garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+    "docs/evaluations/phase-8-rubric.json": "13ee4d4a68b2a480959e41945382b1f9be6d84ffa1022de096c3103033c58d65",
+    "docs/evaluations/phase-8-notes-tasks.json": "09f07d28d949a3b4b10876eee3e9e8072011e703fd28fbbfb5482edd673dc53a",
+    "target/debug/astrid": "121a6a98ae69db4ce99208dcfc3e330150b9e33c3b97c68efb5fd95872cbebaf",
+    "src/auth.rs": "04d6f1f0cb04e6c2cce344b550eb53f2b07c01d43f0cb697dc3579bc3ba0d828",
+    "src/scheduler.rs": "1beb6664eeb76d59b0a995e04eb6ff20d82d1186d82be4ecd81a7fbc3ab2dda9",
+    "src/batch_trace.rs": "54f973a6e9ba5db9b0a00810c05fb6b5bf28a2aea64af9ce2fec1202aef4c567",
+    "src/batch_manifest.rs": "f3f3aff2495563a04c51630cb28bfd097d856d476444eb24a7bd9b1dfbd7de1e",
+    "src/batch_cli.rs": "aa290c2acaf2f7593497915b073bcd9a215451d776b3c145a1449af005d55c3b",
+    "src/main.rs": "8b7bc67fd03faf65cfd95aca6547c993acdc15d6d5f06c53a143c9086363c915",
+    "src/observability.rs": "435c141b9122d598d231bac2b534ffc5bcf3f69c9fd529a34333dd3f8ef98663",
+    "src/lib.rs": "1f390350bfa2964994cc32134eeaa86a5f8c5be9d5a614f3cd10afc2b9c5615d"
+  },
+  "provenance": "Source/binary hashes captured during the live batch without intervening source edits and verified unchanged immediately after. Final validation adds a recorder directory test, truthful diagnostics in explicit CLI reports, and documentation; this original report is preserved without adding later fields. No live rerun.",
+  "fixture_sha256_after": {
+    "tests/fixtures/personal-tasks/outstanding/house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf",
+    "tests/fixtures/personal-tasks/outstanding/garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523"
+  },
+  "grading": {
+    "method": "Solo comparison to frozen rubric and fixture bytes, separate from execution outcome",
+    "notes": [
+      {
+        "criterion": "House outstanding action, source attribution and completed exclusion",
+        "result": "pass",
+        "evidence": "house.txt: buy two warm-white bulbs; tap washer explicitly completed/excluded"
+      },
+      {
+        "criterion": "Garden actions, source attribution and uncertainty",
+        "result": "pass",
+        "evidence": "garden.md: basil on Saturday without calendar date; boiler inspection date not chosen"
+      },
+      {
+        "criterion": "Checklist retains attributions and does not invent dates/completion",
+        "result": "pass",
+        "evidence": "Three outstanding actions attributed to original filenames, unknown dates retained, completed entry excluded"
+      },
+      {
+        "criterion": "Original source results remain separately available",
+        "result": "pass",
+        "evidence": "Both exact result envelopes retained in original bundle and declared C inputs; bytes/digests match"
+      },
+      {
+        "criterion": "Read-only ceiling and unchanged fixture bytes",
+        "result": "pass",
+        "evidence": "All effective worker policies read Allow/write Deny/execute Deny; fixture hashes unchanged; tool-time denial independently tested"
+      }
+    ]
+  },
+  "protocol_checks": {
+    "contiguous_batch_sequences": true,
+    "dependency_started_after_both_publications": true,
+    "source_bytes_and_digests_match": true,
+    "distinct_task_run_session_worker_ids": true,
+    "runtime_invariants": "Established by deterministic tests, not inferred from model quality or wall time"
+  },
+  "coverage": {
+    "batch_recording": "complete",
+    "child_complete": 1,
+    "child_unavailable": 2,
+    "total_children": 3,
+    "missing_child_trace_cause": "not retained by this pre-diagnostic CLI; no specific cause established. First-use directory concurrency test passed. Execution results remain valid; recording is fallible."
+  },
+  "known_usage_subset": {
+    "scope": "checklist child only, 2 of 6 model calls",
+    "input_tokens": 3358,
+    "output_tokens": 273,
+    "cached_tokens": 0
+  },
+  "batch_usage": null,
+  "cost": null,
+  "true_ttft": null,
+  "decode_throughput": null,
+  "quality_or_speed_superiority": null,
+  "original_cli_report": {
+    "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+    "delivery": "headless",
+    "interpretation": "unverified",
+    "lifecycle": [
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "dependencies": [],
+          "kind": "admitted",
+          "permissions": {
+            "execute": "deny",
+            "read": "allow",
+            "write": "deny"
+          },
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece"
+        },
+        "offset_micros": 1617,
+        "sequence": 1
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "dependencies": [],
+          "kind": "admitted",
+          "permissions": {
+            "execute": "deny",
+            "read": "allow",
+            "write": "deny"
+          },
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3"
+        },
+        "offset_micros": 1703,
+        "sequence": 2
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "dependencies": [
+            "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+            "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3"
+          ],
+          "kind": "admitted",
+          "permissions": {
+            "execute": "deny",
+            "read": "allow",
+            "write": "deny"
+          },
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd"
+        },
+        "offset_micros": 1788,
+        "sequence": 3
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "ready",
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+          "worker": null
+        },
+        "offset_micros": 1874,
+        "sequence": 4
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "ready",
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3",
+          "worker": null
+        },
+        "offset_micros": 1877,
+        "sequence": 5
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "running",
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+          "worker": "cb79bd7b-ffed-49b9-88d8-03acfb5ebdb4"
+        },
+        "offset_micros": 1903,
+        "sequence": 6
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "running",
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3",
+          "worker": "c20478d9-0c24-4a3c-9490-269db709a9fe"
+        },
+        "offset_micros": 3648,
+        "sequence": 7
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "kind": "linked",
+          "run": "b3e6d095-2eec-485a-bb34-16096e798934",
+          "session": "34997e93-b0e5-470b-a687-66568f10d615",
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece"
+        },
+        "offset_micros": 12042,
+        "sequence": 8
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "kind": "linked",
+          "run": "217e9860-298f-47a2-a69a-8b77fa3e6c82",
+          "session": "f414f46f-082a-4bbb-ba6e-8a9d5496a88a",
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3"
+        },
+        "offset_micros": 12048,
+        "sequence": 9
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "kind": "child_observed",
+          "observation": {
+            "model_calls": 2,
+            "outcome": "completed",
+            "recording": "unavailable",
+            "tool_calls": 1
+          },
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3"
+        },
+        "offset_micros": 11484055,
+        "sequence": 10
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "bytes": 599,
+          "kind": "published",
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3"
+        },
+        "offset_micros": 11484847,
+        "sequence": 11
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "completed",
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3",
+          "worker": null
+        },
+        "offset_micros": 11484899,
+        "sequence": 12
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "kind": "child_observed",
+          "observation": {
+            "model_calls": 2,
+            "outcome": "completed",
+            "recording": "unavailable",
+            "tool_calls": 1
+          },
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece"
+        },
+        "offset_micros": 16464785,
+        "sequence": 13
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "bytes": 453,
+          "kind": "published",
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece"
+        },
+        "offset_micros": 16464869,
+        "sequence": 14
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "completed",
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+          "worker": null
+        },
+        "offset_micros": 16464890,
+        "sequence": 15
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "ready",
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd",
+          "worker": null
+        },
+        "offset_micros": 16464894,
+        "sequence": 16
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "running",
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd",
+          "worker": "acb6c499-f0b4-4ac0-86b9-4226708c57e6"
+        },
+        "offset_micros": 16464999,
+        "sequence": 17
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "kind": "linked",
+          "run": "1f037a87-2a09-4455-9db1-4ff05cdc2db9",
+          "session": "a4905b96-ab5f-43d0-861d-84cdc7633471",
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd"
+        },
+        "offset_micros": 16466213,
+        "sequence": 18
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "kind": "child_observed",
+          "observation": {
+            "model_calls": 2,
+            "outcome": "completed",
+            "recording": "complete",
+            "tool_calls": 2
+          },
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd"
+        },
+        "offset_micros": 28993519,
+        "sequence": 19
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "bytes": 805,
+          "kind": "published",
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd"
+        },
+        "offset_micros": 28993970,
+        "sequence": 20
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "causes": [],
+          "kind": "transition",
+          "reason": null,
+          "state": "completed",
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd",
+          "worker": null
+        },
+        "offset_micros": 28994167,
+        "sequence": 21
+      },
+      {
+        "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+        "event": {
+          "kind": "finished",
+          "outcome": "completed"
+        },
+        "offset_micros": 28994183,
+        "sequence": 22
+      }
+    ],
+    "measurements": {
+      "cancellation_cleanup_micros": 0,
+      "cost": null,
+      "model_call_reporting_tasks": 3,
+      "model_calls_known_sum": 6,
+      "model_window_occupancy": null,
+      "recording_finalization_micros": 6710,
+      "task_count": 3,
+      "usage": null,
+      "wall_micros": 29000902
+    },
+    "outcome": "completed",
+    "recording": "complete",
+    "source_order": "manifest order; dependency inputs retain declared edge order",
+    "tasks": [
+      {
+        "child_outcome": {
+          "status": "completed"
+        },
+        "id": "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+        "inputs": [],
+        "key": "house",
+        "model_calls": 2,
+        "result": {
+          "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+          "bytes": 453,
+          "dependencies": [],
+          "outcome": {
+            "status": "completed"
+          },
+          "run": "b3e6d095-2eec-485a-bb34-16096e798934",
+          "sha256": "2c025b33b6a905526a9a4d750b5a847872a7732a6b151c3e99cb6dce389d8fb7",
+          "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+          "text": "- **Outstanding action:** Buy two warm-white bulbs for the hallway. (`house.txt`, line 1)\n- **Completed exclusion:** Replace the kitchen tap washer. (`house.txt`, line 2)\n- **Uncertainty:** This is an unverified report of the file’s contents; no dates or independent factual verification were provided.\n- **Coverage:** Read `house.txt` completely (2 lines, EOF reached, no truncation or omitted content). No other sources were inspected, as requested.",
+          "validation": "bounded_committed_final"
+        },
+        "status": {
+          "causes": [],
+          "child": {
+            "model_calls": 2,
+            "outcome": "completed",
+            "recording": "unavailable",
+            "tool_calls": 1
+          },
+          "dependencies": [],
+          "permissions": {
+            "execute": "deny",
+            "read": "allow",
+            "write": "deny"
+          },
+          "reason": null,
+          "result_bytes": 453,
+          "run": "b3e6d095-2eec-485a-bb34-16096e798934",
+          "session": "34997e93-b0e5-470b-a687-66568f10d615",
+          "state": "completed",
+          "worker": "cb79bd7b-ffed-49b9-88d8-03acfb5ebdb4"
+        },
+        "tool_calls": 1
+      },
+      {
+        "child_outcome": {
+          "status": "completed"
+        },
+        "id": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3",
+        "inputs": [],
+        "key": "garden",
+        "model_calls": 2,
+        "result": {
+          "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+          "bytes": 599,
+          "dependencies": [],
+          "outcome": {
+            "status": "completed"
+          },
+          "run": "217e9860-298f-47a2-a69a-8b77fa3e6c82",
+          "sha256": "79c5bd68b0d91a4433bc2ea90023171e18816733d59398e0e60e5e5fdd9685e6",
+          "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3",
+          "text": "## Outstanding actions — `garden.md`\n\n- Water the balcony basil on **Saturday**. The calendar date is not specified.\n- Book the annual boiler inspection. **Date not yet chosen.**\n\n## Completed exclusions\n\n- None listed.\n\n## Uncertainty\n\n- “Saturday” is preserved as written; no explicit calendar date is provided.\n- The boiler inspection date is explicitly unknown.\n- This report is unverified and reflects only the file contents.\n\n## Coverage\n\n- Read `garden.md` completely: lines 1–2, through end of file; no truncation or omitted bytes reported.\n- No other sources were inspected or used.",
+          "validation": "bounded_committed_final"
+        },
+        "status": {
+          "causes": [],
+          "child": {
+            "model_calls": 2,
+            "outcome": "completed",
+            "recording": "unavailable",
+            "tool_calls": 1
+          },
+          "dependencies": [],
+          "permissions": {
+            "execute": "deny",
+            "read": "allow",
+            "write": "deny"
+          },
+          "reason": null,
+          "result_bytes": 599,
+          "run": "217e9860-298f-47a2-a69a-8b77fa3e6c82",
+          "session": "f414f46f-082a-4bbb-ba6e-8a9d5496a88a",
+          "state": "completed",
+          "worker": "c20478d9-0c24-4a3c-9490-269db709a9fe"
+        },
+        "tool_calls": 1
+      },
+      {
+        "child_outcome": {
+          "status": "completed"
+        },
+        "id": "e9ea3c7d-34a8-4b33-be1c-58afac282abd",
+        "inputs": [
+          {
+            "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+            "bytes": 453,
+            "dependencies": [],
+            "outcome": {
+              "status": "completed"
+            },
+            "run": "b3e6d095-2eec-485a-bb34-16096e798934",
+            "sha256": "2c025b33b6a905526a9a4d750b5a847872a7732a6b151c3e99cb6dce389d8fb7",
+            "task": "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+            "text": "- **Outstanding action:** Buy two warm-white bulbs for the hallway. (`house.txt`, line 1)\n- **Completed exclusion:** Replace the kitchen tap washer. (`house.txt`, line 2)\n- **Uncertainty:** This is an unverified report of the file’s contents; no dates or independent factual verification were provided.\n- **Coverage:** Read `house.txt` completely (2 lines, EOF reached, no truncation or omitted content). No other sources were inspected, as requested.",
+            "validation": "bounded_committed_final"
+          },
+          {
+            "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+            "bytes": 599,
+            "dependencies": [],
+            "outcome": {
+              "status": "completed"
+            },
+            "run": "217e9860-298f-47a2-a69a-8b77fa3e6c82",
+            "sha256": "79c5bd68b0d91a4433bc2ea90023171e18816733d59398e0e60e5e5fdd9685e6",
+            "task": "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3",
+            "text": "## Outstanding actions — `garden.md`\n\n- Water the balcony basil on **Saturday**. The calendar date is not specified.\n- Book the annual boiler inspection. **Date not yet chosen.**\n\n## Completed exclusions\n\n- None listed.\n\n## Uncertainty\n\n- “Saturday” is preserved as written; no explicit calendar date is provided.\n- The boiler inspection date is explicitly unknown.\n- This report is unverified and reflects only the file contents.\n\n## Coverage\n\n- Read `garden.md` completely: lines 1–2, through end of file; no truncation or omitted bytes reported.\n- No other sources were inspected or used.",
+            "validation": "bounded_committed_final"
+          }
+        ],
+        "key": "checklist",
+        "model_calls": 2,
+        "result": {
+          "batch": "7c617483-57cf-4bb9-8b21-fa9d8a27368e",
+          "bytes": 805,
+          "dependencies": [
+            "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+            "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3"
+          ],
+          "outcome": {
+            "status": "completed"
+          },
+          "run": "1f037a87-2a09-4455-9db1-4ff05cdc2db9",
+          "sha256": "b1baa1aef35de11a50ca74adfd464daf26e8dacbec94da433f0de27e354d244f",
+          "task": "e9ea3c7d-34a8-4b33-be1c-58afac282abd",
+          "text": "## Outstanding-action checklist\n\n- [ ] Buy two warm-white bulbs for the hallway. — `house.txt`, line 1\n- [ ] Water the balcony basil on **Saturday**; no calendar date is specified. — `garden.md`, line 1\n- [ ] Book the annual boiler inspection; the date has not yet been chosen. — `garden.md`, line 2\n\n**Coverage:** I read `house.txt` (2 lines) and `garden.md` (2 lines) completely through EOF; neither read reported truncation or omitted bytes. No other sources were inspected.\n\n**Unverified interpretation:** I treated only entries explicitly marked “Outstanding” as open actions and excluded the entry marked “Completed” in `house.txt`. This checklist is my unverified synthesis; it does not independently verify the underlying facts, and the original predecessor findings remain separate.",
+          "validation": "bounded_committed_final"
+        },
+        "status": {
+          "causes": [],
+          "child": {
+            "model_calls": 2,
+            "outcome": "completed",
+            "recording": "complete",
+            "tool_calls": 2
+          },
+          "dependencies": [
+            "4567b224-0a2a-49c8-95b4-5b9b23f98ece",
+            "22e56b0b-ff24-42b6-a33a-42ab7e7dc8b3"
+          ],
+          "permissions": {
+            "execute": "deny",
+            "read": "allow",
+            "write": "deny"
+          },
+          "reason": null,
+          "result_bytes": 805,
+          "run": "1f037a87-2a09-4455-9db1-4ff05cdc2db9",
+          "session": "a4905b96-ab5f-43d0-861d-84cdc7633471",
+          "state": "completed",
+          "worker": "acb6c499-f0b4-4ac0-86b9-4226708c57e6"
+        },
+        "tool_calls": 2
+      }
+    ]
+  }
+}

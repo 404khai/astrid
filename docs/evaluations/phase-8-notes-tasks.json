@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "max_model_calls": 12,
+  "timeout_seconds": 300,
+  "tasks": [
+    {
+      "model": "gpt-5.6-sol",
+      "max_model_calls": 4,
+      "timeout_seconds": 120,
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "key": "house",
+      "instruction": "Inspect house.txt only. Report outstanding actions with source filename, completed exclusions, uncertainty and coverage. Do not invent dates or claim unread sources."
+    },
+    {
+      "model": "gpt-5.6-sol",
+      "max_model_calls": 4,
+      "timeout_seconds": 120,
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "key": "garden",
+      "instruction": "Inspect garden.md only. Report outstanding actions with source filename, completed exclusions, uncertainty and coverage. Preserve explicit dates and unknown dates."
+    },
+    {
+      "model": "gpt-5.6-sol",
+      "max_model_calls": 4,
+      "timeout_seconds": 120,
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "key": "checklist",
+      "depends_on": [
+        "house",
+        "garden"
+      ],
+      "instruction": "Combine the attributed predecessor findings into a concise outstanding-action checklist. Preserve each source filename and all uncertainty, exclude completed work, and distinguish your unverified interpretation from the original findings. Do not invent dates or broaden source coverage."
+    }
+  ]
+}

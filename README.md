@@ -41,6 +41,18 @@ and workspace change evidence. Interactive conversations retain multiple runs;
 It streams OpenAI output and executes native tools sequentially.
 macOS is the supported platform.
 
+## Read-only task batches
+
+`astrid batch run <tasks.json> --folder <folder> --concurrency 2` executes a bounded
+caller-authored DAG with fresh owned sessions, read-only grants and explicit
+visible-result dependencies. The final report preserves original results separately
+from unverified synthesis. Ctrl-C joins owned work; failures skip descendants while
+unrelated work continues. `--json` returns the complete bounded bundle/lifecycle.
+`astrid batch trace [id]` separately inspects optional metadata-only batch traces.
+See [manifest examples, limits and API](docs/scheduler.md) and the
+[implementation review](docs/reviews/phase-8.md). There is no concurrent mutation,
+shell, worktree, durable job, daemon or new idle-session format.
+
 ## Build and sign in
 
 ```sh

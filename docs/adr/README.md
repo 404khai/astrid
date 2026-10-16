@@ -22,3 +22,6 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0014](0014-tauri-desktop-runtime-boundary.md) | Tauri desktop and Astrid runtime hosting boundary | Superseded 2026-10-15; accepted 2026-10-14 retained | Paused; partial implementation preserved |
 | [0015](0015-visible-history-routing.md) | Explicit visible-history model handoff | Accepted 2026-10-15; one-shot restriction superseded by 0016 | Visible handoff implemented; final checks passed |
 | [0016](0016-persistent-routing-provenance.md) | Persistent dispatch provenance, conservative v1 migration, resumable visible-history routing | Accepted 2026-10-16 | Implemented; final checks passed |
+| [0017](0017-bounded-task-dag.md) | Bounded process-local DAG, exclusive task ownership and scoped cancellation | Accepted 2026-10-16 | Implemented; [review/evidence](../reviews/phase-8.md) |
+| [0018](0018-worker-authority-and-results.md) | Read-only worker grants and attributed visible-result reconciliation | Accepted 2026-10-16 | Implemented; [review/evidence](../reviews/phase-8.md) |
+| [0019](0019-batch-events-and-traces.md) | Explicit batch projection delivery and metadata trace correlation | Accepted 2026-10-16 | Implemented; [review/evidence](../reviews/phase-8.md) |

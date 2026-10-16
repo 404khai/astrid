@@ -1,0 +1,25 @@
+{
+  "baseline": "16d755c4f04c70d07eed23e9302f725176f3960f",
+  "slice": [
+    "P8-02",
+    "P8-03"
+  ],
+  "rust": {
+    "passed": 237,
+    "failed": 0,
+    "ignored": 1
+  },
+  "commands": {
+    "cargo test --locked": "passed",
+    "cargo fmt --check": "passed",
+    "cargo clippy --locked --all-targets -- -D warnings": "passed"
+  },
+  "source_sha256": {
+    "src/auth.rs": "53cee34cb6d6cf29442fc95e5ddfdec5e10200c0235a14fc471238f16e21af5f",
+    "src/lib.rs": "3f6318c691f4ad43e3fccdc21a8aa891b17882454ba4e304433227bdee91ff22",
+    "src/scheduler.rs": "c2c1a1adec7a81c4c3c3d934998b772c43d752b3e5dba46349a9f97db0f5826d",
+    "tests/scheduler.rs": "c14bb193f75bb379a9b92bfc5896ff5c4b4fdc5288b1cf468c41b155b72648bd"
+  },
+  "live_inference": false,
+  "review": "solo"
+}
