@@ -115,4 +115,6 @@ more repetitions, verified provider accounting/capacity and cross-device trust
 remain future scoped work. No Phase 8, harness adapter, paid infrastructure,
 desktop, local inference or scheduler implementation. M02 Paused/unaccepted,
 ADR 0014 Superseded, Phases 5/13 Deferred. Unrelated user files and recovery data
-are preserved; current changes remain uncommitted on the requested new branch.
+are preserved. Publication: [PR #15](https://github.com/404khai/astrid/pull/15),
+implementation commit `cdc6e95c` on the requested branch; current status is recorded
+in [CURRENT](../CURRENT.md).

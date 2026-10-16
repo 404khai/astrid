@@ -123,5 +123,13 @@
   "recovery_preserved": {
     "handoff_manifest_present": true,
     "tracked_stash_present": true
+  },
+  "publication": {
+    "pr": "https://github.com/404khai/astrid/pull/15",
+    "implementation_commit": "cdc6e95c",
+    "scoped_files": 33,
+    "pinned_source_matches_index": true,
+    "committed_local_markdown_targets_resolved": 339,
+    "new_runtime_changes_or_live_inference": false
   }
 }

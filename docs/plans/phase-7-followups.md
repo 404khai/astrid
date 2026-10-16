@@ -48,3 +48,8 @@ more observed input tokens here. No invented costs or provider capacity.
 All three authorized tickets are complete. No Phase 8 advancement; no new
 infrastructure, harness delegation, desktop or worker implementation. Unrelated
 untracked artifacts and recovery data remain preserved.
+
+Publication — 2026-10-16: [PR #15](https://github.com/404khai/astrid/pull/15) opened
+against `main`; implementation commit `cdc6e95c`, 33 scoped files. Publication
+source hashes and 339 committed local Markdown targets verified; no new runtime
+change or inference. Await maintainer review/acceptance; no Phase 8 implementation.

@@ -1,3 +1,26 @@
+# Publication checkpoint — 2026-10-16
+
+Opened [PR #15](https://github.com/404khai/astrid/pull/15) against `main` from
+`feat/context-meter-routing-comparisons`. Implementation commit: `cdc6e95c`,
+33 explicitly scoped files. No worktree/branch change, force push or unrelated
+artifacts included. Recovery stash/snapshot remain preserved.
+
+Publication verified pinned source hashes against the exact index and all 339 local
+Markdown file targets within committed files, independent of excluded user artifacts.
+Previously completed exact-source checks remain: 218 Rust passed, 0 failed, 1 ignored;
+2 Python passed; fmt, strict all-target clippy and whitespace passed. Publication
+adds no runtime change or new live inference; final checkpoint changes are documentation only.
+See the [review](reviews/phase-7-followups.md) and [active plan](plans/phase-7-followups.md).
+
+Next agenda: maintainer review/merge and explicit Phase 7 closure disposition, then
+Phase 8 planning for task ownership, dependencies, worker state, cancellation,
+permission boundaries and explicit result reconciliation. Phase 8 implementation
+still requires separate authorization. Worktree isolation remains Phase 9; M02
+Paused/unaccepted and Phases 5/13 Deferred. Earlier uncommitted checkpoints below
+are historical.
+
+---
+
 # Active follow-up — 2026-10-16
 
 PR #14 merged at `6608e26b`. Maintainer authorized context usage, controlled routing
