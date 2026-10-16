@@ -347,11 +347,16 @@ server resolution, omitted default effort and subscription cost stay unavailable
 
 Multi-stage routing uses a visible-history view of user/assistant text and complete
 typed tool exchanges, excluding provider-private continuation. Original in-memory
-private messages are retained. It is fresh one-shot only: the result's Session is
-inspection-only, rejecting serialization, snapshot save and continuation. Existing
-native/effort-only sessions retain their snapshot version/fields and continuation.
-See [ADR 0015](adr/0015-visible-history-routing.md) and [plan](plans/phase-7.md).
-Resumable routing awaits a separate provenance/migration decision.
+private messages are retained. The original one-shot restriction is superseded
+by accepted [ADR 0016](adr/0016-persistent-routing-provenance.md): v2 snapshots
+record response dispatch provenance and durable replay mode. Native same-source
+history retains continuation; model/provider changes or routing permanently select
+visible replay. V1 assistant history has unknown origins and migrates conservatively
+without tool replay. Loading does not write; a successful atomic idle save publishes
+v2 within existing bounds. Older binaries reject v2, and post-publication sync errors
+retain the existing uncertain-durability semantics. Policies and permission grants
+are never persisted. See [original handoff ADR](adr/0015-visible-history-routing.md)
+and [follow-up plan](plans/phase-7-followups.md).
 
 This routes direct Responses inference inside Astrid's own harness. It does not
 launch or delegate to an external coding-agent harness, introduce a worker, or

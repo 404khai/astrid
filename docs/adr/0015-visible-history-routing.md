@@ -1,6 +1,8 @@
 # ADR 0015 — Explicit visible-history model handoff
 
-Status: Accepted — 2026-10-15
+Status: Accepted — 2026-10-15. One-shot/inspection-only restriction superseded
+2026-10-16 by [ADR 0016](0016-persistent-routing-provenance.md); visible-history
+handoff and privacy/authority contracts remain binding.
 Implementation: Implemented; deterministic invariants and final full checks passed
 Decision evidence: Maintainer selected “Approve explicit visible-history handoff”
 after the context/options/recommendation/consequences question in this thread.

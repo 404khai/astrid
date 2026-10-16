@@ -1,3 +1,67 @@
+# Publication checkpoint — 2026-10-16
+
+Opened [PR #15](https://github.com/404khai/astrid/pull/15) against `main` from
+`feat/context-meter-routing-comparisons`. Implementation commit: `cdc6e95c`,
+33 explicitly scoped files. No worktree/branch change, force push or unrelated
+artifacts included. Recovery stash/snapshot remain preserved.
+
+Publication verified pinned source hashes against the exact index and all 339 local
+Markdown file targets within committed files, independent of excluded user artifacts.
+Previously completed exact-source checks remain: 218 Rust passed, 0 failed, 1 ignored;
+2 Python passed; fmt, strict all-target clippy and whitespace passed. Publication
+adds no runtime change or new live inference; final checkpoint changes are documentation only.
+See the [review](reviews/phase-7-followups.md) and [active plan](plans/phase-7-followups.md).
+
+Next agenda: maintainer review/merge and explicit Phase 7 closure disposition, then
+Phase 8 planning for task ownership, dependencies, worker state, cancellation,
+permission boundaries and explicit result reconciliation. Phase 8 implementation
+still requires separate authorization. Worktree isolation remains Phase 9; M02
+Paused/unaccepted and Phases 5/13 Deferred. Earlier uncommitted checkpoints below
+are historical.
+
+---
+
+# Active follow-up — 2026-10-16
+
+PR #14 merged at `6608e26b`. Maintainer authorized context usage, controlled routing
+quality comparisons and resumable routing, in that order, on a new branch.
+`feat/context-meter-routing-comparisons` is based on fetched `origin/main`, same
+checkout, no worktree. [Active plan](plans/phase-7-followups.md).
+
+P7-05–07 implemented and solo-reviewed: default context budget meter, controlled
+coding/notes comparisons, resumable routing under accepted
+[ADR 0016](adr/0016-persistent-routing-provenance.md). The older one-shot restriction
+and v1-only format are superseded. V2 records response dispatch origins and durable
+replay mode. V1 history loads without writing, remains unknown, and follows visible
+history; atomic idle save publishes v2. Original private bytes are retained; tools
+are not replayed. Older binaries reject v2. Same-source native continuation remains.
+
+Final validation: **218 Rust passed, 0 failed, 1 ignored**; **2 Python passed**;
+fmt, strict all-target clippy and diff whitespace passed.
+[Follow-up review](reviews/phase-7-followups.md),
+[pinned checks](evaluations/phase-7-followup-validation-2026-10-16.json).
+Meter labels the non-opaque bytes/4 estimate and configured input admission budget;
+partial opaque occupancy and the actual model window remain unknown. Idle values
+are the last prepared selection, not unsent text or total stored history.
+
+Eight new live synthetic comparison episodes passed their task-specific rubrics:
+fixed Sol/low vs Sol→Terra/low, two repetitions each on identical coding and notes
+fixtures. [Live comparison](evaluations/phase-7-comparison-2026-10-16.json).
+This small sample shows no quality superiority. Routed coding input was higher;
+cost, true TTFT/decode and model-window occupancy remain unavailable. These live
+runs preceded provenance implementation; restart/migration evidence is deterministic.
+
+Installed CLI refreshed with locked/offline `cargo install --path .`; `astrid --help`
+smoke passed without inference or loading existing sessions. 339 local Markdown
+targets resolve and pinned source/comparison hashes match.
+
+Work remains on the new branch, uncommitted; no broad staging or unrelated assets
+included. No Phase 8. M02 stays Paused/unaccepted; Phases 5/13 Deferred. Recovery
+stash/snapshot and unrelated untracked assets are retained. Earlier checkpoints
+below are historical; 211/0/1 is the preceding merged baseline.
+
+---
+
 # Publication checkpoint — 2026-10-15
 
 Opened [PR #14](https://github.com/404khai/astrid/pull/14) against `main` from the

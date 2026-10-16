@@ -648,7 +648,14 @@ fn unbound_palette_and_mode_visibility_use_effective_authority() {
 
 #[test]
 fn slash_mode_arguments_submit_as_commands_and_unknown_commands_reach_dispatch() {
-    for command in ["/mode ask", "/mode auto", "/mode unbound", "/unknown"] {
+    for command in [
+        "/mode ask",
+        "/mode auto",
+        "/mode unbound",
+        "/routing path with spaces.json",
+        "/routing off",
+        "/unknown",
+    ] {
         let mut editor = Editor::new(None, "test");
         editor.handle(Event::Paste(command.into()));
         assert_eq!(
@@ -726,7 +733,7 @@ fn unbound_theme_recolors_transcript_prompt_and_mode_label() {
     let buffer = terminal.backend().buffer();
     assert_eq!(buffer[(0, 8)].fg, red); // prompt chevron
     for x in 0..7 {
-        assert_eq!(buffer[(x, 11)].fg, red);
+        assert_eq!(buffer[(x, 10)].fg, red);
     }
     terminal
         .draw(|f| widgets::status(f, "unbound · running", "", true, false, true))
@@ -911,4 +918,95 @@ fn workspace_change_details_are_bounded_and_native_mutations_remain_visible() {
         .collect::<String>();
     assert!(output.contains("utf8:changed-24"));
     assert!(output.contains("+new"));
+}
+
+#[test]
+fn context_meter_is_visible_without_verbose_flag_and_tracks_budget_compaction_and_opaque_unknowns()
+{
+    use astrid::context::{
+        ContextBudget, ContextMeasurement, ContextSelection, ContextSnapshot, ContextSource,
+    };
+    let mut state = Presentation::new("test".into());
+    assert!(state.status(100).contains("ctx unavailable"));
+    let mut selection = ContextSelection {
+        budget: ContextBudget {
+            estimated_context_tokens: 479096,
+            response_reserve_tokens: 4096,
+            ..Default::default()
+        },
+        snapshot: ContextSnapshot {
+            measurements: vec![],
+            serialized_request_bytes: 1084000,
+            non_opaque_json_size_token_heuristic: 271000,
+            provider_input_tokens: None,
+        },
+        decisions: vec![],
+        summary: None,
+    };
+    state.apply(&event(EventKind::ContextSelected {
+        selection: selection.clone(),
+    }));
+    state.apply(&event(EventKind::ContextPrepared {
+        snapshot: selection.snapshot.clone(),
+    }));
+    assert!(
+        state
+            .status(100)
+            .contains("ctx est 57% ~271000/475000 budget")
+    );
+    let output = state
+        .take_output()
+        .iter()
+        .map(|p| p.text.as_str())
+        .collect::<String>();
+    assert!(output.contains("model-window occupancy unknown"));
+    assert!(!output.contains("provider input tokens 271000"));
+    selection.snapshot.non_opaque_json_size_token_heuristic = 95000;
+    selection.snapshot.measurements.push(ContextMeasurement {
+        source: ContextSource::AssistantContinuation,
+        entries: 1,
+        serialized_bytes: 900000,
+        contains_opaque_data: true,
+    });
+    state.apply(&event(EventKind::ContextSelected {
+        selection: selection.clone(),
+    }));
+    assert!(
+        state
+            .status(100)
+            .contains("partial est 20% ~95000/475000 budget")
+    );
+    assert!(super::context_status(Some(&selection)).starts_with("last ctx partial est 20%"));
+    state.apply(&event(EventKind::RunStarted {
+        task: "new".into(),
+        model: "other".into(),
+        workspace: ".".into(),
+        max_model_calls: 2,
+    }));
+    assert!(state.status(100).contains("ctx unavailable"));
+    assert!(!state.status(100).contains("95000"));
+    state.apply(&event(EventKind::ContextPrepared {
+        snapshot: selection.snapshot,
+    }));
+    assert!(state.status(100).contains("?% ~95000/? budget"));
+}
+
+#[test]
+fn context_status_and_command_notice_both_remain_visible_in_composer() {
+    let mut terminal = Terminal::new(TestBackend::new(80, 12)).unwrap();
+    let mut editor = Editor::new(None, "test");
+    terminal
+        .draw(|frame| {
+            widgets::composer(
+                frame,
+                &mut editor,
+                "auto · last ctx est 57% ~271000/475000 budget · session 12345678 · model",
+                "Routing off for subsequent runs; replay safety remains in effect.",
+                false,
+            )
+        })
+        .unwrap();
+    let rendered = text(terminal.backend().buffer());
+    assert!(rendered.contains("57% ~271000/475000 budget"));
+    assert!(rendered.contains("Routing off for subsequent runs"));
 }

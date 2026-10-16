@@ -18,6 +18,7 @@ pub(super) struct Piece {
 }
 pub(super) struct Presentation {
     model: String,
+    context_meter: super::context_meter::ContextMeter,
     pub mode: String,
     pub show_context: bool,
     pub expanded_tool_calls: bool,
@@ -39,6 +40,7 @@ impl Presentation {
     pub(super) fn new(model: String) -> Self {
         Self {
             model,
+            context_meter: Default::default(),
             mode: "auto".into(),
             show_context: false,
             expanded_tool_calls: false,
@@ -74,22 +76,23 @@ impl Presentation {
         );
     }
     pub(super) fn status(&self, width: usize) -> String {
+        let context = self.context_meter.label();
         if self.run.is_empty() {
-            return format!("{} · {}", self.mode, self.state);
+            return format!("{} · {context} · {}", self.mode, self.state);
         }
         if width < 30 {
             format!(
-                "{} RUN {} T{} {}",
+                "{} · {context} · RUN {} T{} {}",
                 self.mode, self.run, self.turn, self.state
             )
         } else if width < 76 {
             format!(
-                "{} RUN {}   TURN {}   {}   MODEL {}",
+                "{} · {context} · RUN {}   TURN {}   {}   MODEL {}",
                 self.mode, self.run, self.turn, self.state, self.model
             )
         } else {
             format!(
-                "{} RUN {}   TURN {}   MODEL {}   CALLS {}   {}",
+                "{} · {context} · RUN {}   TURN {}   MODEL {}   CALLS {}   {}",
                 self.mode, self.run, self.turn, self.model, self.model_calls, self.state
             )
         }
@@ -110,6 +113,7 @@ impl Presentation {
         match &event.kind {
             EventKind::RunStarted { task, model, .. } => {
                 self.model = single_line(model);
+                self.context_meter = Default::default();
                 self.run = event.run_id.to_string()[..5].into();
                 self.line(&format!("› {}", single_line(task)), Ink::Accent);
                 self.line("", Ink::Normal);
@@ -122,27 +126,40 @@ impl Presentation {
             }
             EventKind::ModelRouteSelected { decision } => {
                 self.model = single_line(&decision.effective_model);
-                if decision.reason != astrid::routing::RouteReason::FixedModel {
+                if decision.reason != astrid::routing::RouteReason::FixedModel
+                    || decision.replay == astrid::routing::ReplayMode::VisibleHistory
+                {
                     self.line(
                         &format!(
-                            "  route        {} · effort={:?} · {:?} · {:?}",
-                            self.model, decision.effective_effort, decision.reason, decision.replay
+                            "  route        {} · effort={:?} · {:?} · {:?} · {:?}",
+                            self.model,
+                            decision.effective_effort,
+                            decision.reason,
+                            decision.replay,
+                            decision.replay_reason
                         ),
                         Ink::Normal,
                     );
                 }
             }
-            EventKind::ContextPrepared { snapshot } if self.show_context => {
-                for line in snapshot.inspection_lines() {
-                    self.line(&line, Ink::Normal);
+            EventKind::ContextPrepared { snapshot } => {
+                self.context_meter.prepared(snapshot);
+                self.line(&self.context_meter.line(), Ink::Dim);
+                if self.show_context {
+                    for line in snapshot.inspection_lines() {
+                        self.line(&line, Ink::Normal);
+                    }
                 }
             }
             EventKind::ContextItemAdded { item } if self.show_context => {
                 self.line(&item.inspection_line(), Ink::Normal);
             }
-            EventKind::ContextSelected { selection } if self.show_context => {
-                for line in selection.inspection_lines() {
-                    self.line(&line, Ink::Normal);
+            EventKind::ContextSelected { selection } => {
+                self.context_meter.select(selection);
+                if self.show_context {
+                    for line in selection.inspection_lines() {
+                        self.line(&line, Ink::Normal);
+                    }
                 }
             }
             EventKind::ModelTextDelta { text } => {

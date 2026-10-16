@@ -12,14 +12,14 @@ use crate::{
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, HashSet, VecDeque},
     io,
 };
 use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub struct RunConfig {
-    /// Multi-stage policy is fresh-run only; returned history cannot be saved/resumed.
+    /// Per-run stages; visible-history replay persists independently of this policy.
     pub routing: Option<crate::routing::RoutingPolicy>,
     /// None disables optional telemetry/recording without suppressing core events.
     pub observability: Option<crate::observability::Options>,
@@ -39,6 +39,8 @@ impl RunConfig {
     pub fn validate(&self) -> Result<(), ConfigurationError> {
         if self.observability.as_ref().is_some_and(|o| !o.valid())
             || self.model.trim().is_empty()
+            || self.model.len() > 256
+            || self.model.chars().any(char::is_control)
             || self.task.trim().is_empty()
             || self.max_model_calls == 0
             || self
@@ -70,7 +72,7 @@ pub enum RunOutcome {
         uninspected_tool_results: bool,
     },
 }
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Session {
     pub id: SessionId,
@@ -78,31 +80,76 @@ pub struct Session {
     pub context: crate::context::ContextLedger,
     pub selection: Option<crate::context::ContextSelection>,
     workspace: std::path::PathBuf,
-    /// Never serialized: mixed private history lacks persistent model provenance.
-    #[serde(skip)]
-    inspection_only: bool,
+    /// Missing in v1: never guess which model created private state.
+    #[serde(default)]
+    origins: BTreeMap<ModelCallId, crate::routing::DispatchOrigin>,
+    #[serde(default = "legacy_replay_mode")]
+    replay_mode: crate::routing::ReplayMode,
 }
-impl Serialize for Session {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        if self.inspection_only {
-            return Err(serde::ser::Error::custom(
-                "routed history is inspection-only; snapshot persistence requires a separately versioned provenance contract",
-            ));
-        }
-        use serde::ser::SerializeStruct;
-        // Preserve the existing idle snapshot schema and field ordering exactly.
-        let mut stored = serializer.serialize_struct("Session", 5)?;
-        stored.serialize_field("id", &self.id)?;
-        stored.serialize_field("messages", &self.messages)?;
-        stored.serialize_field("context", &self.context)?;
-        stored.serialize_field("selection", &self.selection)?;
-        stored.serialize_field("workspace", &self.workspace)?;
-        stored.end()
-    }
+fn legacy_replay_mode() -> crate::routing::ReplayMode {
+    crate::routing::ReplayMode::VisibleHistory
 }
 impl Session {
-    pub fn inspection_only(&self) -> bool {
-        self.inspection_only
+    pub(crate) fn migrate_v1(&mut self) {
+        self.origins.clear();
+        self.replay_mode = if self
+            .messages
+            .iter()
+            .any(|m| matches!(m, Message::Assistant(_)))
+        {
+            crate::routing::ReplayMode::VisibleHistory
+        } else {
+            crate::routing::ReplayMode::ProviderContinuation
+        };
+    }
+    pub fn replay_mode(&self) -> crate::routing::ReplayMode {
+        self.replay_mode
+    }
+    pub fn dispatch_origins(&self) -> &BTreeMap<ModelCallId, crate::routing::DispatchOrigin> {
+        &self.origins
+    }
+    fn has_unknown_origin(&self) -> bool {
+        self.context.items.iter().any(|item| match item.origin {
+            crate::context::ContextOrigin::Assistant { model_call_id } => self
+                .origins
+                .get(&model_call_id)
+                .is_none_or(|origin| origin.provider.is_none()),
+            _ => false,
+        })
+    }
+    fn source_matches(&self, provider: &dyn ModelProvider, model: &str) -> bool {
+        self.context.items.iter().all(|item| match item.origin {
+            crate::context::ContextOrigin::Assistant { model_call_id } => {
+                self.origins.get(&model_call_id).is_some_and(|origin| {
+                    origin.provider.is_some()
+                        && origin.provider.as_deref() == provider.provider_name()
+                        && origin.model == model
+                })
+            }
+            _ => true,
+        })
+    }
+    fn replay_reason(
+        &self,
+        provider: &dyn ModelProvider,
+        config: &RunConfig,
+    ) -> crate::routing::ReplayReason {
+        use crate::routing::{ReplayMode, ReplayReason};
+        if config
+            .routing
+            .as_ref()
+            .is_some_and(|p| !p.stages.is_empty())
+        {
+            ReplayReason::ConfiguredStages
+        } else if self.has_unknown_origin() {
+            ReplayReason::UnverifiedHistory
+        } else if self.replay_mode == ReplayMode::VisibleHistory {
+            ReplayReason::SessionVisibleHistory
+        } else if !self.source_matches(provider, &config.model) {
+            ReplayReason::ModelOrProviderChanged
+        } else {
+            ReplayReason::NativeContinuation
+        }
     }
     pub fn new(workspace: &crate::workspace::Workspace) -> Self {
         Self {
@@ -111,7 +158,8 @@ impl Session {
             context: Default::default(),
             selection: None,
             workspace: workspace.root().to_owned(),
-            inspection_only: false,
+            origins: BTreeMap::new(),
+            replay_mode: crate::routing::ReplayMode::ProviderContinuation,
         }
     }
     /// Validate restored state, preserving a terminal incomplete tool batch for
@@ -120,9 +168,6 @@ impl Session {
         &self,
         workspace: &crate::workspace::Workspace,
     ) -> Result<(), String> {
-        if self.inspection_only {
-            return Err("routed history is inspection-only and cannot be persisted".into());
-        }
         if self.workspace != workspace.root() {
             return Err("stored session belongs to another workspace".into());
         }
@@ -171,11 +216,17 @@ impl Session {
     }
     fn validate_provenance(&self) -> Result<(), String> {
         let mut next_message = 0;
+        let mut assistant_ids = BTreeSet::new();
         for (index, item) in self.context.items.iter().enumerate() {
             if item.id.0 != index || item.added_reason.is_empty() {
                 return Err("invalid session context ledger".into());
             }
             use crate::context::ContextOrigin;
+            if let ContextOrigin::Assistant { model_call_id } = item.origin
+                && !assistant_ids.insert(model_call_id)
+            {
+                return Err("duplicate assistant model provenance".into());
+            }
             let expected = match &item.origin {
                 ContextOrigin::UserTask => Some(matches!(
                     self.messages.get(next_message),
@@ -196,6 +247,18 @@ impl Session {
                 return Err("context provenance differs from session history".into());
             }
             next_message += usize::from(expected.is_some());
+        }
+        for (id, origin) in &self.origins {
+            if !assistant_ids.contains(id)
+                || origin.model.trim().is_empty()
+                || origin.model.len() > 256
+                || origin.model.chars().any(char::is_control)
+                || origin.provider.as_ref().is_some_and(|p| {
+                    p.trim().is_empty() || p.len() > 128 || p.chars().any(char::is_control)
+                })
+            {
+                return Err("invalid stored dispatch provenance".into());
+            }
         }
         if next_message != self.messages.len() {
             return Err("session messages lack context provenance".into());
@@ -416,7 +479,7 @@ pub async fn run(
 }
 
 /// Execute another task in an owned, workspace-bound session.
-/// Multi-stage routing and inspection-only routed history are rejected explicitly.
+/// Durable visible-history mode prevents unsafe private continuation across models.
 /// Incomplete terminal tool batches are rejected, never retried or replayed.
 pub async fn run_in_session(
     provider: &dyn ModelProvider,
@@ -431,16 +494,12 @@ pub async fn run_in_session(
         .routing
         .as_ref()
         .is_none_or(|p| p.valid(&config.model, config.max_model_calls, provider));
-    let error = if session.inspection_only {
-        Some("routed history is inspection-only and cannot be continued".into())
-    } else if config
-        .routing
-        .as_ref()
-        .is_some_and(|p| !p.stages.is_empty())
-    {
-        Some("multi-stage routing requires a fresh one-shot run".into())
-    } else if !route_valid {
+    let needs_visible = session.replay_reason(provider, &config)
+        != crate::routing::ReplayReason::NativeContinuation;
+    let error = if !route_valid {
         Some(ConfigurationError.to_string())
+    } else if needs_visible && !provider.capabilities(&config.model).visible_history {
+        Some("provider cannot prepare the required visible-history handoff".into())
     } else if let Err(error) = config.validate() {
         Some(error.to_string())
     } else if session.workspace != tools.workspace().root() {
@@ -474,10 +533,10 @@ async fn run_owned(
     events: Option<mpsc::Sender<ExecutionEvent>>,
     mut session: Session,
 ) -> RunResult {
-    session.inspection_only = config
-        .routing
-        .as_ref()
-        .is_some_and(|p| !p.stages.is_empty());
+    let replay_reason = session.replay_reason(provider, &config);
+    if replay_reason != crate::routing::ReplayReason::NativeContinuation {
+        session.replay_mode = crate::routing::ReplayMode::VisibleHistory;
+    }
     session.messages.push(Message::User(config.task.clone()));
     session.selection = None;
     let run_id = RunId::default();
@@ -531,6 +590,7 @@ async fn run_owned(
         tools,
         permissions,
         &config,
+        replay_reason,
         &cancellation,
         &mut execution,
         &mut session,
@@ -612,6 +672,7 @@ async fn drive(
     tools: &dyn ToolExecutor,
     permissions: &mut dyn PermissionHandler,
     config: &RunConfig,
+    replay_reason: crate::routing::ReplayReason,
     cancel: &Cancellation,
     e: &mut Execution,
     session: &mut Session,
@@ -688,8 +749,10 @@ async fn drive(
             e.emit(EventKind::TurnCancelled).await;
             return RunOutcome::Cancelled;
         }
-        let decision =
+        let mut decision =
             crate::routing::select(provider, &config.model, config.routing.as_ref(), number);
+        decision.replay = session.replay_mode;
+        decision.replay_reason = replay_reason;
         let request_provider = crate::routing::RequestProvider {
             inner: provider,
             options: crate::routing::RequestOptions {
@@ -819,6 +882,14 @@ async fn drive(
             text: response.text.clone(),
         })
         .await;
+        session.origins.insert(
+            e.model.expect("completed model"),
+            crate::routing::DispatchOrigin {
+                provider: decision.provider.clone(),
+                model: decision.effective_model.clone(),
+                effort: decision.effective_effort,
+            },
+        );
         session.messages.push(Message::Assistant(response.clone()));
         let item = session.context.add(
             crate::context::ContextOrigin::Assistant {

@@ -22,7 +22,7 @@ use std::{
 };
 
 pub const MAX_SESSIONS: usize = 32;
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 const MAX_STORE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_SESSION_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -151,8 +151,40 @@ impl SessionStore {
         if bytes.len() as u64 > MAX_STORE_BYTES {
             return Err(io::Error::other("session store exceeds 32 MiB"));
         }
-        let snapshot: SessionSnapshot = serde_json::from_slice(&bytes)
+        let value: serde_json::Value = serde_json::from_slice(&bytes)
             .map_err(|error| io::Error::other(format!("invalid session store: {error}")))?;
+        let version = value["version"]
+            .as_u64()
+            .ok_or_else(|| io::Error::other("invalid session store version"))?;
+        if version != 1 && version != u64::from(VERSION) {
+            return Err(io::Error::other("unsupported session store version"));
+        }
+        if let Some(entries) = value["entries"].as_array() {
+            for entry in entries {
+                let session = &entry["session"];
+                let fields = [
+                    session.get("origins").is_some(),
+                    session.get("replay_mode").is_some(),
+                ];
+                if (version == 1 && fields.iter().any(|present| *present))
+                    || (version == 2 && fields.iter().any(|present| !present))
+                {
+                    return Err(io::Error::other(
+                        "session provenance fields disagree with snapshot version",
+                    ));
+                }
+            }
+        }
+        // Decode typed fields from the original bytes so duplicate struct keys still fail.
+        let mut snapshot: SessionSnapshot = serde_json::from_slice(&bytes)
+            .map_err(|error| io::Error::other(format!("invalid session store: {error}")))?;
+        // Conservative in-memory migration only; load never writes the old file.
+        if version == 1 {
+            for entry in &mut snapshot.entries {
+                entry.session.migrate_v1();
+            }
+        }
+        snapshot.version = VERSION;
         snapshot.validate(&self.workspace)?;
         Ok(Some(snapshot))
     }
@@ -169,7 +201,9 @@ impl SessionStore {
         file.as_file().sync_all()?;
         file.persist(self.directory.join("state.json"))
             .map_err(|error| error.error)?;
-        fs::File::open(&self.directory)?.sync_all()
+        fs::File::open(&self.directory).and_then(|directory| directory.sync_all()).map_err(|error| {
+            io::Error::new(error.kind(), format!("session snapshot published; directory sync failed, durability uncertain: {error}"))
+        })
     }
 }
 // File close releases flock even if the process exits unexpectedly. Do not

@@ -20,4 +20,5 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0012](0012-local-session-persistence.md) | Workspace-scoped local session persistence | Accepted | Implemented; deterministic validation passed |
 | [0013](0013-native-mac-helper-boundary.md) | Native Mac client and bundled Rust helper boundary | Superseded; native direction withdrawn | Not Started |
 | [0014](0014-tauri-desktop-runtime-boundary.md) | Tauri desktop and Astrid runtime hosting boundary | Superseded 2026-10-15; accepted 2026-10-14 retained | Paused; partial implementation preserved |
-| [0015](0015-visible-history-routing.md) | Explicit visible-history model handoff | Accepted 2026-10-15 with one-shot compatibility refinement | Implemented; final checks passed |
+| [0015](0015-visible-history-routing.md) | Explicit visible-history model handoff | Accepted 2026-10-15; one-shot restriction superseded by 0016 | Visible handoff implemented; final checks passed |
+| [0016](0016-persistent-routing-provenance.md) | Persistent dispatch provenance, conservative v1 migration, resumable visible-history routing | Accepted 2026-10-16 | Implemented; final checks passed |

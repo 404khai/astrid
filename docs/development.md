@@ -6,8 +6,10 @@ code and tests establish what actually exists. A planning document does not
 advance the active phase.
 
 Active scope: Phase 7, authorized after Phase 6 closure with limitations on
-2026-10-15. ADR 0015 handoff/one-shot compatibility contract accepted. Phases 5/13
-deferred; M02 paused; GPUI design deferred to Phase 11. See [Phase 7 plan](plans/phase-7.md).
+2026-10-15, with context/comparison/resumability follow-ups authorized 2026-10-16.
+ADR 0015 visible handoff remains binding; accepted ADR 0016 supersedes its one-shot
+restriction and ADR 0012’s v1-only format. Phases 5/13 deferred; M02 paused; GPUI
+design deferred to Phase 11. See the [active plan](plans/phase-7-followups.md).
 
 Start here for the current phase:
 

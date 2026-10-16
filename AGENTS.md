@@ -1,5 +1,17 @@
 # AGENTS.md — Astrid
 
+## Authorized Phase 7 follow-ups — 2026-10-16
+
+PR #14 merged at `6608e26b`. Maintainer requested a new branch and implementation
+of always-visible context usage first, controlled routing quality comparisons,
+and resumable routing after provenance resolution. Active branch:
+`feat/context-meter-routing-comparisons`, created from fetched `origin/main` in
+the same checkout; no worktree. The maintainer explicitly approved ADR 0016's v2
+provenance/durable visible-history migration, superseding ADR 0015's one-shot
+restriction and ADR 0012's v1-only format. Retain private bytes, permissions,
+complete-exchange/cancellation contracts and recovery data. See docs/CURRENT.md
+and docs/plans/phase-7-followups.md. No Phase 8, desktop or later-phase scope.
+
 ## Current implementation transition — 2026-10-15
 
 Phase 6 closed with explicit limitations after the delegated main-based evidence

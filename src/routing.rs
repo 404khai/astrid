@@ -29,6 +29,25 @@ pub enum ReplayMode {
     ProviderContinuation,
     VisibleHistory,
 }
+/// Only validated dispatch configuration; no claim about server-side resolution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DispatchOrigin {
+    pub provider: Option<String>,
+    pub model: String,
+    pub effort: Option<ReasoningEffort>,
+}
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReplayReason {
+    #[default]
+    Unknown,
+    NativeContinuation,
+    ConfiguredStages,
+    UnverifiedHistory,
+    ModelOrProviderChanged,
+    SessionVisibleHistory,
+}
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RequestOptions {
     pub effort: Option<ReasoningEffort>,
@@ -77,6 +96,8 @@ pub struct RouteDecision {
     pub class: ModelClass,
     pub reason: RouteReason,
     pub replay: ReplayMode,
+    #[serde(default)]
+    pub replay_reason: ReplayReason,
 }
 impl RoutingPolicy {
     pub fn valid(&self, initial: &str, ceiling: usize, provider: &dyn ModelProvider) -> bool {
@@ -141,6 +162,11 @@ pub(crate) fn select(
         effective_effort: effort,
         class,
         reason,
+        replay_reason: if policy.is_some_and(|p| !p.stages.is_empty()) {
+            ReplayReason::ConfiguredStages
+        } else {
+            ReplayReason::NativeContinuation
+        },
         replay: if policy.is_some_and(|p| !p.stages.is_empty()) {
             ReplayMode::VisibleHistory
         } else {

@@ -5,6 +5,7 @@ use unicode_width::UnicodeWidthStr;
 
 mod append;
 mod composer;
+mod context_meter;
 mod format;
 mod identity;
 mod inline;
@@ -21,6 +22,9 @@ mod theme;
 mod widgets;
 
 pub use composer::Composer;
+pub fn context_status(selection: Option<&astrid::context::ContextSelection>) -> String {
+    context_meter::idle_label(selection)
+}
 pub use format::printable;
 use format::single_line;
 pub use identity::Identity;
