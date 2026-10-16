@@ -1,7 +1,7 @@
 # ADR 0012: Local session persistence
 
 Date: 2026-10-09
-Status: Accepted
+Status: Accepted; v1 format/migration clauses revised by [ADR 0016](0016-persistent-routing-provenance.md) on 2026-10-16
 Implementation: Implemented; deterministic validation passed
 Decision evidence: Maintainer instruction on 2026-10-09: "Sessions should not be temporary, and the session name should be derived from the first chat sent for that session".
 Related: ADR 0010 ephemeral sessions; ADR 0009 metadata-only traces

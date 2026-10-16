@@ -103,10 +103,14 @@ astrid run "Inspect the sources and explain the result" --model gpt-5.6-sol \
   --routing tests/fixtures/evaluation/routing.json --observability on
 ```
 
-Multi-stage routing is limited to fresh one-shot `run` tasks. Its returned history
-is inspection-only: saving, serializing or continuing that session fails explicitly.
-Single-model and effort-only idle sessions retain their existing schema/continuation.
-Resumable routing needs a future provenance contract.
+Multi-stage routing works in fresh runs and resumable interactive sessions.
+At the interactive prompt use `/routing path/to/routing.json` to configure
+subsequent runs, or `/routing off` to disable stages. The policy is not saved;
+a session's visible-history safety mode is saved and remains active across model
+changes, routing-off and restart. Same-source native sessions retain private
+continuation. Snapshot v2 records dispatch provider/model/effort per response;
+legacy v1 history has unknown provenance and follows visible-history replay.
+See [ADR 0016](docs/adr/0016-persistent-routing-provenance.md) for migration limits.
 
 The JSON policy sets initial effort and ordered stages, each with `from_call`,
 `model`, caller-supplied `class` and optional `effort`. The example switches to
@@ -125,6 +129,28 @@ not grade task quality. See [Phase 7 plan](docs/plans/phase-7.md) and
 [ADR 0015](docs/adr/0015-visible-history-routing.md) for the compatibility boundary.
 This is direct Responses inference, with Astrid executing its own tools. It does
 not launch Codex or delegate to another coding-agent harness.
+
+## Always-visible context budget
+
+Execution status and the idle prompt show a compact meter by default, for example:
+
+```text
+ctx est 57% ~271000/475000 budget
+```
+
+This example is an estimated **local input admission budget**, not measured model
+window occupancy. The denominator is configured context allowance minus response
+reserve (61,440 by default: 65,536 minus 4,096). The numerator is the existing
+non-opaque JSON bytes/4 heuristic. Opaque continuation marks the estimate `partial`;
+missing accounting/budget is unavailable, never zero. Model-window occupancy stays
+unknown. `astrid trace` separately reports provider usage when available; cumulative
+run usage is not current context occupancy.
+
+The active meter updates from context selection/preflight, including compaction.
+The idle prompt says `last` because it describes the last prepared request in the
+selected session, not unsent text or all retained history. Plain output includes
+one compact context line per prepared call; `--show-context` adds the detailed
+breakdown. Command notices occupy their own footer row so the meter cannot hide them.
 
 ## Read-only household notes
 
@@ -564,3 +590,25 @@ permission grants. One interactive process can write each workspace store at a
 time. Save failures remain visible and do not change a run's outcome. Recovery
 uses the last saved idle state; no interrupted tool execution is replayed.
 Sessions that were already lost before persistence was introduced are unavailable.
+
+
+Snapshot v2 adds known response dispatch origins and a durable replay mode. V1
+snapshots load without a write; a subsequent successful atomic idle save publishes
+v2. Earlier binaries reject v2. Private original messages remain stored, but legacy,
+routed or model/provider-changing history is submitted through a visible-only view;
+incomplete terminal tool batches remain non-continuable. Validation and other
+pre-publication failures retain the old snapshot. A post-publication directory-sync
+failure reports uncertain durability, following the existing persistence contract.
+
+To reproduce the controlled synthetic routing comparison using existing auth:
+
+```sh
+cargo build --locked
+python3 scripts/compare_routing.py --output /tmp/routing-comparison.json
+```
+
+The frozen matrix runs two counterbalanced repetitions for notes and coding under
+fixed Sol/low versus Sol-to-Terra/low. Notes need separate factual rubric review;
+coding artifacts are independently tested. Recorded [eight-episode evidence](docs/evaluations/phase-7-comparison-2026-10-16.json)
+shows both configurations passed this small sample, with no general quality or
+speed advantage established. Cost remains unavailable for subscription inference.

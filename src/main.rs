@@ -459,6 +459,7 @@ async fn conversation_loop(
         ..Default::default()
     };
 
+    let mut routing = None;
     let mut startup = true;
     loop {
         if let Err(error) = sessions.persist() {
@@ -477,11 +478,14 @@ async fn conversation_loop(
             ));
         }
         composer.session_label = sessions.active_label();
+        composer.context_label = sessions.context_label();
         let task = composer.compose(&model)?;
         match task.trim() {
             "" => continue,
             "/" | "/help" => {
-                composer.notice = "/mode · /sessions · /new · /model · /settings · /quit".into();
+                composer.notice =
+                    "/mode · /sessions · /new · /model · /routing <file|off> · /settings · /quit"
+                        .into();
                 continue;
             }
             "/quit" | "/exit" => return Ok(()),
@@ -490,6 +494,27 @@ async fn conversation_loop(
                 if let Some(next) = composer.select_model(&models, &model)? {
                     model = next;
                     remember_model_at(model_directory, &model)?;
+                }
+                continue;
+            }
+            command if command == "/routing" || command.starts_with("/routing ") => {
+                let argument = command.strip_prefix("/routing").unwrap().trim();
+                if argument == "off" {
+                    routing = None;
+                    composer.notice =
+                        "Routing off for subsequent runs; session replay safety remains in effect."
+                            .into();
+                } else if argument.is_empty() {
+                    composer.notice = "Use /routing <JSON file> or /routing off. Policy applies to subsequent runs and is not persisted.".into();
+                } else {
+                    match routing_policy(Some(std::path::Path::new(argument)), None) {
+                        Ok(Some(policy)) if policy.valid(&model, max_model_calls, provider) => {
+                            routing = Some(policy);
+                            composer.notice = "Routing on. Policy is not saved; visible-history mode persists with the session.".into();
+                        }
+                        Ok(_) => composer.notice = "Routing policy is unsupported for this model/provider or call ceiling.".into(),
+                        Err(error) => composer.notice = format!("Routing policy rejected: {}", printable(&error.to_string())),
+                    }
                 }
                 continue;
             }
@@ -610,7 +635,7 @@ async fn conversation_loop(
                 tools,
                 &mut permissions,
                 RunConfig {
-                    routing: None,
+                    routing: routing.clone(),
                     observability,
                     model: model.clone(),
                     task,

@@ -86,6 +86,14 @@ impl Sessions {
     pub fn active_index(&self) -> usize {
         self.active
     }
+    pub fn context_label(&self) -> String {
+        crate::console::context_status(
+            self.entries[self.active]
+                .session
+                .as_ref()
+                .and_then(|s| s.selection.as_ref()),
+        )
+    }
     pub fn active_label(&self) -> String {
         let id = self.entries[self.active]
             .session

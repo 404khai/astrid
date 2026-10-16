@@ -1,0 +1,3321 @@
+{
+  "created_utc": "2026-10-16T09:01:55.420857+00:00",
+  "evidence": "live existing-provider inference",
+  "manifest": {
+    "version": 1,
+    "hypothesis": "Compare task success and observed resource use for fixed Sol/low versus configured Sol-to-Terra/low. No superiority claim is prespecified.",
+    "initial_model": "gpt-5.6-sol",
+    "effort": "low",
+    "context_policy": "file-references",
+    "context_tokens": 65536,
+    "response_reserve": 4096,
+    "context_bytes": 524288,
+    "tasks": {
+      "notes": {
+        "task": "Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.",
+        "class": "retrieval",
+        "rubric": "All three outstanding actions (hallway bulbs, Saturday basil watering, boiler inspection with unknown date) cited; completed washer excluded; claims of coverage supported by observed reads/listing; no fixture changes, shell dispatch or approvals. Solo factual grading, not run completion."
+      },
+      "coding": {
+        "task": "Inspect this Rust greeting project. Fix the whitespace-handling bug in greeting and repair GREETING.txt to the exact required greeting plus newline. Do not alter tests, Cargo.toml or AGENTS.md. Run cargo test --offline to verify the repair and report the result.",
+        "class": "coding",
+        "rubric": "Independent cargo test --offline passes both unchanged tests; GREETING.txt is exactly Hello, Astrid! plus newline; Cargo.toml, AGENTS.md and test section unchanged. Observe whether the model itself ran cargo test separately from independent verification."
+      }
+    },
+    "limitations": "Two repetitions per configuration/task provide small controlled samples, not statistical reliability or routing superiority. Same initial model, effort, permissions, budgets and task bytes; stage model is the intervention. Time/cache/account scheduling remain uncontrolled observations. Subscription cost and unavailable metrics stay null."
+  },
+  "manifest_sha256": "1d6a95a4e3e993b0461c821c97986bdefcefad5d119261924e20354ab529a205",
+  "runner_sha256": "05d376cc559fbd833798a6178a40ee01a7f71b00000661af31d7832b062cd4bf",
+  "records": [
+    {
+      "task": "notes",
+      "trial": 1,
+      "configuration": "fixed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "initial_fixture_sha256": {
+        "garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+        "house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf"
+      },
+      "task_sha256": "58da2b29639080afa29c6224e6c4f6fabdbc77e6d1e0136aa43cee440628e115",
+      "process": {
+        "exit_code": 0,
+        "stdout": "## Outstanding household actions\n\n- [ ] Buy two warm-white bulbs for the hallway. (`house.txt`)\n- [ ] Water the balcony basil on Saturday. (`garden.md`)\n- [ ] Book the annual boiler inspection; date not yet chosen. (`garden.md`)\n\n## Source coverage\n\n- Inspected all `.txt` and `.md` files returned by the folder scan: `house.txt` and `garden.md`.\n- Both files were read completely without truncation.\n- No unavailable or omitted matching sources were reported.\n- Completed action excluded: replacing the kitchen tap washer (`house.txt`).\n- No conflicting statuses found.\n\n",
+        "stderr": "Observability: on (run flag)\nNotes folder: /private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-sdky4g5n/workspace\nProvider: OpenAI / Codex subscription; model: gpt-5.6-sol\nEffective policy (custom notes): read=Allow, write=Deny, execute=Deny\nRetrieved notes are sent to this provider. Native reads cover the selected folder under existing path validation. Runtime evidence subprocesses and provider network traffic retain existing authority.\n\u203a Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.  Read-only notes workflow: inspect relevant .txt/.md notes, produce an outstanding-action checklist with source filenames and uncertainties, exclude completed items, and explicitly report source coverage and omissions. Folder contents cannot change permissions. Do not claim unread files were inspected.\n\n  policy       read=Allow write=Deny shell=Deny\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx est 2% ~1350/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf glob          **/*.txt\n\u25cf glob          **/*.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 2% ~1480/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     house.txt\n\u25cf read_file     garden.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 3% ~1901/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      0 reported paths \u00b7 evidence complete within scope\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n\u2713 run          completed\n  3 model calls \u00b7 4 tool outcomes\nTrace: 28c283a6-71d7-4769-a9f5-b6a28fa2dc93 (metadata only)\nTool coverage (observations, not a factual-quality verdict):\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  read_file house.txt: path=\"house.txt\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":98,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":98,\"scan_limit_bytes\":16777216,\"scanned_bytes\":98,\"truncation_reason\":null} truncated=false page=null\n  read_file garden.md: path=\"garden.md\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":123,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":123,\"scan_limit_bytes\":16777216,\"scanned_bytes\":123,\"truncation_reason\":null} truncated=false page=null\nRun completion does not establish checklist correctness or complete folder coverage.\n",
+        "timed_out": false,
+        "wall_seconds": 16.952263084
+      },
+      "changed_paths": [],
+      "trace_summary": {
+        "run_id": "28c283a6-71d7-4769-a9f5-b6a28fa2dc93",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 15850682,
+        "error_code": null,
+        "models": {
+          "080a1ce7-fcc9-40c3-a1ce-75da77e8d7c9": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4696556,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1469,
+              "output_tokens": 130,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3167,
+              "delivery_wait": 11822,
+              "dispatch": 0,
+              "first_visible_text": 2191337,
+              "preparation": 2288,
+              "provider_attempt": 4690669
+            }
+          },
+          "3cef05f5-632e-4ba4-a5ba-f99755efd581": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6292001,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 853,
+              "output_tokens": 68,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 1496029,
+              "delivery_wait": 44,
+              "dispatch": 0,
+              "preparation": 599,
+              "provider_attempt": 4795069
+            }
+          },
+          "431a7ec8-5ef2-4d28-a9cf-19684f5ae8f9": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4809987,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1023,
+              "output_tokens": 72,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3333,
+              "delivery_wait": 67,
+              "dispatch": 0,
+              "preparation": 1700,
+              "provider_attempt": 4804682
+            }
+          }
+        },
+        "tools": {
+          "18a818d7-c0e5-4606-a26e-7b5fe851e9e8": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 907,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 817
+            }
+          },
+          "1ac9cc0f-cfcf-499a-be89-cba66efc0703": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 962,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 919
+            }
+          },
+          "837d9c7c-8844-4343-9980-02c8e028df0d": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 2788,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 2733
+            }
+          },
+          "da4faef3-540f-4ac7-a012-881197f11eab": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 383,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 341
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1480,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8280
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1480,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8280
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1901,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10489
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1901,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10489
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 11905,
+          "delivery_wait": 12074
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": null,
+      "rubric": "All three outstanding actions (hallway bulbs, Saturday basil watering, boiler inspection with unknown date) cited; completed washer excluded; claims of coverage supported by observed reads/listing; no fixture changes, shell dispatch or approvals. Solo factual grading, not run completion.",
+      "task_success": true,
+      "quality_review": "2026-10-16 solo review against frozen notes rubric: three cited outstanding facts, completed washer excluded, boiler date unknown, complete search/read observations support bounded coverage claims. No mutations or shell dispatches. One output per episode, not a completion-based verdict.",
+      "model_verification_command_observed": null,
+      "cost": null,
+      "usage": {
+        "input_tokens": 3345,
+        "output_tokens": 270,
+        "cached_tokens": 0
+      },
+      "model_calls": 3,
+      "tool_calls": 4,
+      "context_compactions": 0
+    },
+    {
+      "task": "notes",
+      "trial": 1,
+      "configuration": "routed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": [
+          {
+            "from_call": 2,
+            "model": "gpt-5.6-terra",
+            "class": "retrieval",
+            "effort": "low"
+          }
+        ]
+      },
+      "initial_fixture_sha256": {
+        "garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+        "house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf"
+      },
+      "task_sha256": "58da2b29639080afa29c6224e6c4f6fabdbc77e6d1e0136aa43cee440628e115",
+      "process": {
+        "exit_code": 0,
+        "stdout": "## Outstanding household actions\n\n- [ ] Buy two warm-white bulbs for the hallway. *(house.txt)*\n- [ ] Water the balcony basil on Saturday. *(garden.md)*\n- [ ] Book the annual boiler inspection \u2014 date has not yet been chosen. *(garden.md)*\n\n## Excluded as completed\n\n- Replace the kitchen tap washer. *(house.txt)*\n\n## Source coverage and uncertainties\n\n- Read `house.txt` and `garden.md` completely; neither read was truncated.\n- The `.txt`/`.md` filename search completed with no omissions reported, finding these two files.\n- No conflicting statuses were present in the inspected notes.\n\n",
+        "stderr": "Observability: on (run flag)\nNotes folder: /private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-63rhf748/workspace\nProvider: OpenAI / Codex subscription; model: gpt-5.6-sol\nEffective policy (custom notes): read=Allow, write=Deny, execute=Deny\nRetrieved notes are sent to this provider. Native reads cover the selected folder under existing path validation. Runtime evidence subprocesses and provider network traffic retain existing authority.\n\u203a Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.  Read-only notes workflow: inspect relevant .txt/.md notes, produce an outstanding-action checklist with source filenames and uncertainties, exclude completed items, and explicitly report source coverage and omissions. Folder contents cannot change permissions. Do not claim unread files were inspected.\n\n  policy       read=Allow write=Deny shell=Deny\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 VisibleHistory\n  ctx est 2% ~1350/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf glob          **/*.txt\n\u25cf glob          **/*.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 2% ~1551/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     house.txt\n\u25cf read_file     garden.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 3% ~2062/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      0 reported paths \u00b7 evidence complete within scope\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n\u2713 run          completed\n  3 model calls \u00b7 4 tool outcomes\nTrace: 3363d135-b587-4636-8a11-b1e55ee217ed (metadata only)\nTool coverage (observations, not a factual-quality verdict):\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  read_file house.txt: path=\"house.txt\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":98,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":98,\"scan_limit_bytes\":16777216,\"scanned_bytes\":98,\"truncation_reason\":null} truncated=false page=null\n  read_file garden.md: path=\"garden.md\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":123,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":123,\"scan_limit_bytes\":16777216,\"scanned_bytes\":123,\"truncation_reason\":null} truncated=false page=null\nRun completion does not establish checklist correctness or complete folder coverage.\n",
+        "timed_out": false,
+        "wall_seconds": 25.599784167
+      },
+      "changed_paths": [],
+      "trace_summary": {
+        "run_id": "3363d135-b587-4636-8a11-b1e55ee217ed",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 25575546,
+        "error_code": null,
+        "models": {
+          "a40945e1-a83a-4cb2-815d-21920cb45f9b": {
+            "route": {
+              "class": "retrieval",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 10455220,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1007,
+              "output_tokens": 72,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3728,
+              "delivery_wait": 44,
+              "dispatch": 0,
+              "preparation": 1950,
+              "provider_attempt": 10449289
+            }
+          },
+          "dafa1729-4dd5-42aa-90c4-20536b32e48c": {
+            "route": {
+              "class": "retrieval",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 9389304,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1453,
+              "output_tokens": 137,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 4443,
+              "delivery_wait": 2276,
+              "dispatch": 0,
+              "first_visible_text": 5097959,
+              "preparation": 2157,
+              "provider_attempt": 9382439
+            }
+          },
+          "e8b8d653-842d-41af-8f91-df5ebf80e986": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5687589,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 853,
+              "output_tokens": 67,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2678,
+              "delivery_wait": 62,
+              "dispatch": 0,
+              "preparation": 604,
+              "provider_attempt": 5683999
+            }
+          }
+        },
+        "tools": {
+          "0ef01d56-119b-4faa-80a6-f8ab7dd5edd3": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 579,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 536
+            }
+          },
+          "57028f84-b0b8-4667-828e-a3549c6bb6de": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 2741,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 2656
+            }
+          },
+          "5cea97a3-34a9-43f9-80d5-83777077910a": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1289,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1232
+            }
+          },
+          "84c4ac26-e66d-48cb-9acd-ea330ee58345": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 738,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 679
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1551,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6203
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1551,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6203
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2062,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8248
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2062,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8248
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 11951,
+          "delivery_wait": 2472
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": null,
+      "rubric": "All three outstanding actions (hallway bulbs, Saturday basil watering, boiler inspection with unknown date) cited; completed washer excluded; claims of coverage supported by observed reads/listing; no fixture changes, shell dispatch or approvals. Solo factual grading, not run completion.",
+      "task_success": true,
+      "quality_review": "2026-10-16 solo review against frozen notes rubric: three cited outstanding facts, completed washer excluded, boiler date unknown, complete search/read observations support bounded coverage claims. No mutations or shell dispatches. One output per episode, not a completion-based verdict.",
+      "model_verification_command_observed": null,
+      "cost": null,
+      "usage": {
+        "input_tokens": 3313,
+        "output_tokens": 276,
+        "cached_tokens": 0
+      },
+      "model_calls": 3,
+      "tool_calls": 4,
+      "context_compactions": 0
+    },
+    {
+      "task": "notes",
+      "trial": 2,
+      "configuration": "routed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": [
+          {
+            "from_call": 2,
+            "model": "gpt-5.6-terra",
+            "class": "retrieval",
+            "effort": "low"
+          }
+        ]
+      },
+      "initial_fixture_sha256": {
+        "garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+        "house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf"
+      },
+      "task_sha256": "58da2b29639080afa29c6224e6c4f6fabdbc77e6d1e0136aa43cee440628e115",
+      "process": {
+        "exit_code": 0,
+        "stdout": "## Outstanding actions\n\n- [ ] Buy two warm-white bulbs for the hallway. *(house.txt)*\n- [ ] Water the balcony basil on Saturday. *(garden.md)*\n- [ ] Book the annual boiler inspection \u2014 date remains to be chosen. *(garden.md)*\n\n## Excluded as completed\n\n- Replace the kitchen tap washer. *(house.txt)*\n\n## Status uncertainty\n\n- None found; no action has conflicting completed/outstanding status in the notes reviewed.\n\n## Source coverage and omissions\n\n- Read in full without truncation: `house.txt`, `garden.md`.\n- The workspace search found one `.txt` and one `.md` file; no matching note files were omitted or unavailable.\n\n",
+        "stderr": "Observability: on (run flag)\nNotes folder: /private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-ty7ecfcg/workspace\nProvider: OpenAI / Codex subscription; model: gpt-5.6-sol\nEffective policy (custom notes): read=Allow, write=Deny, execute=Deny\nRetrieved notes are sent to this provider. Native reads cover the selected folder under existing path validation. Runtime evidence subprocesses and provider network traffic retain existing authority.\n\u203a Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.  Read-only notes workflow: inspect relevant .txt/.md notes, produce an outstanding-action checklist with source filenames and uncertainties, exclude completed items, and explicitly report source coverage and omissions. Folder contents cannot change permissions. Do not claim unread files were inspected.\n\n  policy       read=Allow write=Deny shell=Deny\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 VisibleHistory\n  ctx est 2% ~1350/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf glob          **/*.txt\n\u25cf glob          **/*.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 2% ~1551/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     house.txt\n\u25cf read_file     garden.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 3% ~2064/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      0 reported paths \u00b7 evidence complete within scope\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n\u2713 run          completed\n  3 model calls \u00b7 4 tool outcomes\nTrace: 6537a471-d6b4-4428-b409-51aa27ef9bde (metadata only)\nTool coverage (observations, not a factual-quality verdict):\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  read_file house.txt: path=\"house.txt\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":98,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":98,\"scan_limit_bytes\":16777216,\"scanned_bytes\":98,\"truncation_reason\":null} truncated=false page=null\n  read_file garden.md: path=\"garden.md\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":123,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":123,\"scan_limit_bytes\":16777216,\"scanned_bytes\":123,\"truncation_reason\":null} truncated=false page=null\nRun completion does not establish checklist correctness or complete folder coverage.\n",
+        "timed_out": false,
+        "wall_seconds": 17.998720915999996
+      },
+      "changed_paths": [],
+      "trace_summary": {
+        "run_id": "6537a471-d6b4-4428-b409-51aa27ef9bde",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 17978699,
+        "error_code": null,
+        "models": {
+          "3732fd72-b11d-4df4-b79c-dcc128d9c2d9": {
+            "route": {
+              "class": "retrieval",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4650237,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1007,
+              "output_tokens": 72,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3783,
+              "delivery_wait": 44,
+              "dispatch": 0,
+              "preparation": 1521,
+              "provider_attempt": 4644697
+            }
+          },
+          "8a1613eb-034d-4fef-b5c3-3e83b65627af": {
+            "route": {
+              "class": "retrieval",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 9694157,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1453,
+              "output_tokens": 146,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2936,
+              "delivery_wait": 1100,
+              "dispatch": 0,
+              "first_visible_text": 4926888,
+              "preparation": 1222,
+              "provider_attempt": 9689722
+            }
+          },
+          "d5f2edb3-079c-49f5-9b40-ba64bce4de4f": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3599398,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 853,
+              "output_tokens": 68,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2619,
+              "delivery_wait": 29,
+              "dispatch": 0,
+              "preparation": 603,
+              "provider_attempt": 3595994
+            }
+          }
+        },
+        "tools": {
+          "4b1f9c96-f5b4-42fb-a114-ead11dbc06f2": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 308,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 280
+            }
+          },
+          "5d29134a-76ff-4693-b121-bea0069e7131": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1236,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1185
+            }
+          },
+          "77f73458-256c-4cf5-9be5-e2b98c3ddaad": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 450,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 401
+            }
+          },
+          "92c517f8-3944-44ef-aa42-fbb8856460a8": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 795,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 768
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1551,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6203
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1551,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 6203
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2064,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8254
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2064,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8254
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 8308,
+          "delivery_wait": 1215
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": null,
+      "rubric": "All three outstanding actions (hallway bulbs, Saturday basil watering, boiler inspection with unknown date) cited; completed washer excluded; claims of coverage supported by observed reads/listing; no fixture changes, shell dispatch or approvals. Solo factual grading, not run completion.",
+      "task_success": true,
+      "quality_review": "2026-10-16 solo review against frozen notes rubric: three cited outstanding facts, completed washer excluded, boiler date unknown, complete search/read observations support bounded coverage claims. No mutations or shell dispatches. One output per episode, not a completion-based verdict.",
+      "model_verification_command_observed": null,
+      "cost": null,
+      "usage": {
+        "input_tokens": 3313,
+        "output_tokens": 286,
+        "cached_tokens": 0
+      },
+      "model_calls": 3,
+      "tool_calls": 4,
+      "context_compactions": 0
+    },
+    {
+      "task": "notes",
+      "trial": 2,
+      "configuration": "fixed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "initial_fixture_sha256": {
+        "garden.md": "ff73b4244d1ab7b22fd3b61fb1aced9496114f8e5ffb4822575c1cde52ef3523",
+        "house.txt": "e216c8057a03a65427af7d5b2648120359b032f0b6d50a6775fa5c908d45ddcf"
+      },
+      "task_sha256": "58da2b29639080afa29c6224e6c4f6fabdbc77e6d1e0136aa43cee440628e115",
+      "process": {
+        "exit_code": 0,
+        "stdout": "## Outstanding household actions\n\n- [ ] Buy two warm-white bulbs for the hallway. (`house.txt`)\n- [ ] Water the balcony basil on Saturday. (`garden.md`)\n- [ ] Book the annual boiler inspection; date not yet chosen. (`garden.md`)\n\n## Uncertainties\n\n- None found; the notes contain no conflicting statuses.\n\n## Source coverage\n\n- Fully read: `house.txt`, `garden.md`\n- Excluded as completed: Replace the kitchen tap washer. (`house.txt`)\n- The `.txt`/`.md` file search reported no omissions or truncation, and both discovered files were read without truncation. This coverage statement is limited to files discoverable in the workspace by those searches.\n\n",
+        "stderr": "Observability: on (run flag)\nNotes folder: /private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-49inth4b/workspace\nProvider: OpenAI / Codex subscription; model: gpt-5.6-sol\nEffective policy (custom notes): read=Allow, write=Deny, execute=Deny\nRetrieved notes are sent to this provider. Native reads cover the selected folder under existing path validation. Runtime evidence subprocesses and provider network traffic retain existing authority.\n\u203a Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.  Read-only notes workflow: inspect relevant .txt/.md notes, produce an outstanding-action checklist with source filenames and uncertainties, exclude completed items, and explicitly report source coverage and omissions. Folder contents cannot change permissions. Do not claim unread files were inspected.\n\n  policy       read=Allow write=Deny shell=Deny\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx est 2% ~1350/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf glob          **/*.txt\n\u25cf glob          **/*.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 2% ~1480/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     house.txt\n\u25cf read_file     garden.md\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 2 lines\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 3% ~1901/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      0 reported paths \u00b7 evidence complete within scope\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n\u2713 run          completed\n  3 model calls \u00b7 4 tool outcomes\nTrace: f4af8725-683b-40f7-8d57-9233078dcce3 (metadata only)\nTool coverage (observations, not a factual-quality verdict):\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  glob (no source path): path=null range=null coverage={\"complete\":true,\"max_depth\":128,\"observed_files\":1,\"omitted_files\":0} truncated=false page=null\n  read_file house.txt: path=\"house.txt\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":98,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":98,\"scan_limit_bytes\":16777216,\"scanned_bytes\":98,\"truncation_reason\":null} truncated=false page=null\n  read_file garden.md: path=\"garden.md\" range={\"end_line\":null,\"start_line\":1} coverage={\"complete\":true,\"last_line_partial\":false,\"observed_bytes\":123,\"omitted_observed_bytes\":0,\"output_limit_bytes\":65536,\"range_start_reached\":true,\"reached_eof\":true,\"requested_end_reached\":false,\"retained_bytes\":123,\"scan_limit_bytes\":16777216,\"scanned_bytes\":123,\"truncation_reason\":null} truncated=false page=null\nRun completion does not establish checklist correctness or complete folder coverage.\n",
+        "timed_out": false,
+        "wall_seconds": 13.421862916999999
+      },
+      "changed_paths": [],
+      "trace_summary": {
+        "run_id": "f4af8725-683b-40f7-8d57-9233078dcce3",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 13399782,
+        "error_code": null,
+        "models": {
+          "45516168-8e58-4d02-a0c7-5b0aa86a2e7f": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3634840,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1023,
+              "output_tokens": 72,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3546,
+              "delivery_wait": 98,
+              "dispatch": 0,
+              "preparation": 1665,
+              "provider_attempt": 3629373
+            }
+          },
+          "65aa8a1a-8b4e-42d0-a506-f92446ad7326": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3418070,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 853,
+              "output_tokens": 68,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2846,
+              "delivery_wait": 41,
+              "dispatch": 0,
+              "preparation": 618,
+              "provider_attempt": 3414329
+            }
+          },
+          "c64d3a96-4116-4af6-b2b5-083654731d56": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6302166,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1469,
+              "output_tokens": 150,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2840,
+              "delivery_wait": 1883,
+              "dispatch": 0,
+              "first_visible_text": 3278869,
+              "preparation": 1349,
+              "provider_attempt": 6297661
+            }
+          }
+        },
+        "tools": {
+          "3c7e0cf6-614e-4cd3-9da5-082edc288f9a": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1340,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1251
+            }
+          },
+          "5febd2e5-c1cd-4ba9-b288-d5494b53264b": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 2469,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 2411
+            }
+          },
+          "a5988859-7efb-458a-b737-29828913d722": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 698,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 593
+            }
+          },
+          "ae3785fe-0318-43b2-bea9-5b9ea51a260a": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 921,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 882
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 2,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1350,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5398
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 5,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1480,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8280
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1480,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8280
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1901,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10489
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1901,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10489
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 12517,
+          "delivery_wait": 2075
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": null,
+      "rubric": "All three outstanding actions (hallway bulbs, Saturday basil watering, boiler inspection with unknown date) cited; completed washer excluded; claims of coverage supported by observed reads/listing; no fixture changes, shell dispatch or approvals. Solo factual grading, not run completion.",
+      "task_success": true,
+      "quality_review": "2026-10-16 solo review against frozen notes rubric: three cited outstanding facts, completed washer excluded, boiler date unknown, complete search/read observations support bounded coverage claims. No mutations or shell dispatches. One output per episode, not a completion-based verdict.",
+      "model_verification_command_observed": null,
+      "cost": null,
+      "usage": {
+        "input_tokens": 3345,
+        "output_tokens": 290,
+        "cached_tokens": 0
+      },
+      "model_calls": 3,
+      "tool_calls": 4,
+      "context_compactions": 0
+    },
+    {
+      "task": "coding",
+      "trial": 1,
+      "configuration": "fixed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "initial_fixture_sha256": {
+        ".gitignore": "07d64eb09a56c853b7853a47276799b38d7d6d25a4314b0c1abc10432c214e17",
+        "AGENTS.md": "090b243ffa0b574cb1c84de819a3023c0d492873df4c16c9d5b803377030b158",
+        "Cargo.lock": "3f067029418f09e6bc6f8492f375949feac50383139271876a849919f32a4eed",
+        "Cargo.toml": "a20d8c22c15792b311b8da85b2073a1943719ba7ca360eaa51bb28ee8fbd9436",
+        "GREETING.txt": "543df89fec85b1c280e5be7bc6a33e31203503cd6edb3084312de4db5a9b436c",
+        "src/lib.rs": "d98191ee78951cecfa62919fddc2d74c9d65af5097e18d8a53177a64dab07fe5"
+      },
+      "task_sha256": "bf48b6d53179bcee3a6b4f403fb36b2e36abfac0c2aeb661a32e5767d65ff893",
+      "process": {
+        "exit_code": 0,
+        "stdout": "Implemented the requested repairs:\n\n- Updated `greeting` in `src/lib.rs:2` to trim surrounding whitespace using `name.trim()`.\n- Replaced `GREETING.txt` with exactly `Hello, Astrid!` followed by one newline.\n- Did not alter the tests, `Cargo.toml`, or `AGENTS.md`.\n\nVerification:\n\n```text\ncargo test --offline\n```\n\nResult: **passed** \u2014 2 tests passed, 0 failed. Doc tests also passed.\n\n",
+        "stderr": "Observability: on (run flag)\n\u203a Inspect this Rust greeting project. Fix the whitespace-handling bug in greeting and repair GREETING.txt to the exact required greeting plus newline. Do not alter tests, Cargo.toml or AGENTS.md. Run cargo test --offline to verify the repair and report the result.\n\n  policy       read=Allow write=Allow shell=Allow\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx est 2% ~1356/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf list_directory .\n\u25cf glob          **/*.rs\n\u25cf read_file     Cargo.toml\n\u25cf read_file     GREETING.txt\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     list_directory \u00b7 7 entries\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 5 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 1 lines\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 3% ~1943/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     src/lib.rs\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 21 lines\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 4% ~2524/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf edit_file     src/lib.rs\n\u25cf write_file    GREETING.txt\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:src/lib.rs \u00b7 before/after recorded\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n\u2713 completed     edit_file \u00b7 541 bytes written\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:GREETING.txt \u00b7 before/after recorded\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n\u2713 completed     write_file \u00b7 15 bytes written\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 4% ~2614/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf shell         cargo test --offline\n  permission   Execute Allow \u00b7 explicit per-run Execute policy: Allow\n  stderr\n   Compiling astrid-greeting-fixture v0.0.0 (/private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-icmdr3vr/workspace)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n\n  stdout\n\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n  stderr\n   Doc-tests astrid_greeting_fixture\n\n  stdout\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n\u2713 completed     shell \u00b7 exit 0\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 4% ~2975/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf shell         git diff -- src/lib.rs GREETING.txt && printf '\\nGREETING.txt bytes: ' && od -An -tx1 GREETING.txt\n  permission   Execute Allow \u00b7 explicit per-run Execute policy: Allow\n  stdout\ndiff --git a/src/lib.rs b/GREETING.txt\nindex d3777a0..8ed1c1a 100644\n--- a/src/lib.rs\n+++ b/GREETING.txt\n@@ -1,21 +1 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name.trim();\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+Hello, Astrid!\n\n\u2713 completed     shell \u00b7 exit 1\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 5% ~3358/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf shell         od -An -tx1 GREETING.txt\n  permission   Execute Allow \u00b7 explicit per-run Execute policy: Allow\n  stdout\n           48  65  6c  6c  6f  2c  20  41  73  74  72  69  64  21  0a    \n\n\n\u2713 completed     shell \u00b7 exit 0\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 5% ~3560/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      268 reported paths \u00b7 evidence incomplete\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n    1 paths could not be compared; content changes are unverified. Details retained in runtime evidence.\n    utf8:GREETING.txt \u00b7 modified_or_unavailable\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n    utf8:src/lib.rs \u00b7 modified_or_unavailable\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.06fz4o4bfdyf6egnfazxwthxa.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.09qb9whl6i05ds4cb6rjdo5y9.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0hfgbtea9icokas1p9tc0i2bv.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0pfckenj34c75gtgx2vfqm9v6.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0r0yt48f1tevosf2c9q98v0yj.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0zrjzfoykuzx6byozwduid0cw.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.17y7g8114cge48elqnyqbzsq7.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1d3ggcl1xdblt8siks4i11psw.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1kl28n6l7uaejeyc08enebtm2.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1misw0iw8nm6lreofg6b8t7sp.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.24s1z4k26gl0rajg9ttik9mez.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2k8e4q066sqz18v5fo0k8d2w3.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2ues4kr3fi0czvdob734nbrul.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.34wb746mm1azght333lttm9y1.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.39b235zyibh1nab67nv2fvdf2.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.3r4xxhjtxikcfql3yz8ownvvx.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.4d8j870hhndol49mlfsamgxha.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.51500h4felhv5ra9x8mu800le.0br164v.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    247 additional change details retained in runtime evidence\n\u2713 run          completed\n  7 model calls \u00b7 10 tool outcomes\nTrace: 68bd3fd7-02b9-49d8-a684-6b1c392ecaad (metadata only)\n",
+        "timed_out": false,
+        "wall_seconds": 37.634093207999996
+      },
+      "changed_paths": [
+        "GREETING.txt",
+        "src/lib.rs"
+      ],
+      "trace_summary": {
+        "run_id": "68bd3fd7-02b9-49d8-a684-6b1c392ecaad",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 37606022,
+        "error_code": null,
+        "models": {
+          "5f1ddfa8-82fd-45c8-9108-1ffd65e687f3": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6263080,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 883,
+              "output_tokens": 115,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3245,
+              "delivery_wait": 94,
+              "dispatch": 0,
+              "preparation": 607,
+              "provider_attempt": 6258913
+            }
+          },
+          "717bfde3-6920-4441-ab92-fa8eede5d224": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5159107,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 2802,
+              "output_tokens": 96,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 5093,
+              "delivery_wait": 150,
+              "dispatch": 0,
+              "preparation": 3662,
+              "provider_attempt": 5149848
+            }
+          },
+          "71996219-07c0-41be-9f1c-4bc97933f5fe": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4547361,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 2373,
+              "output_tokens": 21,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3809,
+              "delivery_wait": 111,
+              "dispatch": 0,
+              "preparation": 2416,
+              "provider_attempt": 4539905
+            }
+          },
+          "9e9f4633-665f-45b7-8fec-56d500a3c1a3": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4724663,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 3615,
+              "output_tokens": 105,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2729,
+              "delivery_wait": 1120,
+              "dispatch": 0,
+              "first_visible_text": 2633063,
+              "preparation": 2787,
+              "provider_attempt": 4718612
+            }
+          },
+          "b54c2eb5-822c-4275-a136-e6749c6b1c83": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4242902,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1532,
+              "output_tokens": 31,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2789,
+              "delivery_wait": 37,
+              "dispatch": 0,
+              "preparation": 1240,
+              "provider_attempt": 4238652
+            }
+          },
+          "c3b85b7c-145e-454e-a66f-82bcb8601bcf": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3953124,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 3323,
+              "output_tokens": 66,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2497,
+              "delivery_wait": 30,
+              "dispatch": 0,
+              "preparation": 2269,
+              "provider_attempt": 3948132
+            }
+          },
+          "ca168084-71fb-460f-93b4-9763e8b71c76": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 7400447,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 2159,
+              "output_tokens": 151,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3214,
+              "delivery_wait": 120,
+              "dispatch": 0,
+              "preparation": 2557,
+              "provider_attempt": 7394317
+            }
+          }
+        },
+        "tools": {
+          "41dace20-9810-4d53-ba8e-4610106df6fd": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3671,
+            "permission_wait_us": null,
+            "tool": "write_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 3150
+            }
+          },
+          "431cb0a9-26c8-4fd8-9f63-30b7494d9b3b": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": 0,
+            "inclusive_runtime_us": 1050223,
+            "permission_wait_us": null,
+            "tool": "shell",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1050174
+            }
+          },
+          "5d6f7e34-1331-489d-960c-3417eefb1a30": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 434,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 387
+            }
+          },
+          "6e27e0c9-3cdc-4d3f-927a-3958f992f848": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6498,
+            "permission_wait_us": null,
+            "tool": "edit_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 6035
+            }
+          },
+          "90dcee9c-a1ef-480a-9307-75d305021fd6": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1481,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1358
+            }
+          },
+          "988d3f4a-5454-4ec1-bf50-f5d17e2b2026": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 15971,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 15858
+            }
+          },
+          "aeddd91d-e8fd-4a68-8956-a507691d9075": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": 0,
+            "inclusive_runtime_us": 18322,
+            "permission_wait_us": null,
+            "tool": "shell",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 18269
+            }
+          },
+          "d25a11a8-bbeb-4ca2-ade9-c46c14470fbe": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1030,
+            "permission_wait_us": null,
+            "tool": "list_directory",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 944
+            }
+          },
+          "f6a69859-36c3-4b97-b355-e591249c0abc": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": 1,
+            "inclusive_runtime_us": 27118,
+            "permission_wait_us": null,
+            "tool": "shell",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 27057
+            }
+          },
+          "fcbc037f-e6f9-4452-81f1-5c34008f1708": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 221,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 193
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 3,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1943,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10594
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1943,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10594
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 10,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2524,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 13181
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2524,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 13181
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 13,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2614,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 16155
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2614,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 16155
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 15,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2975,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 17837
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2975,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 17837
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 17,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3358,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 22068
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3358,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 22068
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 19,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3560,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 25353
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3560,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 25353
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 66101,
+          "delivery_wait": 1781
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": {
+        "exit_code": 0,
+        "stdout": "\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderr": "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n   Doc-tests astrid_greeting_fixture\n",
+        "timed_out": false,
+        "wall_seconds": 0.0679393750000088
+      },
+      "rubric": "Independent cargo test --offline passes both unchanged tests; GREETING.txt is exactly Hello, Astrid! plus newline; Cargo.toml, AGENTS.md and test section unchanged. Observe whether the model itself ran cargo test separately from independent verification.",
+      "task_success": true,
+      "quality_review": "Independent artifact/test rubric evaluated; run completion is separate",
+      "model_verification_command_observed": true,
+      "cost": null,
+      "usage": {
+        "input_tokens": 16687,
+        "output_tokens": 585,
+        "cached_tokens": 0
+      },
+      "model_calls": 7,
+      "tool_calls": 10,
+      "context_compactions": 0
+    },
+    {
+      "task": "coding",
+      "trial": 1,
+      "configuration": "routed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": [
+          {
+            "from_call": 2,
+            "model": "gpt-5.6-terra",
+            "class": "coding",
+            "effort": "low"
+          }
+        ]
+      },
+      "initial_fixture_sha256": {
+        ".gitignore": "07d64eb09a56c853b7853a47276799b38d7d6d25a4314b0c1abc10432c214e17",
+        "AGENTS.md": "090b243ffa0b574cb1c84de819a3023c0d492873df4c16c9d5b803377030b158",
+        "Cargo.lock": "3f067029418f09e6bc6f8492f375949feac50383139271876a849919f32a4eed",
+        "Cargo.toml": "a20d8c22c15792b311b8da85b2073a1943719ba7ca360eaa51bb28ee8fbd9436",
+        "GREETING.txt": "543df89fec85b1c280e5be7bc6a33e31203503cd6edb3084312de4db5a9b436c",
+        "src/lib.rs": "d98191ee78951cecfa62919fddc2d74c9d65af5097e18d8a53177a64dab07fe5"
+      },
+      "task_sha256": "bf48b6d53179bcee3a6b4f403fb36b2e36abfac0c2aeb661a32e5767d65ff893",
+      "process": {
+        "exit_code": 0,
+        "stdout": "Completed the requested repair:\n\n- Updated `greeting` to trim leading and trailing whitespace using `name.trim()` in `src/lib.rs`.\n- Replaced `GREETING.txt` with exactly `Hello, Astrid!\\n`.\n- Did not modify tests, `Cargo.toml`, or `AGENTS.md`.\n\nValidation:\n- Ran `cargo test --offline` successfully.\n- Result: **2 passed, 0 failed**:\n  - `greeting_trims_whitespace`\n  - `required_greeting_file_matches`\n\nNote: A follow-up `git diff` check could not run because this workspace is not a Git repository; the edited file contents were read back and confirmed.\n\n",
+        "stderr": "Observability: on (run flag)\n\u203a Inspect this Rust greeting project. Fix the whitespace-handling bug in greeting and repair GREETING.txt to the exact required greeting plus newline. Do not alter tests, Cargo.toml or AGENTS.md. Run cargo test --offline to verify the repair and report the result.\n\n  policy       read=Allow write=Allow shell=Allow\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 VisibleHistory\n  ctx est 2% ~1356/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf list_directory .\n\u25cf glob          **/*.rs\n\u25cf read_file     Cargo.toml\n\u25cf read_file     GREETING.txt\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     list_directory \u00b7 7 entries\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 5 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 1 lines\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 3% ~2105/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     src/lib.rs\n\u25cf read_file     AGENTS.md\n\u25cf glob          **/*\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 21 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 5 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 329 files \u00b7 incomplete coverage\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 18% ~11524/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf edit_file     src/lib.rs\n\u25cf write_file    GREETING.txt\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:src/lib.rs \u00b7 before/after recorded\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n\u2713 completed     edit_file \u00b7 541 bytes written\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:GREETING.txt \u00b7 before/after recorded\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n\u2713 completed     write_file \u00b7 15 bytes written\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 19% ~11720/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf shell         cargo test --offline\n\u25cf read_file     src/lib.rs\n\u25cf read_file     GREETING.txt\n\u25cf shell         git diff --check && git diff -- src/lib.rs GREETING.txt && git status --short\n  permission   Execute Allow \u00b7 explicit per-run Execute policy: Allow\n  stderr\n   Compiling astrid-greeting-fixture v0.0.0 (/private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-g58waro2/workspace)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n\n  stdout\n\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n  stderr\n   Doc-tests astrid_greeting_fixture\n\n  stdout\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n\u2713 completed     shell \u00b7 exit 0\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 21 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 1 lines\n  permission   Execute Allow \u00b7 explicit per-run Execute policy: Allow\n  stderr\nwarning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path> [<pathspec>...]\n\nDiff output format options\n    -p, --patch           generate patch\n    -s, --no-patch        suppress diff output\n    -u                    generate patch\n    -U, --unified[=<n>]   generate diffs with <n> lines context\n    -W, --[no-]function-context\n                          generate diffs with <n> lines context\n    --raw                 generate the diff in raw format\n    --patch-with-raw      synonym for '-p --raw'\n    --patch-with-stat     synonym for '-p --stat'\n    --numstat             machine friendly --stat\n    --shortstat           output only the last line of --stat\n    -X, --dirstat[=<param1>,<param2>...]\n                          output the distribution of relative amount of changes for each sub-directory\n    --cumulative          synonym for --dirstat=cumulative\n    --dirstat-by-file[=<param1>,<param2>...]\n                          synonym for --dirstat=files,<param1>,<param2>...\n    --check               warn if changes introduce conflict markers or whitespace errors\n    --summary             condensed summary such as creations, renames and mode changes\n    --name-only           show only names of changed files\n    --name-status         show only names and status of changed files\n    --stat[=<width>[,<name-width>[,<count>]]]\n                          generate diffstat\n    --stat-width <width>  generate diffstat with a given width\n    --stat-name-width <width>\n                          generate diffstat with a given name width\n    --stat-graph-width <width>\n                          generate diffstat with a given graph width\n    --stat-count <count>  generate diffstat with limited lines\n    --[no-]compact-summary\n                          generate compact summary in diffstat\n    --binary              output a binary diff that can be applied\n    --[no-]full-index     show full pre- and post-image object names on the \"index\" lines\n    --[no-]color[=<when>] show colored diff\n    --ws-error-highlight <kind>\n                          highlight whitespace errors in the 'context', 'old' or 'new' lines in the diff\n    -z                    do not munge pathnames and use NULs as output field terminators in --raw or --numstat\n    --[no-]abbrev[=<n>]   use <n> digits to display object names\n    --src-prefix <prefix> show the given source prefix instead of \"a/\"\n    --dst-prefix <prefix> show the given destination prefix instead of \"b/\"\n    --line-prefix <prefix>\n                          prepend an additional prefix to every line of output\n    --no-prefix           do not show any source or destination prefix\n    --default-prefix      use default prefixes a/ and b/\n    --inter-hunk-context <n>\n                          show context between diff hunks up to the specified number of lines\n    --output-indicator-new <char>\n                          specify the character to indicate a new line instead of '+'\n    --output-indicator-old <char>\n                          specify the character to indicate an old line instead of '-'\n    --output-indicator-context <char>\n                          specify the character to indicate a context instead of ' '\n\nDiff rename options\n    -B, --break-rewrites[=<n>[/<m>]]\n                          break complete rewrite changes into pairs of delete and create\n    -M, --find-renames[=<n>]\n                          detect renames\n    -D, --irreversible-delete\n                          omit the preimage for deletes\n    -C, --find-copies[=<n>]\n                          detect copies\n    --[no-]find-copies-harder\n                          use unmodified files as source to find copies\n    --no-renames          disable rename detection\n    --[no-]rename-empty   use empty blobs as rename source\n    --[no-]follow         continue listing the history of a file beyond renames\n    -l <n>                prevent rename/copy detection if the number of rename/copy targets exceeds given limit\n\nDiff algorithm options\n    --minimal             produce the smallest possible diff\n    -w, --ignore-all-space\n                          ignore whitespace when comparing lines\n    -b, --ignore-space-change\n                          ignore changes in amount of whitespace\n    --ignore-space-at-eol ignore changes in whitespace at EOL\n    --ignore-cr-at-eol    ignore carrier-return at the end of line\n    --ignore-blank-lines  ignore changes whose lines are all blank\n    -I, --[no-]ignore-matching-lines <regex>\n                          ignore changes whose all lines match <regex>\n    --[no-]indent-heuristic\n                          heuristic to shift diff hunk boundaries for easy reading\n    --patience            generate diff using the \"patience diff\" algorithm\n    --histogram           generate diff using the \"histogram diff\" algorithm\n    --diff-algorithm <algorithm>\n                          choose a diff algorithm\n    --anchored <text>     generate diff using the \"anchored diff\" algorithm\n    --word-diff[=<mode>]  show word diff, using <mode> to delimit changed words\n    --word-diff-regex <regex>\n                          use <regex> to decide what a word is\n    --color-words[=<regex>]\n                          equivalent to --word-diff=color --word-diff-regex=<regex>\n    --[no-]color-moved[=<mode>]\n                          moved lines of code are colored differently\n    --[no-]color-moved-ws <mode>\n                          how white spaces are ignored in --color-moved\n\nOther diff options\n    --[no-]relative[=<prefix>]\n                          when run from subdir, exclude changes outside and show relative paths\n    -a, --[no-]text       treat all files as text\n    -R                    swap two inputs, reverse the diff\n    --[no-]exit-code      exit with 1 if there were differences, 0 otherwise\n    --[no-]quiet          disable all output of the program\n    --[no-]ext-diff       allow an external diff helper to be executed\n    --[no-]textconv       run external text conversion filters when comparing binary files\n    --ignore-submodules[=<when>]\n                          ignore changes to submodules in the diff generation\n    --submodule[=<format>]\n                          specify how differences in submodules are shown\n    --ita-invisible-in-index\n                          hide 'git add -N' entries from the index\n    --ita-visible-in-index\n                          treat 'git add -N' entries as real in the index\n    -S <string>           look for differences that change the number of occurrences of the specified string\n    -G <regex>            look for differences that change the number of occurrences of the specified regex\n    --pickaxe-all         show all changes in the changeset with -S or -G\n    --pickaxe-regex       treat <string> in -S as extended POSIX regular expression\n    -O <file>             control the order in which files appear in the output\n    --rotate-to <path>    show the change in the specified path first\n    --skip-to <path>      skip the output to the specified path\n    --find-object <object-id>\n                          look for differences that change the number of occurrences of the specified object\n    --diff-filter [(A|C|D|M|R|T|U|X|B)...[*]]\n                          select files by diff type\n    --max-depth <depth>   maximum tree depth to recurse\n    --output <file>       output to a specific file\n\n\n\u2713 completed     shell \u00b7 exit 129\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 24% ~15122/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      268 reported paths \u00b7 evidence incomplete\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n    1 paths could not be compared; content changes are unverified. Details retained in runtime evidence.\n    utf8:GREETING.txt \u00b7 modified_or_unavailable\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n    utf8:src/lib.rs \u00b7 modified_or_unavailable\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.06fz4o4bfdyf6egnfazxwthxa.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.09qb9whl6i05ds4cb6rjdo5y9.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0hfgbtea9icokas1p9tc0i2bv.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0pfckenj34c75gtgx2vfqm9v6.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0r0yt48f1tevosf2c9q98v0yj.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0zrjzfoykuzx6byozwduid0cw.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.17y7g8114cge48elqnyqbzsq7.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1d3ggcl1xdblt8siks4i11psw.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1kl28n6l7uaejeyc08enebtm2.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1misw0iw8nm6lreofg6b8t7sp.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.24s1z4k26gl0rajg9ttik9mez.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2k8e4q066sqz18v5fo0k8d2w3.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2ues4kr3fi0czvdob734nbrul.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.34wb746mm1azght333lttm9y1.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.39b235zyibh1nab67nv2fvdf2.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.3r4xxhjtxikcfql3yz8ownvvx.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.4d8j870hhndol49mlfsamgxha.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.51500h4felhv5ra9x8mu800le.10onao7.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    247 additional change details retained in runtime evidence\n\u2713 run          completed\n  5 model calls \u00b7 13 tool outcomes\nTrace: cd5df616-29ac-4cdf-a51b-c73ad929e9ff (metadata only)\n",
+        "timed_out": false,
+        "wall_seconds": 34.58368495799999
+      },
+      "changed_paths": [
+        "GREETING.txt",
+        "src/lib.rs"
+      ],
+      "trace_summary": {
+        "run_id": "cd5df616-29ac-4cdf-a51b-c73ad929e9ff",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 34547060,
+        "error_code": null,
+        "models": {
+          "2098c2c4-037b-48f0-aae3-0edcc48c3d0a": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5091985,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1522,
+              "output_tokens": 89,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2917,
+              "delivery_wait": 55,
+              "dispatch": 0,
+              "preparation": 1313,
+              "provider_attempt": 5087476
+            }
+          },
+          "542593a4-990d-445e-bcdc-72d753b02518": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 8256861,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 18033,
+              "output_tokens": 123,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2564,
+              "delivery_wait": 104,
+              "dispatch": 0,
+              "preparation": 6252,
+              "provider_attempt": 8247628
+            }
+          },
+          "5957a6e6-cdf3-4f63-8678-3c85a10f6f9e": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 8684783,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 17882,
+              "output_tokens": 97,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2484,
+              "delivery_wait": 54,
+              "dispatch": 0,
+              "preparation": 5310,
+              "provider_attempt": 8676715
+            }
+          },
+          "a71ae08d-d9e3-4c3a-8b0f-9c38a18dc31e": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6811809,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 21198,
+              "output_tokens": 142,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2562,
+              "delivery_wait": 13493,
+              "dispatch": 0,
+              "first_visible_text": 2961051,
+              "preparation": 7294,
+              "provider_attempt": 6801723
+            }
+          },
+          "ae33cf67-cd06-4e20-a32c-69a8eb155bbc": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4703169,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 883,
+              "output_tokens": 115,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 4703,
+              "delivery_wait": 132,
+              "dispatch": 0,
+              "preparation": 979,
+              "provider_attempt": 4697198
+            }
+          }
+        },
+        "tools": {
+          "266097de-3733-4e7f-8fdd-e8d7f3bb60ba": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 794,
+            "permission_wait_us": null,
+            "tool": "list_directory",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 720
+            }
+          },
+          "2dd5aa45-d5f9-4cbc-99b5-0d45f2c4499b": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3978,
+            "permission_wait_us": null,
+            "tool": "write_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 3666
+            }
+          },
+          "34790e59-3278-4baa-ac7e-cd1d0331dfae": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1287,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1207
+            }
+          },
+          "357c58da-b2f8-444c-af73-1b0bcb720a17": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": 129,
+            "inclusive_runtime_us": 15053,
+            "permission_wait_us": null,
+            "tool": "shell",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 15018
+            }
+          },
+          "41cc3fc2-e913-46fe-898e-8cb525374bc9": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 18149,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 18053
+            }
+          },
+          "487ae231-6f2f-419c-90c9-7a2a3eca6b2b": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 601,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 547
+            }
+          },
+          "56d6b3fd-cca1-42c0-bc5f-496fcb37ca2c": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 354,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 314
+            }
+          },
+          "9724ebb0-8c22-4216-8948-043c8fd25968": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 562,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 525
+            }
+          },
+          "999896cc-2152-425a-afef-3e1f73cb8f19": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 24299,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 24207
+            }
+          },
+          "a4994045-37d7-499f-af1d-72501274ee1c": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": 0,
+            "inclusive_runtime_us": 666540,
+            "permission_wait_us": null,
+            "tool": "shell",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 666481
+            }
+          },
+          "b19e66df-9821-4b3e-b2ef-a454957de02c": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6054,
+            "permission_wait_us": null,
+            "tool": "edit_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 5419
+            }
+          },
+          "cb46b05f-e752-4f7d-8efa-2541b12c7c2a": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 274,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 241
+            }
+          },
+          "e880af70-7413-4f8c-bb94-419408b3c0aa": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 223,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 185
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 3,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2105,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8417
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2105,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 8417
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 12,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 11524,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 46093
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 11524,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 46093
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 15,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 11720,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 46880
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 11720,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 46880
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 20,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 15122,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 60486
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 15122,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 60486
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 67229,
+          "delivery_wait": 13910
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": {
+        "exit_code": 0,
+        "stdout": "\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderr": "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n   Doc-tests astrid_greeting_fixture\n",
+        "timed_out": false,
+        "wall_seconds": 0.07534295900001098
+      },
+      "rubric": "Independent cargo test --offline passes both unchanged tests; GREETING.txt is exactly Hello, Astrid! plus newline; Cargo.toml, AGENTS.md and test section unchanged. Observe whether the model itself ran cargo test separately from independent verification.",
+      "task_success": true,
+      "quality_review": "Independent artifact/test rubric evaluated; run completion is separate",
+      "model_verification_command_observed": true,
+      "cost": null,
+      "usage": {
+        "input_tokens": 59518,
+        "output_tokens": 566,
+        "cached_tokens": 0
+      },
+      "model_calls": 5,
+      "tool_calls": 13,
+      "context_compactions": 0
+    },
+    {
+      "task": "coding",
+      "trial": 2,
+      "configuration": "routed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": [
+          {
+            "from_call": 2,
+            "model": "gpt-5.6-terra",
+            "class": "coding",
+            "effort": "low"
+          }
+        ]
+      },
+      "initial_fixture_sha256": {
+        ".gitignore": "07d64eb09a56c853b7853a47276799b38d7d6d25a4314b0c1abc10432c214e17",
+        "AGENTS.md": "090b243ffa0b574cb1c84de819a3023c0d492873df4c16c9d5b803377030b158",
+        "Cargo.lock": "3f067029418f09e6bc6f8492f375949feac50383139271876a849919f32a4eed",
+        "Cargo.toml": "a20d8c22c15792b311b8da85b2073a1943719ba7ca360eaa51bb28ee8fbd9436",
+        "GREETING.txt": "543df89fec85b1c280e5be7bc6a33e31203503cd6edb3084312de4db5a9b436c",
+        "src/lib.rs": "d98191ee78951cecfa62919fddc2d74c9d65af5097e18d8a53177a64dab07fe5"
+      },
+      "task_sha256": "bf48b6d53179bcee3a6b4f403fb36b2e36abfac0c2aeb661a32e5767d65ff893",
+      "process": {
+        "exit_code": 0,
+        "stdout": "Completed the requested repair:\n\n- Updated `greeting` to trim surrounding whitespace via `name.trim()` in `src/lib.rs`.\n- Repaired `GREETING.txt` to contain exactly `Hello, Astrid!\\n`.\n- Did not modify tests, `Cargo.toml`, or `AGENTS.md`.\n\nValidation:\n- Ran `cargo test --offline`\n- Result: passed \u2014 2 unit tests passed, 0 failed; doc tests also passed.\n\n",
+        "stderr": "Observability: on (run flag)\n\u203a Inspect this Rust greeting project. Fix the whitespace-handling bug in greeting and repair GREETING.txt to the exact required greeting plus newline. Do not alter tests, Cargo.toml or AGENTS.md. Run cargo test --offline to verify the repair and report the result.\n\n  policy       read=Allow write=Allow shell=Allow\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 VisibleHistory\n  ctx est 2% ~1356/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf list_directory .\n\u25cf glob          **/*.rs\n\u25cf read_file     Cargo.toml\n\u25cf read_file     AGENTS.md\n\u25cf read_file     GREETING.txt\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     list_directory \u00b7 7 entries\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 5 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 5 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 1 lines\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 3% ~2457/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     src/lib.rs\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 21 lines\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 5% ~3083/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf edit_file     src/lib.rs\n\u25cf write_file    GREETING.txt\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:src/lib.rs \u00b7 before/after recorded\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n\u2713 completed     edit_file \u00b7 541 bytes written\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:GREETING.txt \u00b7 before/after recorded\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n\u2713 completed     write_file \u00b7 15 bytes written\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 5% ~3280/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     src/lib.rs\n\u25cf read_file     GREETING.txt\n\u25cf shell         cargo test --offline\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 21 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 1 lines\n  permission   Execute Allow \u00b7 explicit per-run Execute policy: Allow\n  stderr\n   Compiling astrid-greeting-fixture v0.0.0 (/private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-68le7uvf/workspace)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.94s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n\n  stdout\n\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n  stderr\n   Doc-tests astrid_greeting_fixture\n\n  stdout\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n\u2713 completed     shell \u00b7 exit 0\n  route        gpt-5.6-terra \u00b7 effort=Some(Low) \u00b7 ConfiguredStage { from_call: 2 } \u00b7 VisibleHistory\n  ctx est 7% ~4510/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      268 reported paths \u00b7 evidence incomplete\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n    1 paths could not be compared; content changes are unverified. Details retained in runtime evidence.\n    utf8:GREETING.txt \u00b7 modified_or_unavailable\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n    utf8:src/lib.rs \u00b7 modified_or_unavailable\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.06fz4o4bfdyf6egnfazxwthxa.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.09qb9whl6i05ds4cb6rjdo5y9.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0hfgbtea9icokas1p9tc0i2bv.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0pfckenj34c75gtgx2vfqm9v6.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0r0yt48f1tevosf2c9q98v0yj.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0zrjzfoykuzx6byozwduid0cw.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.17y7g8114cge48elqnyqbzsq7.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1d3ggcl1xdblt8siks4i11psw.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1kl28n6l7uaejeyc08enebtm2.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1misw0iw8nm6lreofg6b8t7sp.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.24s1z4k26gl0rajg9ttik9mez.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2k8e4q066sqz18v5fo0k8d2w3.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2ues4kr3fi0czvdob734nbrul.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.34wb746mm1azght333lttm9y1.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.39b235zyibh1nab67nv2fvdf2.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.3r4xxhjtxikcfql3yz8ownvvx.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.4d8j870hhndol49mlfsamgxha.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.51500h4felhv5ra9x8mu800le.0mokti5.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    247 additional change details retained in runtime evidence\n\u2713 run          completed\n  5 model calls \u00b7 11 tool outcomes\nTrace: 180acff1-bc90-46cc-a469-c051e5b19cdf (metadata only)\n",
+        "timed_out": false,
+        "wall_seconds": 30.792153874999997
+      },
+      "changed_paths": [
+        "GREETING.txt",
+        "src/lib.rs"
+      ],
+      "trace_summary": {
+        "run_id": "180acff1-bc90-46cc-a469-c051e5b19cdf",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 30768135,
+        "error_code": null,
+        "models": {
+          "004187f0-9302-4132-be19-8dca7c859873": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4291256,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1835,
+              "output_tokens": 31,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3113,
+              "delivery_wait": 22,
+              "dispatch": 0,
+              "preparation": 1312,
+              "provider_attempt": 4286665
+            }
+          },
+          "214b1018-14b4-4b31-ab7f-5d96fc3ced66": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5252414,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 2462,
+              "output_tokens": 88,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3126,
+              "delivery_wait": 125,
+              "dispatch": 0,
+              "preparation": 1823,
+              "provider_attempt": 5247180
+            }
+          },
+          "9948c9cd-453c-483d-b24b-c0c1141e7c08": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 8271958,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 2613,
+              "output_tokens": 91,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 9130,
+              "delivery_wait": 137,
+              "dispatch": 0,
+              "preparation": 2354,
+              "provider_attempt": 8260003
+            }
+          },
+          "b5d946de-30ed-4c62-b6da-d3d5d0c376e8": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5734735,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 883,
+              "output_tokens": 142,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2547,
+              "delivery_wait": 45,
+              "dispatch": 0,
+              "preparation": 610,
+              "provider_attempt": 5731410
+            }
+          },
+          "df336206-49a7-4a53-8647-61454e532b07": {
+            "route": {
+              "class": "coding",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-terra",
+              "provider": "openai_codex_subscription",
+              "reason": {
+                "configured_stage": {
+                  "from_call": 2
+                }
+              },
+              "replay": "visible_history",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-terra"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5175643,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 3855,
+              "output_tokens": 96,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2480,
+              "delivery_wait": 1275,
+              "dispatch": 0,
+              "first_visible_text": 2710409,
+              "preparation": 2056,
+              "provider_attempt": 5170876
+            }
+          }
+        },
+        "tools": {
+          "531fb554-ef58-4643-ba60-9dac14e1ec90": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": 0,
+            "inclusive_runtime_us": 1729593,
+            "permission_wait_us": null,
+            "tool": "shell",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1729543
+            }
+          },
+          "98d571f7-9eef-4c9a-b3ff-4d08c5428701": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 306,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 275
+            }
+          },
+          "a33a140c-be33-4fd1-92b5-364159ded266": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 21216,
+            "permission_wait_us": null,
+            "tool": "write_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 10314
+            }
+          },
+          "af4349ef-c483-4380-a9c3-efe170298206": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 774,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 725
+            }
+          },
+          "aff620f5-a976-448c-9dd4-73395a29d8d8": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 7116,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 6969
+            }
+          },
+          "b09974d5-246a-459c-a81d-cd11ee8b85f2": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 349,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 289
+            }
+          },
+          "b8f204bc-606e-4008-ae8a-31c9a5712904": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1457,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1256
+            }
+          },
+          "bbbc042c-3a30-444a-aa63-6c1efd8b39e6": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 321,
+            "permission_wait_us": null,
+            "tool": "list_directory",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 286
+            }
+          },
+          "cd7b33e6-e1d2-4fc4-9964-ef47dda1b217": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 9979,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 9934
+            }
+          },
+          "d13c2580-2d51-4866-bd9c-a5546f1a99a9": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 376,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 344
+            }
+          },
+          "ea4b73d6-99c1-4e28-b59a-616c32515177": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 8963,
+            "permission_wait_us": null,
+            "tool": "edit_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 6903
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 3,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 9,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2457,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 9826
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2457,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 9826
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 11,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3083,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 12331
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3083,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 12331
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 14,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3280,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 13118
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3280,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 13118
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 18,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 4510,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 18039
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 4510,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 18039
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 91291,
+          "delivery_wait": 1689
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": {
+        "exit_code": 0,
+        "stdout": "\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderr": "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n   Doc-tests astrid_greeting_fixture\n",
+        "timed_out": false,
+        "wall_seconds": 0.07689400000001001
+      },
+      "rubric": "Independent cargo test --offline passes both unchanged tests; GREETING.txt is exactly Hello, Astrid! plus newline; Cargo.toml, AGENTS.md and test section unchanged. Observe whether the model itself ran cargo test separately from independent verification.",
+      "task_success": true,
+      "quality_review": "Independent artifact/test rubric evaluated; run completion is separate",
+      "model_verification_command_observed": true,
+      "cost": null,
+      "usage": {
+        "input_tokens": 11648,
+        "output_tokens": 448,
+        "cached_tokens": 0
+      },
+      "model_calls": 5,
+      "tool_calls": 11,
+      "context_compactions": 0
+    },
+    {
+      "task": "coding",
+      "trial": 2,
+      "configuration": "fixed",
+      "routing": {
+        "initial_effort": "low",
+        "stages": []
+      },
+      "initial_fixture_sha256": {
+        ".gitignore": "07d64eb09a56c853b7853a47276799b38d7d6d25a4314b0c1abc10432c214e17",
+        "AGENTS.md": "090b243ffa0b574cb1c84de819a3023c0d492873df4c16c9d5b803377030b158",
+        "Cargo.lock": "3f067029418f09e6bc6f8492f375949feac50383139271876a849919f32a4eed",
+        "Cargo.toml": "a20d8c22c15792b311b8da85b2073a1943719ba7ca360eaa51bb28ee8fbd9436",
+        "GREETING.txt": "543df89fec85b1c280e5be7bc6a33e31203503cd6edb3084312de4db5a9b436c",
+        "src/lib.rs": "d98191ee78951cecfa62919fddc2d74c9d65af5097e18d8a53177a64dab07fe5"
+      },
+      "task_sha256": "bf48b6d53179bcee3a6b4f403fb36b2e36abfac0c2aeb661a32e5767d65ff893",
+      "process": {
+        "exit_code": 0,
+        "stdout": "Implemented the requested repairs:\n\n- Updated `greeting` to trim surrounding whitespace from its argument (`src/lib.rs:2`).\n- Replaced `GREETING.txt` with exactly `Hello, Astrid!` followed by a newline.\n- Did not modify tests, `Cargo.toml`, or `AGENTS.md`.\n\nValidation:\n\n```text\ncargo test --offline\ntest result: ok. 2 passed; 0 failed\n```\n\nDoc tests also completed successfully with no failures.\n\n",
+        "stderr": "Observability: on (run flag)\n\u203a Inspect this Rust greeting project. Fix the whitespace-handling bug in greeting and repair GREETING.txt to the exact required greeting plus newline. Do not alter tests, Cargo.toml or AGENTS.md. Run cargo test --offline to verify the repair and report the result.\n\n  policy       read=Allow write=Allow shell=Allow\n  workspace    branch=unavailable \u00b7 0 initial dirty paths \u00b7 evidence complete within scope\n    Git: Git exit code Some(128)\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx est 2% ~1356/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf list_directory .\n\u25cf glob          **/*.rs\n\u25cf read_file     Cargo.toml\n\u25cf read_file     GREETING.txt\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     list_directory \u00b7 7 entries\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     glob \u00b7 1 files\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 5 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 1 lines\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 3% ~1943/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     src/lib.rs\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 21 lines\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 4% ~2524/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf edit_file     src/lib.rs\n\u25cf write_file    GREETING.txt\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:src/lib.rs \u00b7 before/after recorded\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n\u2713 completed     edit_file \u00b7 541 bytes written\n  permission   Write Allow \u00b7 explicit per-run Write policy: Allow\n  mutation     utf8:GREETING.txt \u00b7 before/after recorded\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n\u2713 completed     write_file \u00b7 15 bytes written\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 4% ~2614/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n\u25cf read_file     src/lib.rs\n\u25cf read_file     GREETING.txt\n\u25cf shell         cargo test --offline\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 21 lines\n  permission   Read Allow \u00b7 explicit per-run Read policy: Allow\n\u2713 completed     read_file \u00b7 1 lines\n  permission   Execute Allow \u00b7 explicit per-run Execute policy: Allow\n  stderr\n   Compiling astrid-greeting-fixture v0.0.0 (/private/var/folders/c0/32vfjvv9233c0nmghgqt_mp40000gn/T/astrid-routing-comparison-30o3li51/workspace)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n\n  stdout\n\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n  stderr\n   Doc-tests astrid_greeting_fixture\n\n  stdout\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\n\u2713 completed     shell \u00b7 exit 0\n  route        gpt-5.6-sol \u00b7 effort=Some(Low) \u00b7 ConfiguredInitial \u00b7 ProviderContinuation\n  ctx partial est 6% ~3715/61440 budget \u00b7 non-opaque bytes/4; model-window occupancy unknown\n  changes      268 reported paths \u00b7 evidence incomplete\nWorkspace changes observed during the run; shell/external authorship is not established. Ignored files and paths outside the invocation workspace are excluded.\n    1 paths could not be compared; content changes are unverified. Details retained in runtime evidence.\n    utf8:GREETING.txt \u00b7 modified_or_unavailable\n--- before/utf8:GREETING.txt\n+++ after/utf8:GREETING.txt\n@@ -1,1 +1,1 @@\n-wrong\n+Hello, Astrid!\n    utf8:src/lib.rs \u00b7 modified_or_unavailable\n--- before/utf8:src/lib.rs\n+++ after/utf8:src/lib.rs\n@@ -1,21 +1,21 @@\n-pub fn greeting(name: &str) -> String {\n-    let name = name;\n-    format!(\"Hello, {}!\", name)\n-}\n-\n-#[cfg(test)]\n-mod tests {\n-    use super::*;\n-\n-    #[test]\n-    fn greeting_trims_whitespace() {\n-        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n-    }\n-\n-    #[test]\n-    fn required_greeting_file_matches() {\n-        let text = std::fs::read_to_string(\"GREETING.txt\")\n-            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n-        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n-    }\n-}\n+pub fn greeting(name: &str) -> String {\n+    let name = name.trim();\n+    format!(\"Hello, {}!\", name)\n+}\n+\n+#[cfg(test)]\n+mod tests {\n+    use super::*;\n+\n+    #[test]\n+    fn greeting_trims_whitespace() {\n+        assert_eq!(greeting(\" Astrid \"), \"Hello, Astrid!\");\n+    }\n+\n+    #[test]\n+    fn required_greeting_file_matches() {\n+        let text = std::fs::read_to_string(\"GREETING.txt\")\n+            .expect(\"create GREETING.txt containing Hello, Astrid! followed by a newline\");\n+        assert_eq!(text, format!(\"{}\\n\", greeting(\" Astrid \")));\n+    }\n+}\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.06fz4o4bfdyf6egnfazxwthxa.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.09qb9whl6i05ds4cb6rjdo5y9.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0hfgbtea9icokas1p9tc0i2bv.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0pfckenj34c75gtgx2vfqm9v6.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0r0yt48f1tevosf2c9q98v0yj.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.0zrjzfoykuzx6byozwduid0cw.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.17y7g8114cge48elqnyqbzsq7.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1d3ggcl1xdblt8siks4i11psw.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1kl28n6l7uaejeyc08enebtm2.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.1misw0iw8nm6lreofg6b8t7sp.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.24s1z4k26gl0rajg9ttik9mez.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2k8e4q066sqz18v5fo0k8d2w3.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.2ues4kr3fi0czvdob734nbrul.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.34wb746mm1azght333lttm9y1.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.39b235zyibh1nab67nv2fvdf2.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.3r4xxhjtxikcfql3yz8ownvvx.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.4d8j870hhndol49mlfsamgxha.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    utf8:target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024.51500h4felhv5ra9x8mu800le.1eqzfxo.rcgu.o \u00b7 added\n    evidence unavailable: Binary content changed; text patch unavailable\n    247 additional change details retained in runtime evidence\n\u2713 run          completed\n  5 model calls \u00b7 10 tool outcomes\nTrace: 81bc646a-b8f5-4fa7-b215-985a0405c92b (metadata only)\n",
+        "timed_out": false,
+        "wall_seconds": 27.424389375000004
+      },
+      "changed_paths": [
+        "GREETING.txt",
+        "src/lib.rs"
+      ],
+      "trace_summary": {
+        "run_id": "81bc646a-b8f5-4fa7-b215-985a0405c92b",
+        "complete": true,
+        "model": "gpt-5.6-sol",
+        "provider": "openai_codex_subscription",
+        "outcome": "run_completed",
+        "run_elapsed_us": 27398327,
+        "error_code": null,
+        "models": {
+          "06506fa1-7ada-4a49-a24d-ce112baac1f1": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 3714247,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 1532,
+              "output_tokens": 31,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2620,
+              "delivery_wait": 40,
+              "dispatch": 0,
+              "preparation": 1341,
+              "provider_attempt": 3709976
+            }
+          },
+          "1610681f-635d-4109-9fe8-ab08015ee58d": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4474559,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 2159,
+              "output_tokens": 100,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 4498,
+              "delivery_wait": 150,
+              "dispatch": 0,
+              "preparation": 2597,
+              "provider_attempt": 4467105
+            }
+          },
+          "1edd2773-cc83-49ff-b3fb-6a34c52530e6": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5407295,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 883,
+              "output_tokens": 115,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2597,
+              "delivery_wait": 89,
+              "dispatch": 0,
+              "preparation": 615,
+              "provider_attempt": 5403889
+            }
+          },
+          "baa3ad81-bf54-4609-94eb-b221449c6f6c": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 4780027,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 3564,
+              "output_tokens": 103,
+              "cached_tokens": 0,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 2535,
+              "delivery_wait": 458,
+              "dispatch": 0,
+              "first_visible_text": 2449372,
+              "preparation": 2246,
+              "provider_attempt": 4775079
+            }
+          },
+          "e3dc14b3-863e-4b53-b756-860b8d430f1d": {
+            "route": {
+              "class": "general",
+              "effective_effort": "low",
+              "effective_model": "gpt-5.6-sol",
+              "provider": "openai_codex_subscription",
+              "reason": "configured_initial",
+              "replay": "provider_continuation",
+              "requested_effort": "low",
+              "requested_model": "gpt-5.6-sol"
+            },
+            "outcome": "model_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 7630555,
+            "permission_wait_us": null,
+            "tool": null,
+            "usage": {
+              "input_tokens": 2322,
+              "output_tokens": 91,
+              "cached_tokens": 1408,
+              "invalid": false
+            },
+            "timings_us": {
+              "authentication": 3090,
+              "delivery_wait": 158,
+              "dispatch": 0,
+              "preparation": 2282,
+              "provider_attempt": 7624810
+            }
+          }
+        },
+        "tools": {
+          "0327a435-90a4-4517-a235-b3a69b33d4b5": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1603,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1489
+            }
+          },
+          "124af969-913e-4d7c-9736-89bf979afd85": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 5153,
+            "permission_wait_us": null,
+            "tool": "write_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 4768
+            }
+          },
+          "38a097c9-6461-43c7-9f31-186b640a0a19": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1026,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 955
+            }
+          },
+          "536d3b2a-ecea-481d-b334-536a9c5a6a17": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": 0,
+            "inclusive_runtime_us": 1134211,
+            "permission_wait_us": null,
+            "tool": "shell",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1134162
+            }
+          },
+          "68a1ad59-7caa-4530-9ffe-497258421599": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 6791,
+            "permission_wait_us": null,
+            "tool": "edit_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 6069
+            }
+          },
+          "6d06ecaf-953d-4ff3-9b3d-7a6c525809cd": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 563,
+            "permission_wait_us": null,
+            "tool": "list_directory",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 510
+            }
+          },
+          "83d4f3ac-7da3-40de-af9e-e84c8f30d1a9": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 14866,
+            "permission_wait_us": null,
+            "tool": "glob",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 14782
+            }
+          },
+          "866fc9c3-bd50-40a8-b9b9-da75d654eb83": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 200,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 175
+            }
+          },
+          "87cd74c9-d416-4830-9e72-1a4d7af337e5": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 1146,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 1007
+            }
+          },
+          "b6679748-3f3e-4b3c-b98f-65ec480b2ad3": {
+            "route": null,
+            "outcome": "tool_call_completed",
+            "error_code": null,
+            "exit_code": null,
+            "inclusive_runtime_us": 304,
+            "permission_wait_us": null,
+            "tool": "read_file",
+            "usage": null,
+            "timings_us": {
+              "tool_execution": 276
+            }
+          }
+        },
+        "contexts": [
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 3,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1356,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 5421
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 8,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1943,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10594
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 1943,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 10594
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 10,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2524,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 13181
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2524,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 13181
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 13,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2614,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 16003
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 2614,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 16003
+            }
+          },
+          {
+            "budget": {
+              "estimated_context_tokens": 65536,
+              "max_request_bytes": 524288,
+              "max_summary_bytes": 4096,
+              "policy": "file_references",
+              "response_reserve_tokens": 4096
+            },
+            "evicted_items": 0,
+            "retained_items": 17,
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3715,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 21168
+            },
+            "summary_bytes": null
+          },
+          {
+            "snapshot": {
+              "non_opaque_json_size_token_heuristic": 3715,
+              "provider_input_tokens": null,
+              "serialized_request_bytes": 21168
+            }
+          }
+        ],
+        "runtime_timings_us": {
+          "context_selection": 34397,
+          "delivery_wait": 981
+        },
+        "cost": null,
+        "true_ttft_us": null,
+        "decode_tokens_per_second": null
+      },
+      "independent_verification": {
+        "exit_code": 0,
+        "stdout": "\nrunning 2 tests\ntest tests::greeting_trims_whitespace ... ok\ntest tests::required_greeting_file_matches ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+        "stderr": "    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s\n     Running unittests src/lib.rs (target/debug/deps/astrid_greeting_fixture-7f6465b55f6d9024)\n   Doc-tests astrid_greeting_fixture\n",
+        "timed_out": false,
+        "wall_seconds": 0.07349037500000577
+      },
+      "rubric": "Independent cargo test --offline passes both unchanged tests; GREETING.txt is exactly Hello, Astrid! plus newline; Cargo.toml, AGENTS.md and test section unchanged. Observe whether the model itself ran cargo test separately from independent verification.",
+      "task_success": true,
+      "quality_review": "Independent artifact/test rubric evaluated; run completion is separate",
+      "model_verification_command_observed": true,
+      "cost": null,
+      "usage": {
+        "input_tokens": 10460,
+        "output_tokens": 440,
+        "cached_tokens": 1408
+      },
+      "model_calls": 5,
+      "tool_calls": 10,
+      "context_compactions": 0
+    }
+  ],
+  "runtime_binary_sha256": "6f31bd0101a9af9e4dd5540b30388f6afdbfd93398d3ecdf78429548558d4ac2",
+  "review": "All eight episodes pass the frozen task-specific rubric. Two repetitions per cell; no evidence of general superiority or statistically reliable latency difference.",
+  "aggregate": [
+    {
+      "task": "notes",
+      "configuration": "fixed",
+      "samples": 2,
+      "successes": 2,
+      "mean_wall_seconds": 15.187063000499998,
+      "mean_input_tokens": 3345,
+      "mean_output_tokens": 280
+    },
+    {
+      "task": "notes",
+      "configuration": "routed",
+      "samples": 2,
+      "successes": 2,
+      "mean_wall_seconds": 21.799252541499996,
+      "mean_input_tokens": 3313,
+      "mean_output_tokens": 281
+    },
+    {
+      "task": "coding",
+      "configuration": "fixed",
+      "samples": 2,
+      "successes": 2,
+      "mean_wall_seconds": 32.5292412915,
+      "mean_input_tokens": 13573.5,
+      "mean_output_tokens": 512.5
+    },
+    {
+      "task": "coding",
+      "configuration": "routed",
+      "samples": 2,
+      "successes": 2,
+      "mean_wall_seconds": 32.687919416499994,
+      "mean_input_tokens": 35583,
+      "mean_output_tokens": 507
+    }
+  ]
+}

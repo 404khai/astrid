@@ -124,17 +124,17 @@ pub(super) fn composer_in_area(
     };
     frame.render_widget(&editor.textarea, editor_area);
     let help = if let Some(notice) = editor.notice {
-        format!("{model} · {notice}")
+        notice.to_owned()
     } else if !notice.is_empty() {
-        format!("{model} · {notice}")
+        notice.to_owned()
     } else if editor.menu() {
-        format!("{model} · ↑/↓ select · Enter confirm · Esc cancel")
+        "↑/↓ select · Enter confirm · Esc cancel".to_owned()
     } else {
-        format!("{model} · Enter sends · Ctrl-J newline · / commands")
+        "Enter sends · Ctrl-J newline · / commands".to_owned()
     };
     frame.render_widget(
         Paragraph::new(vec![
-            Line::styled("─".repeat(footer.width as usize), Ink::Dim.style(color)),
+            theme::mode_line(truncate(model, footer.width as usize), unbound, color),
             theme::mode_line(truncate(&help, footer.width as usize), unbound, color),
         ])
         .style(Ink::Dim.style(color)),

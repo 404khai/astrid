@@ -297,6 +297,15 @@ fn pty_child() {
         struct Provider;
         #[async_trait::async_trait]
         impl ModelProvider for Provider {
+            fn provider_name(&self) -> Option<&'static str> {
+                Some("pty_fixture")
+            }
+            fn capabilities(&self, _model: &str) -> astrid::routing::ModelCapability {
+                astrid::routing::ModelCapability {
+                    visible_history: true,
+                    reasoning_efforts: vec![],
+                }
+            }
             fn measure_request(
                 &self,
                 request: &ModelRequest<'_>,
@@ -400,6 +409,9 @@ fn pty_child() {
     }
     #[async_trait::async_trait]
     impl ModelProvider for Provider {
+        fn provider_name(&self) -> Option<&'static str> {
+            Some("pty_fixture")
+        }
         async fn generate(
             &self,
             request: &ModelRequest<'_>,
@@ -812,4 +824,49 @@ fn pty_dumb_terminal_accepts_interactive_line_input() {
         String::from_utf8_lossy(&pty.output)
     );
     assert!(!pty.output.contains(&27));
+}
+
+#[test]
+fn pty_routing_policy_can_resume_after_restart_and_off_keeps_visible_history() {
+    let root = tempfile::tempdir().unwrap();
+    let policy = root.path().join("routing.json");
+    std::fs::write(&policy, r#"{"initial_effort":null,"stages":[{"from_call":2,"model":"fixture-routed","class":"coding","effort":null}]}"#).unwrap();
+    let mut first = Pty::new("conversations", root.path(), "xterm-256color");
+    first.wait_for_screen("Message Astrid");
+    first.send(format!("/routing {}\r", policy.display()).as_bytes());
+    first.wait_for_screen("Routing on");
+    first.send(b"routed chat\r");
+    first.wait_for("REPLY:routed chat:COUNT:1");
+    first.wait_for_screen("Message Astrid");
+    first.send(b"/quit\r");
+    assert!(first.finish().success());
+    let mut second = Pty::new("conversations", root.path(), "xterm-256color");
+    second.wait_for_screen("Message Astrid");
+    second.send(b"/routing off\r");
+    second.wait_for_screen("Routing off");
+    second.send(b"continued chat\r");
+    second.wait_for("REPLY:continued chat:COUNT:2");
+    second.wait_for_screen("Message Astrid");
+    second.wait_for_screen("last ctx est");
+    second.send(b"/quit\r");
+    assert!(second.finish().success());
+    let path = walkdir::WalkDir::new(root.path().join("model-settings/sessions"))
+        .into_iter()
+        .map(Result::unwrap)
+        .find(|entry| entry.file_name() == "state.json")
+        .unwrap()
+        .into_path();
+    let saved: serde_json::Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    assert_eq!(saved["version"], 2);
+    assert_eq!(
+        saved["entries"][0]["session"]["replay_mode"],
+        "visible_history"
+    );
+    assert_eq!(
+        saved["entries"][0]["session"]["origins"]
+            .as_object()
+            .unwrap()
+            .len(),
+        2
+    );
 }

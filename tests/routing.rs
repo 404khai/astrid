@@ -210,88 +210,53 @@ async fn routed_run_preserves_private_session_denies_mutations_and_accounts_exac
         });
         fs::write(path, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
     }
-    assert!(result.session.inspection_only());
+    assert_eq!(result.session.replay_mode(), ReplayMode::VisibleHistory);
+    assert_eq!(result.session.dispatch_origins().len(), 3);
     let original = serde_json::to_string(&result.session.messages).unwrap();
     assert!(original.contains("PRIVATE-ROUTE-SENTINEL"));
-    assert!(
-        serde_json::to_string(&result.session)
-            .unwrap_err()
-            .to_string()
-            .contains("inspection-only")
-    );
-    // A failed routed save preserves the previous accepted idle snapshot.
+    let serialized = serde_json::to_string(&result.session).unwrap();
+    assert!(serialized.contains("PRIVATE-ROUTE-SENTINEL"));
     use astrid::session_store::{SessionSnapshot, SessionStore, StoredSession};
     let idle_store = SessionStore::open(store.path(), tools.workspace()).unwrap();
-    let idle = runtime::Session::new(tools.workspace());
-    let idle_id = idle.id;
-    idle_store
-        .save(&SessionSnapshot::new(
-            tools.workspace(),
-            0,
-            vec![StoredSession {
-                session: idle,
-                runs: 0,
-                outcome: None,
-            }],
-        ))
-        .unwrap();
-    let invalid = SessionSnapshot::new(
+    let snapshot = SessionSnapshot::new(
         tools.workspace(),
         0,
         vec![StoredSession {
-            session: result.session.clone(),
+            session: result.session,
             runs: 1,
-            outcome: Some(result.outcome.clone()),
+            outcome: Some(result.outcome),
         }],
     );
-    assert!(
-        idle_store
-            .save(&invalid)
-            .unwrap_err()
-            .to_string()
-            .contains("inspection-only")
-    );
-    assert_eq!(
-        idle_store.load().unwrap().unwrap().entries[0].session.id,
-        idle_id
-    );
-    let followup = Server::start(vec![]).await;
-    // Both routed and native continuation must fail; no provider authentication.
-    for routed in [true, false] {
-        let mut next = config(store.path());
-        if !routed {
-            next.routing = None;
-        }
-        let rejected = runtime::run_in_session(
-            &followup.provider,
-            &tools,
-            &mut handler,
-            next,
-            Cancellation::default(),
-            None,
-            result.session.clone(),
-        )
-        .await
-        .unwrap_err();
-        assert!(rejected.message.contains("inspection-only"));
-        assert_eq!(
-            serde_json::to_string(&rejected.session.messages).unwrap(),
-            original
-        );
-    }
-    let rejected = runtime::run_in_session(
+    idle_store.save(&snapshot).unwrap();
+    let restored = idle_store
+        .load()
+        .unwrap()
+        .unwrap()
+        .entries
+        .remove(0)
+        .session;
+    assert_eq!(serde_json::to_string(&restored.messages).unwrap(), original);
+    let followup = Server::start(vec![reply(&[], "SCRIPTED followup")]).await;
+    let mut next = config(store.path());
+    next.routing = None;
+    next.task = "Follow up without tools".into();
+    let result = runtime::run_in_session(
         &followup.provider,
         &tools,
         &mut handler,
-        config(store.path()),
+        next,
         Cancellation::default(),
         None,
-        runtime::Session::new(tools.workspace()),
+        restored,
     )
     .await
-    .unwrap_err();
-    assert!(rejected.message.contains("fresh one-shot"));
-    assert!(followup.finish().await.is_empty());
+    .unwrap();
+    assert_eq!(result.outcome, RunOutcome::Completed);
+    assert_eq!(result.tool_calls, 0);
+    assert_eq!(result.session.replay_mode(), ReplayMode::VisibleHistory);
+    let requests = followup.finish().await;
+    assert!(!requests[0].to_string().contains("PRIVATE-ROUTE-SENTINEL"));
+    assert!(requests[0].to_string().contains("permission_denied"));
 }
 
 #[tokio::test]
@@ -486,7 +451,7 @@ async fn cancellation_in_a_routed_batch_skips_side_effects_and_incomplete_sessio
     )
     .await
     .unwrap_err();
-    assert!(rejected.message.contains("inspection-only"));
+    assert!(rejected.message.contains("incomplete"));
     assert_eq!(server.finish().await.len(), 1);
 }
 

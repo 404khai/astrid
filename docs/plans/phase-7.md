@@ -1,5 +1,9 @@
 # Phase 7 — Deterministic direct-inference routing
 
+2026-10-16 follow-up: this document preserves the initial implementation checkpoint.
+The one-shot/v1-only restriction below is superseded by accepted ADR 0016. See the
+[active follow-up plan](phase-7-followups.md) and [current review](../reviews/phase-7-followups.md).
+
 Authorization: Maintainer's 2026-10-15 new-thread instruction, conditional on
 Phase 6 evidence closure. ADR 0015 handoff accepted explicitly in this thread.
 Implementation: Complete for the accepted one-shot contract.

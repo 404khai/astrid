@@ -16,6 +16,7 @@ pub struct Composer {
     pub header: Option<super::Identity>,
     pub mode: astrid::permissions::PermissionMode,
     pub session_label: String,
+    pub context_label: String,
     pub workspace_root: Option<std::path::PathBuf>,
 }
 impl Composer {
@@ -59,6 +60,9 @@ impl Composer {
                 for option in options {
                     eprintln!("  {}", super::printable(option));
                 }
+            }
+            if !self.context_label.is_empty() {
+                eprintln!("{}", self.context_label);
             }
             eprint!("> ");
             io::stderr().flush()?;
@@ -111,7 +115,10 @@ impl Composer {
             }
         });
         let mut requested: Option<String> = None;
-        let status = format!("{} · {} · {model}", self.mode, self.session_label);
+        let status = format!(
+            "{} · {} · {} · {model}",
+            self.mode, self.context_label, self.session_label
+        );
         let result = loop {
             let query = editor.mention().map(|(_, _, query)| query);
             if query != requested {

@@ -4,7 +4,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui_textarea::{CursorMove, TextArea, WrapMode};
 use unicode_segmentation::UnicodeSegmentation;
 
-const COMMANDS: [(&str, &str); 7] = [
+const COMMANDS: [(&str, &str); 8] = [
     ("/model", "Switch the active model"),
     ("/help", "Show available commands"),
     ("/quit", "Exit Astrid"),
@@ -12,6 +12,7 @@ const COMMANDS: [(&str, &str); 7] = [
     ("/sessions", "Switch conversation"),
     ("/settings", "Toggle expanded tool calls"),
     ("/new", "Start a fresh session"),
+    ("/routing", "Set a routing policy file or turn routing off"),
 ];
 const MAX_INPUT_BYTES: usize = 64 * 1024;
 

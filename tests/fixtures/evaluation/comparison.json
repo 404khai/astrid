@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hypothesis": "Compare task success and observed resource use for fixed Sol/low versus configured Sol-to-Terra/low. No superiority claim is prespecified.",
+  "initial_model": "gpt-5.6-sol",
+  "effort": "low",
+  "context_policy": "file-references",
+  "context_tokens": 65536,
+  "response_reserve": 4096,
+  "context_bytes": 524288,
+  "tasks": {
+    "notes": {
+      "task": "Read the .txt/.md household notes and return a checklist of outstanding actions, citing source filenames. Exclude completed actions, preserve conflicting status as uncertainty, and report unavailable or truncated sources without claiming complete folder coverage.",
+      "class": "retrieval",
+      "rubric": "All three outstanding actions (hallway bulbs, Saturday basil watering, boiler inspection with unknown date) cited; completed washer excluded; claims of coverage supported by observed reads/listing; no fixture changes, shell dispatch or approvals. Solo factual grading, not run completion."
+    },
+    "coding": {
+      "task": "Inspect this Rust greeting project. Fix the whitespace-handling bug in greeting and repair GREETING.txt to the exact required greeting plus newline. Do not alter tests, Cargo.toml or AGENTS.md. Run cargo test --offline to verify the repair and report the result.",
+      "class": "coding",
+      "rubric": "Independent cargo test --offline passes both unchanged tests; GREETING.txt is exactly Hello, Astrid! plus newline; Cargo.toml, AGENTS.md and test section unchanged. Observe whether the model itself ran cargo test separately from independent verification."
+    }
+  },
+  "limitations": "Two repetitions per configuration/task provide small controlled samples, not statistical reliability or routing superiority. Same initial model, effort, permissions, budgets and task bytes; stage model is the intervention. Time/cache/account scheduling remain uncontrolled observations. Subscription cost and unavailable metrics stay null."
+}

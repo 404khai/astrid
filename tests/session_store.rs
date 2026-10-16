@@ -324,3 +324,294 @@ fn stored_response_cannot_bypass_provider_completion_validation() {
     let invalid = json!({"text":"", "tool_calls":[], "continuation":[{"type":"message", "role":"user", "content":[]}]});
     assert!(serde_json::from_value::<astrid::model::ModelResponse>(invalid).is_err());
 }
+
+fn private_reply() -> Vec<serde_json::Value> {
+    let mut events = reply(&[], "visible answer");
+    events.last_mut().unwrap()["response"]["output"].as_array_mut().unwrap().insert(0,
+        json!({"type":"reasoning","id":"opaque-history","encrypted_content":"PERSISTENT-PRIVATE-SENTINEL","summary":[]}));
+    events
+}
+
+#[tokio::test]
+async fn known_native_model_change_persists_visible_mode_across_restart_without_private_replay() {
+    use astrid::routing::{ReplayMode, ReplayReason};
+    let root = tempfile::tempdir().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let workspace = Workspace::new(root.path()).unwrap();
+    let tools = Tools::new(workspace.clone(), Duration::from_secs(5)).unwrap();
+    let server = Server::start(vec![
+        private_reply(),
+        reply(&[], "changed model"),
+        reply(&[], "back to initial"),
+    ])
+    .await;
+    let mut handler = Confirmation::new(false);
+    let first = runtime::run(
+        &server.provider,
+        &tools,
+        &mut handler,
+        config("first"),
+        Cancellation::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        first.session.replay_mode(),
+        ReplayMode::ProviderContinuation
+    );
+    assert_eq!(first.session.dispatch_origins().len(), 1);
+    let original = serde_json::to_string(&first.session.messages).unwrap();
+    let mut next = config("change model");
+    next.model = "different-model".into();
+    let second = runtime::run_in_session(
+        &server.provider,
+        &tools,
+        &mut handler,
+        next,
+        Cancellation::default(),
+        None,
+        first.session,
+    )
+    .await
+    .unwrap();
+    assert_eq!(second.session.replay_mode(), ReplayMode::VisibleHistory);
+    assert!(
+        second.state.models.values().all(
+            |m| m.route.as_ref().unwrap().replay_reason == ReplayReason::ModelOrProviderChanged
+        )
+    );
+    let store = SessionStore::open(directory.path(), &workspace).unwrap();
+    store
+        .save(&SessionSnapshot::new(
+            &workspace,
+            0,
+            vec![StoredSession {
+                session: second.session,
+                runs: 2,
+                outcome: Some(RunOutcome::Completed),
+            }],
+        ))
+        .unwrap();
+    drop(store);
+    let store = SessionStore::open(directory.path(), &workspace).unwrap();
+    let restored = store.load().unwrap().unwrap().entries.remove(0).session;
+    assert_eq!(restored.dispatch_origins().len(), 2);
+    assert_eq!(
+        serde_json::to_string(&restored.messages[..2]).unwrap(),
+        original
+    );
+    let third = runtime::run_in_session(
+        &server.provider,
+        &tools,
+        &mut handler,
+        config("initial model again, routing off"),
+        Cancellation::default(),
+        None,
+        restored,
+    )
+    .await
+    .unwrap();
+    assert_eq!(third.session.replay_mode(), ReplayMode::VisibleHistory);
+    assert!(third.state.models.values().all(|m| m.route.as_ref().unwrap().replay_reason == ReplayReason::SessionVisibleHistory));
+    let requests = server.finish().await;
+    assert!(
+        requests[1..]
+            .iter()
+            .all(|r| !r.to_string().contains("PERSISTENT-PRIVATE-SENTINEL"))
+    );
+    assert!(
+        serde_json::to_string(&third.session.messages)
+            .unwrap()
+            .contains("PERSISTENT-PRIVATE-SENTINEL")
+    );
+}
+
+#[tokio::test]
+async fn v1_migration_is_read_only_until_successful_v2_save_and_unknown_history_is_visible() {
+    use astrid::routing::{ReplayMode, ReplayReason};
+    let root = tempfile::tempdir().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let workspace = Workspace::new(root.path()).unwrap();
+    let tools = Tools::new(workspace.clone(), Duration::from_secs(5)).unwrap();
+    let server = Server::start(vec![private_reply(), reply(&[], "migrated followup")]).await;
+    let mut handler = Confirmation::new(false);
+    let first = runtime::run(
+        &server.provider,
+        &tools,
+        &mut handler,
+        config("old task"),
+        Cancellation::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    let store = SessionStore::open(directory.path(), &workspace).unwrap();
+    store
+        .save(&SessionSnapshot::new(
+            &workspace,
+            0,
+            vec![entry(first.session)],
+        ))
+        .unwrap();
+    let path = state_path(directory.path());
+    let mut legacy: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    legacy["version"] = json!(1);
+    for entry in legacy["entries"].as_array_mut().unwrap() {
+        entry["session"].as_object_mut().unwrap().remove("origins");
+        entry["session"]
+            .as_object_mut()
+            .unwrap()
+            .remove("replay_mode");
+    }
+    let bytes = serde_json::to_vec(&legacy).unwrap();
+    fs::write(&path, &bytes).unwrap();
+    let loaded = store.load().unwrap().unwrap();
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    assert_eq!(
+        loaded.entries[0].session.replay_mode(),
+        ReplayMode::VisibleHistory
+    );
+    assert!(loaded.entries[0].session.dispatch_origins().is_empty());
+    let bad = SessionSnapshot::new(
+        &workspace,
+        9,
+        vec![entry(loaded.entries[0].session.clone())],
+    );
+    assert!(store.save(&bad).is_err());
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+    let result = runtime::run_in_session(
+        &server.provider,
+        &tools,
+        &mut handler,
+        config("continue migrated"),
+        Cancellation::default(),
+        None,
+        loaded.entries.into_iter().next().unwrap().session,
+    )
+    .await
+    .unwrap();
+    assert!(
+        result
+            .state
+            .models
+            .values()
+            .all(|m| m.route.as_ref().unwrap().replay_reason == ReplayReason::UnverifiedHistory)
+    );
+    assert_eq!(result.session.dispatch_origins().len(), 1);
+    store
+        .save(&SessionSnapshot::new(
+            &workspace,
+            0,
+            vec![StoredSession {
+                session: result.session,
+                runs: 2,
+                outcome: Some(result.outcome),
+            }],
+        ))
+        .unwrap();
+    let saved: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    assert_eq!(saved["version"], 2);
+    assert!(saved.to_string().contains("PERSISTENT-PRIVATE-SENTINEL"));
+    assert!(
+        !server.finish().await[1]
+            .to_string()
+            .contains("PERSISTENT-PRIVATE-SENTINEL")
+    );
+}
+
+#[tokio::test]
+async fn v2_rejects_partial_or_foreign_provenance_without_overwriting_snapshot() {
+    let root = tempfile::tempdir().unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let workspace = Workspace::new(root.path()).unwrap();
+    let tools = Tools::new(workspace.clone(), Duration::from_secs(5)).unwrap();
+    let server = Server::start(vec![private_reply()]).await;
+    let first = runtime::run(
+        &server.provider,
+        &tools,
+        &mut Confirmation::new(false),
+        config("task"),
+        Cancellation::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    server.finish().await;
+    let store = SessionStore::open(directory.path(), &workspace).unwrap();
+    let snapshot = SessionSnapshot::new(&workspace, 0, vec![entry(first.session)]);
+    store.save(&snapshot).unwrap();
+    let path = state_path(directory.path());
+    let original: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let mut partial = original.clone();
+    partial["entries"][0]["session"]
+        .as_object_mut()
+        .unwrap()
+        .remove("origins");
+    let mut foreign = original.clone();
+    foreign["entries"][0]["session"]["origins"]
+        [astrid::events::ModelCallId::default().to_string()] =
+        json!({"provider":"openai_codex_subscription","model":"fixture","effort":null});
+    let mut legacy_smuggling = original.clone();
+    legacy_smuggling["version"] = json!(1);
+    let duplicate_version = serde_json::to_string(&original).unwrap().replacen(
+        "\"version\":2",
+        "\"version\":2,\"version\":2",
+        1,
+    );
+    fs::write(&path, duplicate_version.as_bytes()).unwrap();
+    assert!(store.load().is_err());
+    assert!(store.save(&snapshot).is_err());
+    assert_eq!(fs::read(&path).unwrap(), duplicate_version.as_bytes());
+    for value in [partial, foreign, legacy_smuggling] {
+        let bytes = serde_json::to_vec(&value).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        assert!(store.load().is_err());
+        assert!(store.save(&snapshot).is_err());
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+    }
+}
+
+#[tokio::test]
+async fn unsupported_visible_handoff_returns_unchanged_session_without_model_access() {
+    struct Unsupported;
+    #[async_trait::async_trait]
+    impl astrid::model::ModelProvider for Unsupported {
+        async fn generate(
+            &self,
+            _: &astrid::model::ModelRequest<'_>,
+            _: &mut dyn astrid::model::TextSink,
+        ) -> Result<astrid::model::ModelResponse, astrid::model::ModelError> {
+            panic!("required visible-history support must be checked before provider access")
+        }
+    }
+    let root = tempfile::tempdir().unwrap();
+    let workspace = Workspace::new(root.path()).unwrap();
+    let tools = Tools::new(workspace, Duration::from_secs(5)).unwrap();
+    let server = Server::start(vec![private_reply()]).await;
+    let first = runtime::run(
+        &server.provider,
+        &tools,
+        &mut Confirmation::new(false),
+        config("first"),
+        Cancellation::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    server.finish().await;
+    let before = serde_json::to_string(&first.session).unwrap();
+    let rejected = runtime::run_in_session(
+        &Unsupported,
+        &tools,
+        &mut Confirmation::new(false),
+        config("different provider"),
+        Cancellation::default(),
+        None,
+        first.session,
+    )
+    .await
+    .unwrap_err();
+    assert!(rejected.message.contains("visible-history"));
+    assert_eq!(serde_json::to_string(&rejected.session).unwrap(), before);
+}
