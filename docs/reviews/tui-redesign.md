@@ -143,3 +143,8 @@ Final isolated export checks: **276 Rust passed, 0 failed, 1 ignored**, across
 25 suites; **2 Python passed**. Formatting, strict all-target Clippy and source
 hash comparison passed. Tests used mocks/PTY fixtures, without cloud credentials
 or live VM commands. Only documentation changed after these source checks.
+
+Publication: [PR #18](https://github.com/404khai/astrid/pull/18), targeting
+`main` after PR #17 merge `5d423a7d`; implementation commit `8ddc037c`.
+The PR diff contains exactly the twelve scoped presentation/evidence files.
+GitHub checks and merge are the remaining publication steps at this checkpoint.

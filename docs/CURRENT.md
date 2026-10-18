@@ -1,3 +1,16 @@
+# Terminal redesign PR published — 2026-10-18
+
+[PR #18](https://github.com/404khai/astrid/pull/18) targets main after merged
+[InstaBox PR #17](https://github.com/404khai/astrid/pull/17) (`5d423a7d`).
+Implementation `8ddc037c` contains exactly twelve scoped console/evidence files;
+no InstaBox/runtime changes or unrelated user files. Exact source validation:
+276 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt and strict Clippy passed.
+Source hashes and historical evidence are retained in the review/evaluation below.
+Maintainer authorized both merges; GitHub checks and PR #18 merge remain at this
+checkpoint. No live VM commands, credential reads, desktop or phase advancement.
+
+---
+
 # Terminal redesign publication review — 2026-10-18
 
 Maintainer requested a separate PR and merge for the named Redesign Astrid Terminal
