@@ -8,7 +8,8 @@ links resolved. The original local checkpoint history remains preserved in the
 working file, outside that commit. No merge or installed CLI refresh.
 
 The maintainer authorized starting the next item after publication. RC-02 is
-implemented on separate `feat/live-token-usage`, stacked on the recovery branch:
+committed as `36ccc11d` on `feat/live-token-usage` and published as
+[PR #20](https://github.com/404khai/astrid/pull/20), stacked on PR #19:
 one optional typed provider-usage report per call, checked replay, per-call CLI
 counts and known run totals with per-metric coverage. Observability off still
 means no added telemetry collection or trace writes. Missing/invalid counts stay

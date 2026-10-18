@@ -57,5 +57,11 @@
     "No monetary cost, quota percentage or model-window occupancy inferred",
     "No live inference or InstaBox action; no provider/InstaBox credential or private-session content reads",
     "RE-01 target-authority contract remains unaccepted; no remote adapter implementation"
-  ]
+  ],
+  "publication": {
+    "implementation_commit": "36ccc11d",
+    "pr": "https://github.com/404khai/astrid/pull/20",
+    "base": "feat/followup-context-recovery",
+    "merged": false
+  }
 }

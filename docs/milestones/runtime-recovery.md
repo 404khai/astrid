@@ -74,3 +74,6 @@ Clippy passed.** The ignored case remains the optional recording-overhead test.
 [compatibility and solo review](../reviews/live-token-usage-2026-10-18.md).
 No live inference/InstaBox acceptance or installed binary refresh. Usage is opt-in;
 missing or invalid values remain unavailable. RE-01 still needs target authority.
+
+Publication: implementation `36ccc11d`, [PR #20](https://github.com/404khai/astrid/pull/20)
+stacked on recovery PR #19. Neither PR was merged by this task.

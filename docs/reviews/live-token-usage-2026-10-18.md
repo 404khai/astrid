@@ -2,7 +2,9 @@
 
 2026-10-18. Parent: recovery commit `dc7cbfbc`,
 [PR #19](https://github.com/404khai/astrid/pull/19). Separate stacked branch
-`feat/live-token-usage`; no merge or Phase 9 transition.
+`feat/live-token-usage`; implementation `36ccc11d` published as
+[PR #20](https://github.com/404khai/astrid/pull/20), base PR #19. No merge or
+Phase 9 transition.
 
 ## Observable behavior
 
