@@ -348,3 +348,23 @@ only documentation/setup/publication notes changed after those passing checks.
 No additional runtime tests or live authentication are claimed for publication.
 The scoped index, source hashes, local document links and whitespace are checked
 before committing. Credential examples contain prompts or synthetic test values only.
+
+## Publication result — 2026-10-18
+
+Opened [PR #17](https://github.com/404khai/astrid/pull/17) against `main`, title
+`feat(instabox): add opt-in metadata discovery`, from `feat/instabox-discovery`.
+The implementation commit is `0fb9f603` with the same conventional title and exactly
+the nine files listed above. A subsequent documentation-only conventional commit
+records this publication; the implementation/test bytes remain unchanged.
+
+Verified main baseline `f3d2f3cd` contains scheduler PR #16 and differs from the
+original `c9efb084` baseline only in ancestry, not tree contents. Thus the PR has
+no scheduler implementation diff. No unrelated files, keys, `.env`, reference
+images, apps or build output were staged. No merge or live cloud action.
+
+The staged-tree verification before publication matched all four source hashes,
+resolved 154 local Markdown file targets and passed scoped whitespace checks.
+Previously reported runtime checks remain historical exact-source evidence, not a
+new run caused by documentation publication. The initial no-publication statements
+above describe the earlier slice and are superseded only for this explicitly
+requested PR; remote execution/credential/machine restrictions remain in force.

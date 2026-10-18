@@ -1,3 +1,26 @@
+# InstaBox PR published — 2026-10-18
+
+Opened [PR #17](https://github.com/404khai/astrid/pull/17),
+**feat(instabox): add opt-in metadata discovery**, from `feat/instabox-discovery`
+against `main` at the maintainer's explicit request. Implementation commit:
+`0fb9f603`. Exactly nine scoped files; no unrelated user artifacts or scheduler
+implementation changes. No merge, rebase, main switch, worktree or phase advancement.
+Scheduler PR #16 was verified merged at `f3d2f3cd`; its tree equals the original
+InstaBox baseline `c9efb084`, so `main` is the correct base.
+
+Pre-publication review verified all four code/test hashes against the staged tree,
+154 local Markdown targets and clean scoped whitespace. Prior exact-source checks
+remain **263 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt/strict Clippy
+passed**. Publication/setup notes change documentation only; no new runtime or
+live-cloud acceptance is claimed. [Report and key setup](research/instabox-discovery.md),
+[validation evidence](evaluations/instabox-validation-2026-10-18.json).
+No API key was read, persisted or sent to chat/Git. No authenticated InstaBox call,
+remote execution, lifecycle change or file transfer was performed. Remote target
+execution/security contracts remain proposed; unrelated files/recovery data retained.
+The following checkpoints preserve their original pre-publication state.
+
+---
+
 # InstaBox publication preparation — 2026-10-18
 
 Maintainer explicitly authorized scoped staging, conventional commit, push and PR

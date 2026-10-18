@@ -70,5 +70,16 @@
     "One bounded metadata page; no VM connection or execution",
     "Exec/nonzero-exit/remote-cancellation/lifecycle tests deferred; report names acceptance criteria",
     "No runtime trace or session schema changes; discovery is a CLI management experiment"
-  ]
+  ],
+  "publication": {
+    "pr": "https://github.com/404khai/astrid/pull/17",
+    "title": "feat(instabox): add opt-in metadata discovery",
+    "implementation_commit": "0fb9f603",
+    "base": "main",
+    "verified_base_head": "f3d2f3cd825e230cab3a69ee802cce21bdf36de1",
+    "files": 9,
+    "code_and_test_hashes_unchanged": true,
+    "runtime_checks_rerun": false,
+    "note": "Original worktree/check records above describe implementation-time evidence; publication and hidden-prompt setup updates are documentation only."
+  }
 }
