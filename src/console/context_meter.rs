@@ -36,9 +36,20 @@ impl ContextMeter {
         }
     }
     pub(super) fn line(&self) -> String {
+        let limits = self.budget.as_ref().map_or_else(String::new, |budget| {
+            format!(
+                " · reserve {} (planning only) · request bytes {}/{}",
+                budget.response_reserve_tokens,
+                self.snapshot
+                    .as_ref()
+                    .map_or(0, |s| s.serialized_request_bytes),
+                budget.max_request_bytes,
+            )
+        });
         format!(
-            "  {} · non-opaque bytes/4; model-window occupancy unknown",
-            self.label()
+            "  {} · non-opaque bytes/4; model-window occupancy unknown{}",
+            self.label(),
+            limits
         )
     }
 }

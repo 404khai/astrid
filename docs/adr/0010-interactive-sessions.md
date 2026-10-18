@@ -119,3 +119,12 @@ Deterministic evidence: `tests/sessions.rs`, context-selection fixtures in
 `src/context.rs`, and the conversation/switching PTY scenario in
 `src/console/pty_tests.rs`. The one-shot runtime API remains covered by the existing
 runtime/environment/context suites.
+
+
+## Scoped follow-up selection amendment — 2026-10-18
+
+Accepted [ADR 0020](0020-followup-context-recovery.md) revises only the
+historical-submission/latest-exchange interaction: retain the question and latest
+actual complete exchange while permitting earlier exchanges in that submission
+to be compacted. Original history and incomplete-batch denial remain unchanged.
+The original decision text above is retained as history.

@@ -1,3 +1,52 @@
+# Recovery PR preparation — 2026-10-18
+
+Maintainer authorized committing the completed recovery slice, opening a PR, then
+starting RC-02 from the [active plan](plans/remote-mobile-cli.md). Recovery branch:
+`feat/followup-context-recovery`, based on fetched `origin/main` `ea183c08` in the
+same checkout; its baseline tree equals the previously validated `8dea6765` tree.
+Scoped publication excludes unrelated `.gitignore`, pre-existing local checkpoint
+history, incident artifacts, user assets and recovery files. Source hashes still
+match the recorded **279/0/1 Rust**, **2 Python**, fmt/strict Clippy validation.
+No phase transition, merge, live inference or VM operation.
+
+---
+
+# Runtime recovery and remote/mobile/CLI direction — 2026-10-18
+
+Maintainer requested root-cause context/cancellation recovery before remote
+computer use, reuse of the existing Expo mobile app for iOS/Android, and CLI
+infrastructure research. Separately accepted [ADR 0020](adr/0020-followup-context-recovery.md)
+allows the latest historical submission's earlier complete exchanges to compact
+while retaining its question and actual latest exchange. Original private v2
+history, continuation, provenance, permissions and incomplete-batch denial remain.
+
+Implemented that selector/event-validation repair and CLI display of model-call
+ceiling, response planning reserve and request byte ceiling. Budget defaults are
+unchanged. New deterministic fixtures exercise oversized follow-ups, cancellation
+after complete exchanges, no repeated edit, original history retention, summary
+lineage, private-reasoning exclusion and event replay. The same new unit regression
+fails with `ProtectedOverflow` under the original selector. Final validation:
+**279 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt/strict all-target
+Clippy and whitespace passed**. See [milestone](milestones/runtime-recovery.md) and
+[solo review](reviews/runtime-recovery-2026-10-18.md).
+
+[Active dependency-ordered plan](plans/remote-mobile-cli.md): RC-01 recovery,
+RC-02 honest live usage projection, then RE-01 typed InstaBox execution. Mocks can
+support mobile platform work independently; real mobile networking waits for a
+concrete authenticated Host/trust contract. Computer use needs bounded image
+admission and distinct observation/action grants. CLI starts with existing status
+protocols and a tmux/Herdr reuse experiment, not a new PTY multiplexer. Live usage
+counts in the normal CLI projection and the runtime remote adapter are not yet
+implemented; merged standalone InstaBox CLI execution remains independent.
+
+Same `feat/tui-redesign` checkout, baseline `8dea6765`; initial dirty changes and
+unrelated assets/recovery files preserved. No credential/private-session read,
+live inference/cloud/VM action, provisioning, port exposure, secret transfer,
+branch/worktree switch, staging, commit or publication. M02 remains paused; no
+Phase 9, concurrent writes/shell, daemon or desktop implementation.
+
+---
+
 # Terminal redesign PR published — 2026-10-18
 
 [PR #18](https://github.com/404khai/astrid/pull/18) targets main after merged

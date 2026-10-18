@@ -970,6 +970,11 @@ fn context_meter_is_visible_without_verbose_flag_and_tracks_budget_compaction_an
         .map(|p| p.text.as_str())
         .collect::<String>();
     assert!(output.contains("model-window occupancy unknown"));
+    assert!(output.contains("reserve 4096 (planning only)"));
+    assert!(output.contains(&format!(
+        "request bytes 1084000/{}",
+        selection.budget.max_request_bytes
+    )));
     assert!(!output.contains("provider input tokens 271000"));
     selection.snapshot.non_opaque_json_size_token_heuristic = 95000;
     selection.snapshot.measurements.push(ContextMeasurement {
@@ -995,6 +1000,12 @@ fn context_meter_is_visible_without_verbose_flag_and_tracks_budget_compaction_an
     }));
     assert!(state.status(100).contains("ctx unavailable"));
     assert!(!state.status(100).contains("95000"));
+    let output = state
+        .take_output()
+        .into_iter()
+        .map(|p| p.text)
+        .collect::<String>();
+    assert!(output.contains("up to 2 model calls"));
     state.apply(&event(EventKind::ContextPrepared {
         snapshot: selection.snapshot,
     }));

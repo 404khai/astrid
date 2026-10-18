@@ -1,3 +1,21 @@
+# Runtime recovery and next-client direction — 2026-10-18
+
+The maintainer requested root-cause context/cancellation recovery and honest
+budget/usage visibility before a smallest safe InstaBox runtime adapter, plus an
+Expo iOS/Android plan using the existing mobile app and CLI infrastructure research.
+[Active plan](docs/plans/remote-mobile-cli.md),
+[recovery milestone](docs/milestones/runtime-recovery.md).
+The maintainer explicitly approved the scoped history-selection amendment in
+[ADR 0020](docs/adr/0020-followup-context-recovery.md) in this session. Earlier
+whole-historical-submission protection is amended only as recorded there.
+Unmatched tool batches still cannot continue; no synthetic outcomes or side-effect
+replay. Preserve private v2 history/provenance, original continuation, permissions,
+recovery data and unrelated files. No automatic budget increase, live cloud action,
+machine creation, port exposure or secret transfer. Remote target authority and
+Host pairing/network trust require concrete contracts before dependent code.
+No Phase 9, concurrent writes/shell, PTY multiplexer, daemon or desktop implementation.
+M02 remains paused. Meister is primary; Astrix remain specialized identities.
+
 # AGENTS.md — Astrid
 
 ## Phase 8 implementation authorization and naming — 2026-10-16

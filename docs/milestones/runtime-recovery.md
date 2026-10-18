@@ -1,0 +1,63 @@
+# Runtime recovery before remote execution
+
+Date: 2026-10-18
+Authorization: Implementation authorized by the current maintainer request;
+[ADR 0020](../adr/0020-followup-context-recovery.md) separately accepted in this session.
+Implementation: RC-01 Complete; budget presentation Complete; RC-02 live usage projection Draft.
+Acceptance: RC-01 Passed with the explicit limitations below.
+This scoped milestone does not advance Phase 9 or resume paused M02.
+
+## First implementation slice — RC-01
+
+Repair follow-up context admission at the selection boundary. A short explanation
+request after a large completed transcript must dispatch under the unchanged
+allowance. Protect the original/current request, latest actual complete exchange
+and its historical question; permit the earlier prefix to be omitted/condensed.
+Preserve full original history, v2 provenance, original continuation, complete
+request/result units, call-ID uniqueness, permissions and cancellation barriers.
+
+The existing unmatched-tool cancellation policy remains binding: inspect the old
+session and start `/new`; do not replay tools or manufacture outcomes. A cancelled
+model request with no committed incomplete batch may accept a follow-up. This
+slice fixes context stranding, not active-job/crash recovery.
+
+Tests: oversized original and follow-up submissions; private reasoning excluded
+from summary; source history unchanged; actual mocked dispatch and no repeated
+edit; event replay; protected overflow remains a failure; existing cancellation,
+permission, persistence and routing suites. No real session or credential reads.
+
+## Independently reviewable visibility follow-up — RC-02
+
+The small CLI presentation change in this slice prints the configured model-call
+ceiling, planning response reserve and exact request bytes/ceiling alongside the
+existing local utilization estimate. These are configuration/admission values,
+not an enforced provider output-token limit or known model-window occupancy.
+
+Remaining work: expose provider-reported input/output/cached counts in the normal
+run projection, with explicit unavailable/invalid states and completeness for
+aggregates. Current `observability::Usage` already validates counts; traces/stats
+can inspect known values via `astrid trace <run-id>` and `astrid stats` (only retained/recorded coverage). `ExecutionEvent` and `ModelResponse` do not currently
+carry usage to the console. Choose a bounded headless metadata projection rather
+than reading trace files during rendering or conflating estimates with usage.
+Test absent, zero, malformed, partial and cancelled-call telemetry; cached is a
+subset of input. Never derive account quota percentage or cost without a basis.
+
+## Validation record
+
+Baseline inspected: `8dea6765`, existing `feat/tui-redesign` checkout. Unrelated
+`.gitignore`, earlier CURRENT entries, user assets and recovery files preserved.
+Initial serial `cargo test --locked --offline -- --test-threads=1` passed before
+the repair. Final validation on the pinned source:
+
+- `cargo test --locked --offline -- --test-threads=1`: **279 passed, 0 failed, 1 ignored**.
+- `cargo fmt --check`: passed.
+- `cargo clippy --locked --offline --all-targets -- -D warnings`: passed.
+- `python3 -m unittest test_compare_routing.py` from `scripts/`: **2 passed**.
+- Scoped whitespace and local Markdown link checks passed.
+
+The ignored case is the existing optional recording-overhead experiment.
+[Source hashes and command record](../evaluations/runtime-recovery-2026-10-18.json),
+[solo review and limits](../reviews/runtime-recovery-2026-10-18.md). No live inference, cloud action, provisioning, port exposure or secret
+transfer is part of acceptance.
+
+[Dependency-ordered direction](../plans/remote-mobile-cli.md).

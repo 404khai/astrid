@@ -92,3 +92,12 @@ submissions: protect original/current tasks and the latest exchange; keep each
 older follow-up submission with its entire response history. Current-submission
 exchanges remain indivisible assistant/tool units. Request accounting and
 admission semantics are unchanged.
+
+
+## Scoped follow-up selection amendment — 2026-10-18
+
+Accepted [ADR 0020](0020-followup-context-recovery.md) revises only the
+historical-submission/latest-exchange interaction: retain the question and latest
+actual complete exchange while permitting earlier exchanges in that submission
+to be compacted. Original history and incomplete-batch denial remain unchanged.
+The original decision text above is retained as history.

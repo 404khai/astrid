@@ -481,7 +481,24 @@ impl ExecutionState {
                         .then_some(item.message_index)
                         .flatten()
                 });
-                // Earlier user submissions are selected with their whole response history.
+                let latest_exchange_index = self.context_items.iter().rev().find_map(|item| {
+                    matches!(item.origin, crate::context::ContextOrigin::Assistant { .. })
+                        .then_some(item.message_index)
+                        .flatten()
+                });
+                let latest_question = self
+                    .context_items
+                    .iter()
+                    .filter_map(|item| {
+                        matches!(item.origin, crate::context::ContextOrigin::UserTask)
+                            .then_some(item.message_index)
+                            .flatten()
+                    })
+                    .filter(|index| Some(*index) <= latest_exchange_index)
+                    .max();
+                // ADR 0020: the latest historical submission may omit its earlier
+                // exchanges while retaining the question and actual latest exchange.
+                // All other historical submissions remain atomic.
                 let mut submission_retention = BTreeMap::new();
                 for (decision, item) in selection.decisions.iter().zip(&self.context_items) {
                     if let Some(index) = item
@@ -497,6 +514,13 @@ impl ExecutionState {
                             .filter_map(|candidate| candidate.message_index)
                             .filter(|task| *task <= index)
                             .max();
+                        if submission == latest_question
+                            && (Some(index) == latest_question
+                                || Some(index) >= latest_exchange_index)
+                        {
+                            require(decision.retained)?;
+                            continue;
+                        }
                         require(
                             submission_retention
                                 .insert(submission, decision.retained)
