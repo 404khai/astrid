@@ -1,3 +1,27 @@
+# InstaBox CLI completion for merge — 2026-10-18
+
+Maintainer requested completion and merge of PR #17. Optional metadata discovery,
+local `.env` key fallback and separately granted bounded CLI exec on an explicit
+existing ID are now reviewed together. Corrected the interrupted executor's wire
+fields, cwd/timeout defaults, bounded metadata/response waits, phase-aware Ctrl-C,
+unknown-outcome/error/output reporting and nonzero CLI exit behavior. No lifecycle,
+transfer, runtime/model tool, scheduler grants or phase advancement. No credentials
+read, account claims or live VM commands.
+[Completion review](reviews/instabox-completion-2026-10-18.md),
+[exact isolated-source evidence](evaluations/instabox-completion-2026-10-18.json),
+[setup/research](research/instabox-discovery.md).
+
+Isolated exported source checks: **271 Rust passed, 0 failed, 1 ignored; 2 Python
+passed**; format, strict all-target Clippy and whitespace passed. Fifteen focused
+synthetic InstaBox tests passed; no live cloud acceptance is claimed.
+
+Console redesign work is excluded from this InstaBox commit/PR and will be reviewed
+and published separately after its merge. User files, private sessions and recovery
+data remain preserved in the same checkout. Prior publication/checkpoint counts
+below retain their original historical source scope.
+
+---
+
 # InstaBox PR published — 2026-10-18
 
 Opened [PR #17](https://github.com/404khai/astrid/pull/17),

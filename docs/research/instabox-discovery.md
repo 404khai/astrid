@@ -1,5 +1,13 @@
 # InstaBox: optional Linux execution investigation
 
+Current completion/merge scope (2026-10-18): optional metadata discovery, local
+`.env` key fallback and separately granted bounded CLI exec on an explicit existing
+machine. [Authoritative completion review](../reviews/instabox-completion-2026-10-18.md)
+and [new evidence](../evaluations/instabox-completion-2026-10-18.json) supersede the
+initial discovery-only and interrupted-executor limitations below. Historical
+research, original validation counts and publication records remain dated evidence.
+No live credentials/VM action or phase transition was used for this completion.
+
 Date: 2026-10-18. Baseline `c9efb084`, branch `feat/instabox-discovery`, created
 from the existing checkout HEAD without switching to main. User authorization:
 official-source research and a small reversible local integration/read-only spike.
@@ -116,10 +124,11 @@ account inventory. Lists/usage are separate observations, not an atomic snapshot
 No default entitlement, quota headroom or provisioning readiness is fabricated.
 
 The command requires its own explicit grant, independently of local permission
-presets. Missing grant denies before reading the key; invalid IDs deny before
+presets. Missing grant denies before reading the environment or `.env`; invalid IDs deny before
 network. Production origin is fixed HTTPS; URL overrides, redirects, proxy environment
-configuration and TLS bypass are unsupported. Only `INSTABOX_API_KEY` is read;
-no CLI credential store, provider authentication or GitHub token is consulted.
+configuration and TLS bypass are unsupported. Only `INSTABOX_API_KEY` is used: a non-empty environment value wins, otherwise
+the invocation directory's `.env` assignment is read after explicit discovery
+consent. No CLI credential store, provider authentication or GitHub token is consulted.
 Header is marked sensitive; transport/status/JSON errors are categorical, never raw
 server/request errors. Bodies are bounded to 256 KiB, lists to 100; overall deadline
 15 seconds includes all request bodies, connect timeout 5 seconds. Cancellation
@@ -149,23 +158,30 @@ cargo run --locked -- instabox discover --allow-discovery
 cargo run --locked -- instabox discover --allow-discovery --machine m_REPLACE_WITH_EXACT_26_CHAR_ID
 ```
 
-For your own optional account check in **zsh**, enter the key at a hidden prompt
-rather than pasting it into chat or a command argument/history. Use a restricted
-`machines:read` key. The following is user setup guidance only; it was not run
-against a real key during development or publication:
+The user requested `.env` support after shell entry proved troublesome. Put the
+key in `/Users/admin/Developer/astrid/.env` (already covered by `.gitignore`):
 
-```zsh
-read -rs 'INSTABOX_API_KEY?InstaBox API key: '
-printf '\n'
-export INSTABOX_API_KEY
-cargo run --locked -- instabox discover --allow-discovery
-unset INSTABOX_API_KEY
+```dotenv
+INSTABOX_API_KEY=your_actual_key_here
 ```
 
-The key exists only in that shell environment until unset or the shell exits.
-Astrid does not load `.env` files or persist this key; do not commit a key or `.env`
-file. A secret manager may also populate `INSTABOX_API_KEY` in the launched process.
-This optional integration uses existing HTTP dependencies and adds no SDK dependency.
+Use a restricted `machines:read` key and keep the file local. The empty template
+was created with owner-only permissions; an existing file is never overwritten.
+The actual key was not read during development. Run from the repository directory:
+
+```sh
+cargo run --locked -- instabox discover --allow-discovery
+```
+
+A non-empty exported `INSTABOX_API_KEY` takes precedence; if you previously exported
+an incorrect value, run `unset INSTABOX_API_KEY` to use the file. Empty environment
+values fall back to `.env`. The loader reads only the current directory's `.env`
+(no parent-directory search), supports blank/comment lines, optional `export` and
+plain/single/double-quoted values, and never executes shell code, expands variables
+or exports file contents to other processes. It reads only this key assignment;
+other settings are ignored. Missing/empty keys and malformed/duplicate assignments
+fail without printing values. The input is bounded to 16 KiB, UTF-8 regular files
+only; symlinks are refused. No additional dependency or SDK was added.
 
 The ID placeholder is intentionally invalid; replace it with an observed ID.
 `INSTABOX_API_URL` is intentionally ignored. There is no offline fixture flag in
@@ -368,3 +384,27 @@ Previously reported runtime checks remain historical exact-source evidence, not 
 new run caused by documentation publication. The initial no-publication statements
 above describe the earlier slice and are superseded only for this explicitly
 requested PR; remote execution/credential/machine restrictions remain in force.
+
+## Local `.env` follow-up — 2026-10-18
+
+The maintainer explicitly requested a gitignored `.env` and intends to enter the
+key locally. This supersedes the initial environment-only setup limitation and
+hidden-prompt instructions; earlier publication/evidence sections retain their
+dated pre-follow-up facts. The loader applies only to opt-in InstaBox discovery,
+without process-environment mutation or provider/runtime changes. No actual `.env`
+contents were inspected, no authenticated cloud call was made, and `.env` must
+never be staged. Work stays in the current `feat/tui-redesign` checkout, preserving
+the unrelated in-progress terminal changes; no branch switch, staging or publication
+is included in this follow-up. Tests and exact-source evidence are recorded in the
+follow-up checkpoint after validation.
+
+Dotenv follow-up validation: `cargo test --locked -- --test-threads=1` **270 passed,
+0 failed, 1 ignored** in the combined current checkout, including the unrelated
+terminal redesign; `cargo fmt --check`, strict all-target Clippy and whitespace
+passed. Two added synthetic file-loader tests and the expanded isolated CLI
+preflight case cover fallback/precedence, quotes/comments/empty values, no shell
+execution or parent search, invalid/duplicate assignments, size/UTF-8 bounds and
+symlink refusal. [Follow-up evidence](../evaluations/instabox-dotenv-2026-10-18.json).
+Original published PR #17 evidence is retained separately; these local changes
+have not been staged/committed/pushed. The key file is ignored, not part of any
+source hash or report, and was never read during validation.

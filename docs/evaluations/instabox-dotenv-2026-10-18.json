@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-18",
+  "scope": "User-requested local .env fallback for opt-in InstaBox discovery",
+  "branch": "feat/tui-redesign",
+  "head": "31a3986b555a5a5b240ea3889b8d2f64316cb9fe",
+  "worktree": "Uncommitted dotenv follow-up in existing checkout with preserved unrelated terminal-redesign changes; full counts cover this combined checkout",
+  "source_sha256": {
+    "src/instabox.rs": "d8f18a92592c678fb28220654531ae30f5616a04b5ea98b29f4dc207c36abd85",
+    "tests/instabox_cli.rs": "20bec397d4c70206a45886f656df82c178ca54ca458415260595419dede5ba35",
+    "tests/support/instabox_mock.rs": "c6c0cdae3e38e879bfcc036578f77ee898de8b317eea9ce0927b74e7cf6a5d94"
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked -- --test-threads=1",
+      "passed": 270,
+      "failed": 0,
+      "ignored": 1,
+      "log_sha256": "fcaad0deb29828c84059b22a3741593ef4ad99e4776193ca431d4e42f781d6f6"
+    },
+    {
+      "command": "cargo fmt --check",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "command": "git check-ignore .env",
+      "result": "ignored by existing .gitignore"
+    }
+  ],
+  "acceptance": [
+    "Two additional synthetic dotenv tests cover parsing, precedence, literal values, bounds, malformed/duplicate assignments, UTF-8 and symlink refusal",
+    "Actual CLI subprocess test uses isolated current directory and fake keys; verifies file fallback, explicit opt-in and environment precedence before any request"
+  ],
+  "private_file": "Created empty .env using create-new semantics, owner mode 0600; contents never inspected afterward, file excluded from evidence and Git",
+  "cloud_requests": 0,
+  "credentials_read_for_validation": false,
+  "publication": "No staging, commit, push, PR update or branch switch for this local follow-up"
+}
