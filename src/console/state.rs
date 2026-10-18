@@ -19,6 +19,8 @@ pub(super) struct Piece {
 pub(super) struct Presentation {
     model: String,
     context_meter: super::context_meter::ContextMeter,
+    usage_meter: super::usage_meter::UsageMeter,
+    usage_reported: bool,
     pub mode: String,
     pub show_context: bool,
     pub expanded_tool_calls: bool,
@@ -41,6 +43,8 @@ impl Presentation {
         Self {
             model,
             context_meter: Default::default(),
+            usage_meter: Default::default(),
+            usage_reported: false,
             mode: "auto".into(),
             show_context: false,
             expanded_tool_calls: false,
@@ -74,6 +78,24 @@ impl Presentation {
             &format!("  {model_calls} model calls · {tool_calls} tool outcomes"),
             Ink::Dim,
         );
+        self.line(
+            &format!(
+                "  usage total  {} · cached is a subset of input; unavailable counts are not zero",
+                self.usage_meter.label(model_calls)
+            ),
+            Ink::Dim,
+        );
+    }
+    fn missing_usage(&mut self) {
+        if !self.usage_reported {
+            self.line(
+                &format!(
+                    "  usage        {} · telemetry off or provider did not report",
+                    super::usage_meter::call_label(&Default::default())
+                ),
+                Ink::Dim,
+            );
+        }
     }
     pub(super) fn status(&self, width: usize) -> String {
         let context = self.context_meter.label();
@@ -119,6 +141,8 @@ impl Presentation {
             } => {
                 self.model = single_line(model);
                 self.context_meter = Default::default();
+                self.usage_meter = Default::default();
+                self.usage_reported = false;
                 self.run = event.run_id.to_string()[..5].into();
                 self.line(&format!("› {}", single_line(task)), Ink::Accent);
                 self.line("", Ink::Normal);
@@ -131,6 +155,7 @@ impl Presentation {
             EventKind::TurnStarted { number } => self.turn = *number,
             EventKind::ModelCallStarted { number } => {
                 self.model_calls = *number;
+                self.usage_reported = false;
                 self.state = "model";
             }
             EventKind::ModelRouteSelected { decision } => {
@@ -175,17 +200,32 @@ impl Presentation {
                 self.emit(text, Ink::Reply, true);
                 self.text_open = true;
             }
+            EventKind::ModelUsageReported { usage } => {
+                if !self.usage_reported {
+                    self.usage_meter.add(usage);
+                    self.usage_reported = true;
+                    self.line(
+                        &format!("  usage        {}", super::usage_meter::call_label(usage)),
+                        Ink::Dim,
+                    );
+                }
+            }
             EventKind::ModelCallCompleted { .. } => {
                 if self.text_open {
                     self.emit("\n\n", Ink::Normal, true);
                     self.text_open = false;
                 }
+                self.missing_usage();
             }
-            EventKind::ModelCallFailed { message } => self.line(
-                &format!("× model        response interrupted: {message}"),
-                Ink::Normal,
-            ),
+            EventKind::ModelCallFailed { message } => {
+                self.missing_usage();
+                self.line(
+                    &format!("× model        response interrupted: {message}"),
+                    Ink::Normal,
+                );
+            }
             EventKind::ModelCallCancelled => {
+                self.missing_usage();
                 self.line("! model        response interrupted", Ink::Normal)
             }
             EventKind::ToolCallRequested { call } => {

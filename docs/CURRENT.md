@@ -1,3 +1,31 @@
+# Recovery PR published; live token usage — 2026-10-18
+
+Committed recovery as `dc7cbfbc` and opened
+[PR #19](https://github.com/404khai/astrid/pull/19), targeting main. The nineteen
+scoped files exclude initial unrelated edits, local incident artifacts and user
+assets; all six validated source hashes matched the index and 125 index Markdown
+links resolved. The original local checkpoint history remains preserved in the
+working file, outside that commit. No merge or installed CLI refresh.
+
+The maintainer authorized starting the next item after publication. RC-02 is
+implemented on separate `feat/live-token-usage`, stacked on the recovery branch:
+one optional typed provider-usage report per call, checked replay, per-call CLI
+counts and known run totals with per-metric coverage. Observability off still
+means no added telemetry collection or trace writes. Missing/invalid counts stay
+unavailable, zero stays zero, cached is a subset of input. No quota/cost or model
+window estimate is invented. No session v2/private-continuation format changes.
+
+**283 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt and strict all-target
+Clippy passed.** [Compatibility and solo review](reviews/live-token-usage-2026-10-18.md),
+[active plan](plans/remote-mobile-cli.md), [milestone](milestones/runtime-recovery.md).
+No live inference/InstaBox action, provider/InstaBox credential or private-session
+content read, provisioning, port exposure, secret transfer, daemon, desktop or PTY
+implementation. Existing GitHub CLI authentication is used for publication. Original
+unrelated dirty files and recovery data remain intact. RE-01 awaits its concrete
+target-authority contract after RC-02; no next phase is inferred.
+
+---
+
 # Recovery PR preparation — 2026-10-18
 
 Maintainer authorized committing the completed recovery slice, opening a PR, then

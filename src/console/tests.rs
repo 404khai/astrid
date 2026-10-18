@@ -12,6 +12,94 @@ use std::path::Path;
 use unicode_width::UnicodeWidthStr;
 
 #[test]
+fn provider_usage_projection_preserves_zero_unknown_coverage_and_run_reset() {
+    use astrid::observability::Usage;
+    let mut state = Presentation::new("test".into());
+    state.apply(&event(EventKind::ModelCallStarted { number: 1 }));
+    state.apply(&event(EventKind::ModelUsageReported {
+        usage: Usage {
+            input_tokens: Some(12),
+            output_tokens: Some(0),
+            cached_tokens: Some(4),
+            invalid: false,
+        },
+    }));
+    state.apply(&event(EventKind::ModelCallCompleted {
+        text: "done".into(),
+    }));
+    state.apply(&event(EventKind::ModelCallStarted { number: 2 }));
+    state.apply(&event(EventKind::ModelUsageReported {
+        usage: Usage {
+            input_tokens: Some(3),
+            ..Default::default()
+        },
+    }));
+    state.apply(&event(EventKind::ModelCallCompleted {
+        text: "done".into(),
+    }));
+    state.apply(&event(EventKind::ModelCallStarted { number: 3 }));
+    state.apply(&event(EventKind::ModelCallCancelled));
+    state.finish(3, 0);
+    let output = state
+        .take_output()
+        .into_iter()
+        .map(|p| p.text)
+        .collect::<String>();
+    assert!(output.contains("input 12 · output 0 · cached 4 (subset of input)"));
+    assert!(output.contains("input 15 known (2/3 calls)"));
+    assert!(output.contains("output 0 known (1/3 calls)"));
+    assert!(output.contains("cached 4 known (1/3 calls)"));
+    assert!(output.contains("input unavailable · output unavailable · cached unavailable"));
+    assert!(output.contains("model        response interrupted"));
+    assert!(!output.contains("input 19")); // cached counts are not added to input
+    state.apply(&event(EventKind::RunStarted {
+        task: "fresh".into(),
+        model: "test".into(),
+        workspace: ".".into(),
+        max_model_calls: 2,
+    }));
+    state.apply(&event(EventKind::ModelCallStarted { number: 1 }));
+    state.apply(&event(EventKind::ModelCallCompleted {
+        text: "done".into(),
+    }));
+    state.finish(1, 0);
+    let output = state
+        .take_output()
+        .into_iter()
+        .map(|p| p.text)
+        .collect::<String>();
+    assert!(output.contains("input unavailable (0/1 calls)"));
+    assert!(!output.contains("15 known"));
+}
+
+#[test]
+fn provider_usage_labels_invalid_counts_and_totals_without_integer_overflow() {
+    use astrid::observability::Usage;
+    let mut meter = super::usage_meter::UsageMeter::default();
+    let invalid = Usage {
+        input_tokens: Some(2),
+        cached_tokens: Some(3),
+        ..Default::default()
+    }
+    .normalized();
+    assert!(super::usage_meter::call_label(&invalid).contains("invalid provider usage"));
+    assert!(super::usage_meter::call_label(&invalid).contains("input unavailable"));
+    meter.add(&invalid);
+    for _ in 0..2 {
+        meter.add(&Usage {
+            input_tokens: Some(u64::MAX),
+            ..Default::default()
+        });
+    }
+    assert!(
+        meter
+            .label(3)
+            .contains("input 36893488147419103230 known (2/3 calls)")
+    );
+    assert!(meter.label(3).contains("output unavailable (0/3 calls)"));
+}
+
+#[test]
 fn designed_header_preserves_logo_metadata_and_scrollback() {
     for width in [40, 80, 120] {
         let mut bytes = Vec::new();

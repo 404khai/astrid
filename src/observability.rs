@@ -155,6 +155,23 @@ pub struct Usage {
     pub invalid: bool,
 }
 impl Usage {
+    /// Canonical typed metadata, including values supplied by a custom provider.
+    /// Invalid counts never become apparently known usage in a client or trace.
+    pub fn normalized(&self) -> Self {
+        if self.invalid
+            || self
+                .cached_tokens
+                .zip(self.input_tokens)
+                .is_some_and(|(c, i)| c > i)
+        {
+            Self {
+                invalid: true,
+                ..Self::default()
+            }
+        } else {
+            self.clone()
+        }
+    }
     pub fn from_response(value: &serde_json::Value) -> Self {
         let Some(v) = value.get("usage").filter(|v| !v.is_null()) else {
             return Self::default();
@@ -352,6 +369,10 @@ fn project(event: &ExecutionEvent, elapsed_us: u64) -> Record {
             "model_route_selected"
         }
         ModelCallStarted { .. } => "model_call_started",
+        ModelUsageReported { usage } => {
+            metadata = serde_json::json!({"usage":usage});
+            "model_usage_reported"
+        }
         ModelFirstTextDelta => "model_first_text_delta",
         ModelTextDelta { .. } => "model_text_delta",
         ModelCallCompleted { .. } => "model_call_completed",
