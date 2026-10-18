@@ -1,5 +1,13 @@
 # Phase 8 — Scheduler and Workers
 
+2026-10-18 independent scoped extension: the user authorized an optional
+[InstaBox discovery experiment](../research/instabox-discovery.md) on
+`feat/instabox-discovery`. It adds metadata inspection and separately granted
+bounded standalone CLI exec outside the worker/runtime tool path. Scheduler grants,
+accepted ADRs, completion and acceptance disposition below remain unchanged; no
+cloud workers, runtime/model remote tools or Phase 9 transition. The completion
+review linked from the investigation records the final CLI scope and validation.
+
 Date: 2026-10-16
 Authorization: Planning and implementation explicitly approved by the maintainer
 Implementation: P8-01–05 Done; solo review recommends close with explicit limitations; maintainer acceptance pending
