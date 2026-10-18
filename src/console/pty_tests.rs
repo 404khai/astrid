@@ -31,6 +31,10 @@ impl Pty {
             ws_xpixel: 0,
             ws_ypixel: 0,
         };
+        if scenario == "welcome_small" {
+            size.ws_row = 12;
+            size.ws_col = 24;
+        }
         assert_eq!(
             unsafe {
                 libc::openpty(
@@ -79,7 +83,12 @@ impl Pty {
         {
             command.env_remove("NO_COLOR");
         }
-        if scenario == "conversations" {
+        if scenario == "conversations"
+            || matches!(
+                scenario,
+                "welcome_color" | "welcome_small" | "welcome_unbound"
+            )
+        {
             command.env_remove("NO_COLOR");
         }
         if scenario == "redirected_stderr" {
@@ -102,7 +111,7 @@ impl Pty {
             master,
             slave,
             original,
-            parser: vt100::Parser::new(24, 80, 2000),
+            parser: vt100::Parser::new(size.ws_row, size.ws_col, 2000),
             output: Vec::new(),
             queries: 0,
             record: root.join("termios.json"),
@@ -158,6 +167,40 @@ impl Pty {
             );
             std::thread::sleep(Duration::from_millis(5));
         }
+    }
+    fn capture(&self, name: &str) {
+        let Some(directory) = std::env::var_os("ASTRID_UI_CAPTURE_DIR") else {
+            return;
+        };
+        let directory = std::path::PathBuf::from(directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let screen = self.parser.screen();
+        let (height, width) = screen.size();
+        let cells: Vec<_> = (0..height)
+            .flat_map(|row| {
+                (0..width).map(move |col| {
+                    let cell = screen.cell(row, col).unwrap();
+                    serde_json::json!({
+                        "text": cell.contents(),
+                        "fg": format!("{:?}", cell.fgcolor()),
+                        "bg": format!("{:?}", cell.bgcolor()),
+                        "dim": cell.dim(),
+                    })
+                })
+            })
+            .collect();
+        std::fs::write(
+            directory.join(format!("{name}.json")),
+            serde_json::to_vec(&serde_json::json!({"width": width,"height": height,"cells":cells}))
+                .unwrap(),
+        )
+        .unwrap();
+        std::fs::write(
+            directory.join(format!("{name}.ansi")),
+            screen.contents_formatted(),
+        )
+        .unwrap();
+        std::fs::write(directory.join(format!("{name}.txt")), screen.contents()).unwrap();
     }
     fn send(&mut self, bytes: &[u8]) {
         self.master.write_all(bytes).unwrap();
@@ -365,6 +408,39 @@ fn pty_child() {
         instructions: None,
         tools: vec!["shell".into()],
     };
+    if matches!(
+        scenario.as_str(),
+        "welcome_color" | "welcome_plain" | "welcome_small" | "welcome_unbound"
+    ) {
+        // Direct client fixture: even a mistyped command cannot reach catalog/auth.
+        let mode = if scenario == "welcome_unbound" {
+            astrid::permissions::PermissionMode::Unbound
+        } else {
+            astrid::permissions::PermissionMode::Auto
+        };
+        let mut id = id;
+        id.mode = mode.to_string();
+        let mut composer = Composer {
+            mode,
+            header: Some(id),
+            context_label: "ctx unknown".into(),
+            ..Default::default()
+        };
+        assert_eq!(composer.compose("fixture").unwrap().trim(), "/mode");
+        assert_eq!(
+            composer
+                .choose(
+                    "Permission mode — fixture",
+                    &["auto".into(), "ask".into()],
+                    "auto"
+                )
+                .unwrap(),
+            None
+        );
+        assert_eq!(composer.compose("fixture").unwrap(), "/quit");
+        assert!(!crossterm::terminal::is_raw_mode_enabled().unwrap());
+        return;
+    }
     if scenario == "composer" || scenario == "composer_cancel" {
         welcome(&id).unwrap();
         let result = Composer::default().compose("fixture");
@@ -535,6 +611,8 @@ fn pty_conversation_continues_switches_modes_and_returns_to_selected_session() {
     let root = tempfile::tempdir().unwrap();
     let mut pty = Pty::new("conversations", root.path(), "xterm-256color");
     pty.wait_for_screen("Message Astrid");
+    pty.wait_for_screen("Enter sends");
+    pty.capture("pty-welcome");
     for (mode, notice, expected) in [
         (
             "unbound",
@@ -550,6 +628,7 @@ fn pty_conversation_continues_switches_modes_and_returns_to_selected_session() {
     ] {
         pty.send(format!("/mode {mode}\r").as_bytes());
         pty.wait_for_screen(notice);
+        pty.capture(&format!("pty-{mode}"));
         let screen = pty.parser.screen();
         assert_eq!(screen.contents().matches("astrid  0.1.0").count(), 1);
         assert!(
@@ -869,4 +948,86 @@ fn pty_routing_policy_can_resume_after_restart_and_off_keeps_visible_history() {
             .len(),
         2
     );
+}
+
+#[test]
+fn pty_welcome_resize_and_monochrome_keep_input_and_selection() {
+    for scenario in [
+        "welcome_color",
+        "welcome_plain",
+        "welcome_small",
+        "welcome_unbound",
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let mut pty = Pty::new(scenario, root.path(), "xterm-256color");
+        pty.wait_for_screen("Message Astrid");
+        pty.wait_for_screen("Enter sends");
+        if scenario == "welcome_plain" {
+            for sequence in [b"\x1b[38;", b"\x1b[48;"] {
+                assert!(!pty.output.windows(sequence.len()).any(|b| b == sequence));
+            }
+            pty.capture("pty-no-color");
+        }
+        pty.resize(24, 12);
+        pty.send(b"draft");
+        pty.wait_for_screen("draft");
+        assert!(pty.parser.screen().contents().contains("Enter sends"));
+        pty.capture(&format!("pty-small-{scenario}"));
+        pty.resize(80, 24);
+        pty.send(b" text");
+        pty.wait_for_screen("draft text");
+        assert!(
+            pty.parser.screen().contents().contains("████"),
+            "hero should return after growing"
+        );
+        pty.capture(&format!("pty-restored-{scenario}"));
+        let screen = pty.parser.screen();
+        // Detect the exact original 30×10 geometry independently of viewport position.
+        let (rows, columns) = screen.size();
+        let origin = (0..=rows - 10)
+            .find_map(|y| {
+                (0..=columns - 30).find_map(|x| {
+                    crate::logo::LOGO
+                        .lines()
+                        .enumerate()
+                        .all(|(row, line)| {
+                            format!("{line:30}")
+                                .chars()
+                                .enumerate()
+                                .all(|(col, pixel)| {
+                                    let actual = screen
+                                        .cell(y + row as u16, x + col as u16)
+                                        .unwrap()
+                                        .contents();
+                                    if pixel == ' ' {
+                                        actual.trim().is_empty()
+                                    } else {
+                                        actual == pixel.to_string()
+                                    }
+                                })
+                        })
+                        .then_some((x, y))
+                })
+            })
+            .expect("original mascot should return after enlargement");
+        let eye = screen.cell(origin.1 + 3, origin.0 + 10).unwrap();
+        assert_eq!(
+            eye.fgcolor(),
+            if scenario == "welcome_plain" {
+                vt100::Color::Default
+            } else if scenario == "welcome_unbound" {
+                vt100::Color::Rgb(247, 198, 0)
+            } else {
+                vt100::Color::Rgb(0, 247, 213)
+            }
+        );
+        pty.send(&[27]); // clear draft; wait so ESC cannot combine with the next key
+        pty.wait_for_screen("Message Astrid");
+        pty.send(b"/mode \r");
+        pty.wait_for_screen("Permission mode");
+        pty.send(&[27]);
+        pty.wait_for_screen("Message Astrid");
+        pty.send(b"/quit\r");
+        assert!(pty.finish().success());
+    }
 }

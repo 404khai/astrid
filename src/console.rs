@@ -20,6 +20,7 @@ mod terminal;
 mod tests;
 mod theme;
 mod widgets;
+mod wordmark;
 
 pub use composer::Composer;
 pub fn context_status(selection: Option<&astrid::context::ContextSelection>) -> String {
@@ -35,10 +36,12 @@ pub fn interactive_available() -> bool {
     terminal::interactive()
 }
 pub fn welcome(identity: &Identity) -> io::Result<()> {
+    let (width, height) = terminal::size().unwrap_or((80, 24));
     identity::append_header(
         &mut io::stderr().lock(),
         identity,
-        terminal::size().map_or(80, |(w, _)| w),
+        width,
+        height.saturating_sub(6),
         terminal::color(),
     )
 }

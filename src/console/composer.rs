@@ -80,12 +80,10 @@ impl Composer {
             }
             return Ok(Some(line));
         }
-        let size = terminal::size().unwrap_or((80, 24));
-        let header_height = self.header.as_ref().map_or(0, |id| {
-            super::identity::header_lines(id, size.0, terminal::color()).len() as u16
-        });
-        let mut session =
-            Session::with_height(terminal::color(), (header_height + 10).min(size.1 as u16))?;
+        // Ratatui clips the requested inline height to the current terminal.
+        // Keep the desired height so a small launch can grow after a resize.
+        let viewport_height = if self.header.is_some() { 40 } else { 10 };
+        let mut session = Session::with_height(terminal::color(), viewport_height as u16)?;
         let terminal = &mut session.renderer.terminal;
         let mut editor = Editor::new(models, model);
         editor.choice_title = title.map(str::to_owned);
@@ -146,27 +144,12 @@ impl Composer {
                 }
             }
             terminal.draw(|frame| {
-                let mut area = frame.area();
-                if let Some(identity) = &self.header {
-                    let lines = super::identity::header_lines(
-                        identity,
-                        area.width as usize,
-                        terminal::color(),
-                    );
-                    let height = (lines.len() as u16).min(area.height.saturating_sub(5));
-                    frame.render_widget(
-                        ratatui::widgets::Paragraph::new(lines),
-                        ratatui::layout::Rect::new(area.x, area.y, area.width, height),
-                    );
-                    area.y += height;
-                    area.height -= height;
-                }
-                widgets::composer_in_area(
+                widgets::conversation(
                     frame,
-                    area,
                     &mut editor,
                     &status,
                     &self.notice,
+                    self.header.as_ref(),
                     terminal::color(),
                 )
             })?;

@@ -1,3 +1,29 @@
+# Terminal redesign publication review — 2026-10-18
+
+Maintainer requested a separate PR and merge for the named Redesign Astrid Terminal
+UI session, after completing/merging InstaBox. PR #17 is now merged at `5d423a7d`
+with isolated 271/0/1 Rust and 2 Python evidence. This new TUI PR targets that main
+baseline and contains no InstaBox implementation changes.
+
+Reviewed the session's latest exchanges and presentation code, including the user
+correction restoring the original mascot beside the ARC-gradient ASTRID wordmark.
+Centered/adaptive welcome, shaded composer, exact mode colors and narrow/monochrome
+fallbacks retain existing runtime, permissions, scrollback, cancellation, sessions
+and trace behavior. No desktop work or phase advancement.
+[Scope and visual review](reviews/tui-redesign.md),
+[exact publication evidence](evaluations/tui-redesign-validation-2026-10-18.json).
+
+Exact staged source export: 276 Rust passed, 0 failed, 1 ignored; 2 Python passed.
+Formatting and strict all-target Clippy passed. Tests used deterministic mocks
+and PTY fixtures, with no live VM commands or credential reads.
+
+Private credentials/sessions, local incident reports, ignore changes and unrelated
+user/reference/build files are excluded and preserved. Same checkout and branch;
+no worktree or main switch. Earlier checkpoint statements retain their original
+implementation/publication-time scope.
+
+---
+
 # InstaBox CLI completion for merge — 2026-10-18
 
 Maintainer requested completion and merge of PR #17. Optional metadata discovery,
