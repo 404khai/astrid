@@ -1,3 +1,46 @@
+# InstaBox publication preparation — 2026-10-18
+
+Maintainer explicitly authorized scoped staging, conventional commit, push and PR
+for the completed discovery experiment. Branch `feat/instabox-discovery`, same
+checkout. Fetched main `f3d2f3cd` contains merged scheduler PR #16 and has the
+identical tree to the original `c9efb084` baseline, so the PR targets `main` with
+only the nine InstaBox files. No rebase/merge, main switch or phase advancement.
+
+Full pre-publication review and all four recorded code/test hashes match the
+previous **263/0/1 Rust**, **2 Python**, fmt and strict Clippy evidence; only setup
+and publication documentation changed. Hidden zsh key entry guidance is in the
+[report](research/instabox-discovery.md); no `.env` loading, key persistence,
+credential inspection, authenticated cloud requests or remote machine actions.
+Unrelated assets and recovery data remain outside the scoped index.
+
+---
+
+# Optional InstaBox discovery experiment — 2026-10-18
+
+Completed the user-authorized official-source research and local metadata discovery
+spike on `feat/instabox-discovery`, created from existing HEAD `c9efb084` after the
+user explicitly superseded the initial no-branch-switch instruction. Same checkout;
+no main switch/worktree, staging, commit or publication. Unrelated user files,
+private sessions and recovery data preserved.
+
+`astrid instabox discover --allow-discovery [--machine <exact-id>]` performs bounded
+metadata GETs only, with separate explicit discovery consent and environment API-key
+auth. No VM connection, exec, auto-resume, lifecycle, transfer, snapshot or desktop
+implementation. No authenticated/live cloud tests or real credential reads.
+[Research, source links, commands, proposed future contracts and solo review](research/instabox-discovery.md).
+[Exact-source validation](evaluations/instabox-validation-2026-10-18.json): **263 Rust
+passed, 0 failed, 1 ignored**, **2 Python passed**; fmt, strict all-target Clippy and
+whitespace passed. The report retains an initial sandbox bind restriction and an
+existing nested-compilation timeout; isolated fixture and final full reruns passed.
+
+Phase 8 scheduler/PR #16 disposition below remains authoritative: implementation
+review complete, closure with limitations recommended, maintainer acceptance
+pending. No phase advancement, remote worker grants or durable jobs. Next scoped
+implementation action is a proposed target-authority/cancellation/trace ADR and
+mocked exec contracts; no live remote action is authorized by this checkpoint.
+
+---
+
 # Scheduler PR publication — 2026-10-16
 
 Opened [PR #16](https://github.com/404khai/astrid/pull/16), **Add bounded read-only task

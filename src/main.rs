@@ -21,6 +21,7 @@ use std::{
 
 mod batch_cli;
 mod console;
+mod instabox;
 mod logo;
 mod sessions;
 use console::Console;
@@ -66,6 +67,11 @@ enum BatchCommand {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Experimental metadata discovery only; never connects to or wakes a VM.
+    Instabox {
+        #[command(subcommand)]
+        command: instabox::Command,
+    },
     /// Inspect bounded read-only task batches.
     Batch {
         #[command(subcommand)]
@@ -702,12 +708,14 @@ async fn conversation_loop(
 }
 
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
-    let directory = auth::default_directory()?;
     let command = match cli.command {
+        Some(Commands::Instabox { command }) => return instabox::run(command).await,
         Some(command) => command,
         None => return interactive_loop().await,
     };
+    let directory = auth::default_directory()?;
     match command {
+        Commands::Instabox { command } => return instabox::run(command).await,
         Commands::Batch {
             command:
                 BatchCommand::Run {

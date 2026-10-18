@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-18",
+  "baseline": "c9efb084c5a05ec8a5842d72570b88bdd1e3cae2",
+  "branch": "feat/instabox-discovery",
+  "worktree": "uncommitted scoped changes; original checkout; no staging/commit/publication",
+  "source_sha256": {
+    "src/main.rs": "29d866da87d55d3dbaad2fd1a7f591a2e9da0936ca7ac74a43b24134e02ec164",
+    "src/instabox.rs": "bed33c01721b9cbd5982fd013c70e2ef81146e3e747c4f37fd76a9b836ad4676",
+    "tests/instabox_cli.rs": "f096b34626f4d129043929e0a4beaff7bf7be6e1aab2b793638565a2f5a2e044",
+    "tests/support/instabox_mock.rs": "df3f0b7e9c12b7a2597962dac1e20fc9b278bd6df3a608696e6e3c9550a59c80"
+  },
+  "checks": [
+    {
+      "command": "cargo test --locked",
+      "result": "passed",
+      "passed": 263,
+      "failed": 0,
+      "ignored": 1,
+      "completed_suites_including_doc_tests": 25,
+      "log_sha256": "6686ceddda96e18fe1b209a05c66fdc2b3599c7b8a468b11492a5afe1b281f05"
+    },
+    {
+      "command": "cargo test --locked instabox",
+      "result": "passed",
+      "passed": 7,
+      "scope": "mock HTTP unit tests; CLI subprocess test covered by full suite"
+    },
+    {
+      "command": "cargo fmt --check",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "python3 -m unittest discover -s scripts -p 'test_*.py'",
+      "result": "passed",
+      "passed": 2
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "prior_attempts": [
+    {
+      "check": "focused HTTP tests inside sandbox",
+      "result": "localhost bind denied before assertions; rerun outside sandbox passed"
+    },
+    {
+      "check": "first full suite",
+      "result": "existing personal_tasks coding fixture nested Rust compile exceeded 30-second deadline while Clippy ran; no fixture code changed"
+    },
+    {
+      "check": "isolated personal_tasks coding fixture rerun",
+      "result": "passed",
+      "seconds": 20.65
+    }
+  ],
+  "cloud": {
+    "authenticated_requests": 0,
+    "remote_exec": 0,
+    "lifecycle_or_snapshot_changes": 0,
+    "file_transfers": 0,
+    "real_credential_reads": 0
+  },
+  "limitations": [
+    "No live compatibility or account entitlement verified",
+    "One bounded metadata page; no VM connection or execution",
+    "Exec/nonzero-exit/remote-cancellation/lifecycle tests deferred; report names acceptance criteria",
+    "No runtime trace or session schema changes; discovery is a CLI management experiment"
+  ]
+}

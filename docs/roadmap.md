@@ -5,6 +5,11 @@ See [current handoff](CURRENT.md) and the new AGENTS authorization entry.
 
 # Astrid canonical engineering roadmap
 
+2026-10-18 scoped extension: [InstaBox discovery experiment](research/instabox-discovery.md)
+adds optional explicitly granted metadata inspection only. Remote execution,
+target authority, lifecycle and transfers remain proposed execution-environment
+work; this does not advance or accept any phase.
+
 2026-10-16 latest scope: maintainer accepted ADRs 0017–0019 and authorized
 [Phase 8 implementation](plans/phase-8.md) in a new thread and new branch
 `feat/task-scheduler-workers` from main `16d755c4`. PR #15 is merged. Phase 7 closure
