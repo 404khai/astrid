@@ -15,20 +15,33 @@ use unicode_width::UnicodeWidthStr;
 fn designed_header_preserves_logo_metadata_and_scrollback() {
     for width in [40, 80, 120] {
         let mut bytes = Vec::new();
-        append_header(&mut bytes, &identity(), width, true).unwrap();
+        append_header(&mut bytes, &identity(), width, 18, true).unwrap();
         let output = String::from_utf8(bytes).unwrap();
         assert!(output.contains("astrid"));
         assert!(output.contains("model"));
-        assert!(output.contains("cwd"));
+        assert!(output.contains("directory"));
         assert!(output.contains("38;2;68;89;249"));
-        assert!(output.contains("38;2;0;247;213"));
+        assert!(output.contains("38;2;26;50;236"));
         assert!(!output.contains("\x1b[2J"));
         assert!(!output.contains("\x1b[r"));
     }
     let mut bytes = Vec::new();
-    append_header(&mut bytes, &identity(), 80, false).unwrap();
+    append_header(&mut bytes, &identity(), 80, 18, false).unwrap();
     assert!(!bytes.contains(&0x1b));
 }
+#[test]
+fn append_welcome_obeys_short_terminal_budget() {
+    for color in [false, true] {
+        let mut bytes = Vec::new();
+        append_header(&mut bytes, &identity(), 80, 2, color).unwrap();
+        let output = String::from_utf8(bytes).unwrap();
+        assert_eq!(output.lines().count(), 2);
+        assert!(!output.contains('█'));
+        assert!(output.contains("auto"));
+        assert!(output.contains("gpt-5.6-sol"));
+    }
+}
+
 fn identity() -> Identity {
     Identity {
         mode: "auto".into(),
@@ -50,7 +63,7 @@ fn text_is_sanitized_and_truncated_by_terminal_cells() {
     assert_eq!(truncate("hello", 0), "");
     assert_eq!(truncate("hello", 1), "…");
     for width in 0..80 {
-        for row in identity().rows(width) {
+        for row in identity::header_lines(&identity(), width, 18, false) {
             assert!(row.width() <= width);
         }
         assert!(tool_list(&identity().tools, width).width() <= width);
@@ -546,7 +559,7 @@ fn theme_and_input_limits_remain_explicit() {
     );
     assert_eq!(
         super::theme::selection_style(true).fg,
-        Some(ratatui::style::Color::Indexed(208))
+        Some(ratatui::style::Color::Rgb(68, 89, 249))
     );
     assert_eq!(
         super::theme::composer_style(false),
@@ -615,20 +628,17 @@ fn unbound_palette_and_mode_visibility_use_effective_authority() {
     let mut id = identity();
     id.mode = "unbound".into();
     let mut bytes = Vec::new();
-    append_header(&mut bytes, &id, 80, true).unwrap();
+    append_header(&mut bytes, &id, 80, 18, true).unwrap();
     let output = String::from_utf8(bytes).unwrap();
     assert!(output.contains("unbound"));
     assert!(output.contains("\x1b[38;2;249;68;71mastrid"));
     assert!(output.contains("38;2;249;68;71"));
     assert!(output.contains("38;2;236;26;29"));
-    assert!(output.contains("38;2;247;198;0"));
-    let upper = theme::paint_logo("█", 0, true, true);
-    let middle = theme::paint_logo("█", 6, true, true);
-    let lower = theme::paint_logo("█", 9, true, true);
-    assert_eq!(upper, lower);
-    assert_ne!(upper, middle);
+    assert_eq!(theme::wordmark_rgb(0, true), (249, 68, 71));
+    assert_eq!(theme::wordmark_rgb(3, true), (236, 26, 29));
+    assert_eq!(theme::wordmark_rgb(6, true), (249, 68, 71));
     let mut bytes = Vec::new();
-    append_header(&mut bytes, &id, 80, false).unwrap();
+    append_header(&mut bytes, &id, 80, 18, false).unwrap();
     assert!(!bytes.contains(&27));
     let mut state = Presentation::new("test".into());
     state.apply(&event(EventKind::PermissionsConfigured {
@@ -692,11 +702,11 @@ fn expanded_tool_results_are_optional_and_bounded() {
 }
 
 #[test]
-fn composer_background_starts_at_two_rows_and_grows() {
+fn composer_panel_includes_padding_metadata_and_grows() {
     use ratatui::style::Color;
     let mut terminal = Terminal::new(TestBackend::new(40, 12)).unwrap();
     let mut editor = Editor::new(None, "test");
-    for (input, expected) in [("", 2), ("first\nsecond", 2), (&"a".repeat(80), 3)] {
+    for (input, expected) in [("", 6), ("first\nsecond", 6), (&"a".repeat(80), 7)] {
         editor.textarea.select_all();
         editor.textarea.insert_str(input);
         terminal
@@ -731,7 +741,7 @@ fn unbound_theme_recolors_transcript_prompt_and_mode_label() {
         .draw(|f| widgets::composer(f, &mut editor, "unbound · session · test", "", true))
         .unwrap();
     let buffer = terminal.backend().buffer();
-    assert_eq!(buffer[(0, 8)].fg, red); // prompt chevron
+    assert_eq!(buffer[(0, 7)].fg, red); // prompt chevron
     for x in 0..7 {
         assert_eq!(buffer[(x, 10)].fg, red);
     }
@@ -1009,4 +1019,192 @@ fn context_status_and_command_notice_both_remain_visible_in_composer() {
     let rendered = text(terminal.backend().buffer());
     assert!(rendered.contains("57% ~271000/475000 budget"));
     assert!(rendered.contains("Routing off for subsequent runs"));
+}
+
+#[test]
+fn welcome_reflows_preserves_input_and_exact_arc_stops() {
+    use ratatui::style::{Color, Style};
+    assert_eq!(theme::wordmark_rgb(0, false), (68, 89, 249));
+    assert_eq!(theme::wordmark_rgb(3, false), (26, 50, 236));
+    assert_eq!(theme::wordmark_rgb(6, false), (68, 89, 249));
+    for row in 0..7 {
+        assert_eq!(
+            theme::wordmark_rgb(row, false),
+            theme::wordmark_rgb(6 - row, false)
+        );
+    }
+    for (w, h) in [(120, 30), (80, 24), (40, 24), (24, 12), (8, 8), (1, 1)] {
+        for mode in ["auto", "unbound"] {
+            for color in [false, true] {
+                let mut id = identity();
+                id.mode = mode.into();
+                let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
+                let mut editor = Editor::new(None, "fixture");
+                let status = format!("{mode} · ctx unknown · fixture");
+                terminal
+                    .draw(|f| widgets::conversation(f, &mut editor, &status, "", Some(&id), color))
+                    .unwrap();
+                let buffer = terminal.backend().buffer();
+                let rendered = text(buffer);
+                if w >= 24 && h >= 12 {
+                    assert!(rendered.contains("Message Astrid"), "{w}x{h}: {rendered}");
+                    assert!(rendered.contains(mode));
+                    assert!(rendered.contains("Enter sends"));
+                }
+                let pixels = buffer.content.iter().filter(|c| c.symbol() == "█").count();
+                assert_eq!(pixels > 0, w >= 30 && h >= 22);
+                if !color {
+                    assert!(
+                        buffer
+                            .content
+                            .iter()
+                            .all(|c| c.fg == Color::Reset && c.bg == Color::Reset)
+                    );
+                    assert_eq!(
+                        theme::wordmark_style(3, false, mode == "unbound"),
+                        Style::default()
+                    );
+                }
+                // Menus must fit alongside the welcome, including after shrinking.
+                editor.handle(Event::Paste("/mode".into()));
+                terminal
+                    .draw(|f| widgets::conversation(f, &mut editor, &status, "", Some(&id), color))
+                    .unwrap();
+                if w >= 24 && h >= 12 {
+                    assert!(text(terminal.backend().buffer()).contains("Commands"));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn capture_welcome_and_conversation_samples() {
+    let Some(directory) = std::env::var_os("ASTRID_UI_CAPTURE_DIR") else {
+        return;
+    };
+    let directory = std::path::PathBuf::from(directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    for (w, h, mode, color, welcome) in [
+        (120, 30, "auto", true, true),
+        (80, 24, "auto", true, true),
+        (40, 24, "auto", true, true),
+        (40, 32, "auto", true, true),
+        (24, 12, "auto", true, true),
+        (80, 24, "unbound", true, true),
+        (80, 24, "auto", false, true),
+        (80, 10, "auto", true, false),
+    ] {
+        let mut id = identity();
+        id.mode = mode.into();
+        let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
+        let mut editor = Editor::new(None, &id.model);
+        let status = format!("{mode} · ctx unknown · new session · {}", id.model);
+        terminal
+            .draw(|f| {
+                widgets::conversation(f, &mut editor, &status, "", welcome.then_some(&id), color)
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let name = format!(
+            "{}-{w}x{h}-{mode}-{color}",
+            if welcome { "welcome" } else { "composer" }
+        );
+        std::fs::write(directory.join(format!("{name}.txt")), text(buffer)).unwrap();
+        let cells: Vec<_> = buffer
+            .content
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "text": c.symbol(), "fg": format!("{:?}", c.fg), "bg": format!("{:?}", c.bg),
+                    "dim": c.modifier.contains(ratatui::style::Modifier::DIM),
+                })
+            })
+            .collect();
+        std::fs::write(
+            directory.join(format!("{name}.json")),
+            serde_json::to_vec(&json!({"width":w,"height":h,"cells":cells})).unwrap(),
+        )
+        .unwrap();
+    }
+}
+
+#[test]
+fn original_mascot_geometry_and_eyes_share_the_welcome_with_wordmark() {
+    use ratatui::style::Color;
+    for (width, height, mascot_x, mascot_y, block_text) in [
+        (80, 18, 5, 1, true),
+        (120, 18, 8, 1, true),
+        (40, 18, 5, 1, false),
+        (40, 26, 5, 1, true),
+    ] {
+        for mode in ["auto", "unbound"] {
+            for color in [false, true] {
+                let mut id = identity();
+                id.mode = mode.into();
+                let lines = identity::header_lines(&id, width, height, color);
+                let mut buffer = Buffer::empty(ratatui::layout::Rect::new(
+                    0,
+                    0,
+                    width as u16,
+                    height as u16,
+                ));
+                use ratatui::widgets::Widget;
+                ratatui::widgets::Paragraph::new(lines).render(buffer.area, &mut buffer);
+                for (row, original) in crate::logo::LOGO.lines().enumerate() {
+                    let original = format!("{original:30}");
+                    for (column, pixel) in original.chars().enumerate() {
+                        let cell = &buffer[((mascot_x + column) as u16, (mascot_y + row) as u16)];
+                        assert_eq!(
+                            cell.symbol(),
+                            pixel.to_string(),
+                            "{width}x{height} row {row} col {column}"
+                        );
+                        if color && pixel == '█' {
+                            let (r, g, b) = theme::logo_rgb(row, column, mode == "unbound");
+                            assert_eq!(cell.fg, Color::Rgb(r, g, b));
+                        } else {
+                            assert_eq!(cell.fg, Color::Reset);
+                        }
+                    }
+                }
+                let eye = &buffer[((mascot_x + 10) as u16, (mascot_y + 3) as u16)];
+                assert_eq!(
+                    eye.fg,
+                    if !color {
+                        Color::Reset
+                    } else if mode == "unbound" {
+                        Color::Rgb(247, 198, 0)
+                    } else {
+                        Color::Rgb(0, 247, 213)
+                    }
+                );
+                // The wordmark remains beside the mascot or below it on tall narrow windows.
+                let (x, y, scale) = if width >= 69 {
+                    (mascot_x + 33, 2, if width >= 104 { 2 } else { 1 })
+                } else {
+                    (2, 12, 1)
+                };
+                if block_text {
+                    for (row, word) in wordmark::rows(scale).iter().enumerate() {
+                        for (column, pixel) in word.chars().enumerate().filter(|(_, c)| *c == '█')
+                        {
+                            let cell = &buffer[((x + column) as u16, (y + row) as u16)];
+                            assert_eq!(cell.symbol(), pixel.to_string());
+                            assert_eq!(
+                                cell.fg,
+                                theme::wordmark_style(row, color, mode == "unbound")
+                                    .fg
+                                    .unwrap_or(Color::Reset)
+                            );
+                        }
+                    }
+                } else {
+                    assert!(text(&buffer).contains("ASTRID"));
+                }
+                assert!(text(&buffer).contains("model"));
+                assert!(text(&buffer).contains("directory"));
+            }
+        }
+    }
 }

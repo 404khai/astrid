@@ -12,6 +12,43 @@ use ratatui::{
     widgets::Paragraph,
 };
 
+/// Welcome and input share a centered reading column; only startup owns the hero.
+pub(super) fn conversation(
+    frame: &mut Frame,
+    editor: &mut Editor,
+    status: &str,
+    notice: &str,
+    header: Option<&super::Identity>,
+    color: bool,
+) {
+    let mut area = frame.area();
+    if let Some(identity) = header {
+        let lines = super::identity::header_lines(
+            identity,
+            area.width as usize,
+            area.height.saturating_sub(6) as usize,
+            color,
+        );
+        let height = lines.len() as u16;
+        frame.render_widget(
+            Paragraph::new(lines),
+            Rect::new(area.x, area.y, area.width, height),
+        );
+        area.y += height;
+        area.height -= height;
+    }
+    let inset = (area.width.saturating_sub(88) / 2).max(if area.width >= 40 {
+        2
+    } else if area.width >= 12 {
+        1
+    } else {
+        0
+    });
+    area.x += inset;
+    area.width -= inset * 2;
+    composer_in_area(frame, area, editor, status, notice, color);
+}
+
 #[cfg(test)]
 pub(super) fn composer(
     frame: &mut Frame,
@@ -50,9 +87,21 @@ pub(super) fn composer_in_area(
             (line.width() + 1).div_ceil(width).max(1)
         })
         .sum::<usize>();
-    let height = (menu_rows + rows.max(2) + 2).min(usize::from(bounds.height)) as u16;
+    let height = (menu_rows + rows.max(2) + 4).min(usize::from(bounds.height)) as u16;
     let bounds = Rect::new(bounds.x, bounds.bottom() - height, bounds.width, height);
-    let (menu, area, footer) = layout::composer(bounds, menu_rows);
+    frame.render_widget(
+        Paragraph::new("").style(theme::composer_style(color)),
+        bounds,
+    );
+    // Keep one row of breathing room above the editor when space permits.
+    let padding = u16::from(bounds.height >= 6);
+    let inner = Rect::new(
+        bounds.x,
+        bounds.y + padding,
+        bounds.width,
+        bounds.height - padding,
+    );
+    let (menu, area, footer) = layout::composer(inner, menu_rows);
     frame.render_widget(Paragraph::new("").style(theme::composer_style(color)), menu);
     frame.render_widget(Paragraph::new("").style(theme::composer_style(color)), area);
     if menu.height > 0 {
@@ -137,7 +186,7 @@ pub(super) fn composer_in_area(
             theme::mode_line(truncate(model, footer.width as usize), unbound, color),
             theme::mode_line(truncate(&help, footer.width as usize), unbound, color),
         ])
-        .style(Ink::Dim.style(color)),
+        .style(theme::composer_style(color)),
         footer,
     );
 }

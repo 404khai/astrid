@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-18",
+  "scope": "CLI presentation redesign with restored mascot; no runtime/permission change",
+  "base": "main",
+  "base_commit": "5d423a7d52e1011a952c03d7e19355824e04e69e",
+  "source_sha256": {
+    "src/console.rs": "a0d1f6da74e6795a155dbf9af481451f2ee1cb2aea75b0b92399b37bfc03e1c4",
+    "src/console/composer.rs": "e034781e6e7586aa414adbdc970449f34452d9b6200316b99217317732325986",
+    "src/console/identity.rs": "7f88cb242f54a4ec3f06b8e8de138f36897edebe191c5e944b521b90b1bcd49d",
+    "src/console/legacy.rs": "60ec71ffd3372b71fb79e1c2e0016a2b4e5daded9e25048bc8906f4c3a837c18",
+    "src/console/pty_tests.rs": "3460f009a3ea5084c5a19330fe18c809dff53f6a572480b42a82add56987d42b",
+    "src/console/tests.rs": "8442d72dcdade20c4bc037d8645cf23c4d936676a41af53de7317886cbeb902a",
+    "src/console/theme.rs": "7e540f56618a9412ef81a68a8de6bc12acb55d50f1bbf7dc604cc39c63512c87",
+    "src/console/widgets.rs": "74f17e82e4e90727d06294d11565578908136822a6d198c4e3de142daff55d77",
+    "src/console/wordmark.rs": "e8a40713b749e1fb060a7b4b48cba4aab9447c194b3726c8bc6ec48d00cbb561"
+  },
+  "validation": {
+    "method": "isolated export of staged tracked tree; locked offline dependencies; serial Rust tests",
+    "rust": {
+      "passed": 276,
+      "failed": 0,
+      "ignored": 1,
+      "suites": 25
+    },
+    "python": {
+      "passed": 2,
+      "failed": 0
+    },
+    "fmt": "passed",
+    "clippy_all_targets_deny_warnings": "passed",
+    "source_sha256_verified": true,
+    "logs": {
+      "/tmp/astrid-tui-pr-exact-tests.log": "38f6e9834d528e7e860080341d011683069108f0e62e257c22374ecb5b8ec44e",
+      "/tmp/astrid-tui-pr-exact-clippy.log": "92823f4fe59351629fce03c3c00f5249d4c365bf306c327160f7f28f4f3ddfba"
+    }
+  },
+  "visual_review": "Re-inspected saved normal and unbound PTY-cell PNG projections; final resize/monochrome PTY regressions passed; no Terminal.app screenshot/live inference claimed",
+  "secrets_or_cloud_access": false
+}
