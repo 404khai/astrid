@@ -49,4 +49,3 @@ of this slice. Stop after its reviewable PR.
 Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
 stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs
 remain unmerged. No live operation or successor implementation was performed.
-
