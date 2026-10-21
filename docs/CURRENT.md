@@ -1,3 +1,44 @@
+# Screenshot observation contract and fixtures — 2026-10-21
+
+CU-01 uses parent-created `feat/screenshot-observation` from main `7d7f45d5`,
+same preserved checkout, no worktree. #22/#23 were already merged upstream;
+this task merges no PR. The maintainer explicitly accepted
+[ADR 0022](adr/0022-screenshot-observation.md) with its gates: separate exact-call
+observe authority, one memory-only frame/10 s retention and zero model image
+context/disclosure. No local preset, exec grant, selection or resume grants observe.
+
+Public OpenAPI and SDK 0.5.3 audit found POST desktop status but no direct screenshot
+endpoint; SDK screenshot uses commands/files and guest cleanup. No guessed wire
+payload or live adapter was added. The executable specification is Python-only,
+synthetic and disconnected from Rust/runtime/provider/session/trace integration.
+Its restricted PNG decoder and explicit fake-clock cleanup are fixture proofs,
+not a production decoder, idle timer or hard cancellation guarantee.
+
+**308 Rust passed, 0 failed, 1 ignored; 18 Python passed (16 CU-01 + 2 existing);
+fmt, strict all-target Clippy and whitespace passed.**
+[Review/API audit](reviews/screenshot-observation-2026-10-21.md),
+[evidence](evaluations/screenshot-observation-2026-10-21.json),
+[milestone](milestones/screenshot-observation.md), [active plan](plans/remote-mobile-cli.md).
+Private v2, original results/history, continuation/provenance, complete exchanges,
+context admission, cancellation and ADRs 0008/0009/0021 remain unchanged.
+
+Design/fixture slice validated. Full CU-01 runtime observation remains gated on
+transport, production decoding, runtime integration and separately authorized live
+scope. Image persistence/provider/schema changes remain gated. RE-02 live trial
+is independently pending exact target/scope; CLI/fixture checks are not live evidence.
+No credentials/private sessions or reference images read, cloud/VM/model action,
+CU-02 actions, lifecycle, Host/mobile, daemon, PTY or desktop client implementation.
+Next plan item CU-02 remains future; stop here and leave its contracts unresolved.
+Unrelated `.gitignore`, historical CURRENT edits and untracked user/recovery data
+remain preserved and outside the task commit.
+
+Publication: contract `1579a889` and fixtures `11971bf8` are published in
+[PR #24](https://github.com/404khai/astrid/pull/24) against main, **open and unmerged**.
+No PR was merged by this task. Only the design/fixture slice is delivered;
+runtime/live gates remain pending and CU-02 has not begun.
+
+---
+
 # Foreground InstaBox CLI approvals — 2026-10-21
 
 RE-02 connects invocation-only `--instabox-machine <exact-ID>` selection to
