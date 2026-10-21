@@ -19,7 +19,7 @@ public OpenAPI and SDK evidence, including the missing direct screenshot route.
 Design/fixture exit: independently exercise denial/binding/single use, bounds,
 safe restricted synthetic PNG decode, replacement/expiry/cancellation cleanup,
 staleness and unavailable image-token accounting without a real machine or model.
-Full bounded screenshot/status runtime observation remains gated on accepted
+Full bounded screenshot/status runtime observation remains gated on runtime integration under accepted
 authority, supported transport and production decoder, then separately scoped live
 authorization. Fixtures cannot establish live evidence or complete that exit.
 
@@ -32,3 +32,15 @@ are preserved. Rust owns the harness; Meister primary, Astrix specialized.
 Stop after this slice and its PR. Next plan item CU-02 remains future and requires
 action, coordinate/freshness and provider-image contracts; do not start it. CU-01
 runtime and RE-02 live gates remain pending independently.
+
+
+## Validation and disposition
+
+Accepted contract committed as `1579a889` before the fixture implementation commit.
+Sixteen CU-01 Python synthetic tests plus two existing comparison tests pass;
+**308 Rust passed, 0 failed, 1 ignored**, fmt/strict all-target Clippy/whitespace
+passed. [Review/limits](../reviews/screenshot-observation-2026-10-21.md),
+[source evidence](../evaluations/screenshot-observation-2026-10-21.json).
+Only design/fixture exit is satisfied. No runtime tool, transport, production PNG
+decoder, image session persistence or model image input was installed. Full CU-01
+runtime/live acceptance remains pending; no CU-02 work began.

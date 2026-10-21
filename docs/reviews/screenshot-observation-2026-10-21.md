@@ -39,8 +39,54 @@ advertised as a working screenshot tool, or used on real captured data. Producti
 permissions, CLI, provider, context, events, session and trace code remain unchanged.
 No PNG data, paths, hashes or arbitrary screen content enters metadata traces.
 
-Fixture coverage/validation and publication are recorded below after execution.
+Fixture coverage/validation and publication are recorded below.
 Remaining gates: verified bounded live transport/cleanup;
 maintained production decoder with bounded cancellation; headless runtime complete
 exchange integration; explicit exact-machine live trial. Provider image disclosure,
 retention/schema migration and CU-02 actions require later separate decisions.
+
+
+## Fixture implementation and solo review
+
+`scripts/screenshot_observation_fixture.py` is a Python executable specification,
+not a Rust runtime tool or transport. Synthetic PNGs are generated in memory by
+`scripts/test_screenshot_observation.py`; no captured screen, image file or user
+reference asset is read. No new dependency, Rust export, tool registration, CLI
+flag, provider input, session schema or trace field was added.
+
+Sixteen deterministic tests cover every binding identity/canonical operation,
+unknown/action arguments, unrelated local presets/exec/selection/resume values,
+atomic single consumption across 32 contenders, no serialization, exact expiry,
+cancellation racing admission, cancellation/deadline during receipt, failure with
+no retry, categorical errors, status allowlist/inconsistency, replacement/failure/
+geometry/close/expiry cleanup, stale call IDs, failed-frame traffic/count spending,
+whole-run window, byte/pixel bounds, CRC/truncation/trailing PNG, ancillary/animated/
+unsupported formats and decompression bombs. Accounting keeps PNG/RGBA/pixels
+separate, image context zero, image tokens/cost unavailable.
+
+Solo review checked the proposed contract against the existing text-only model,
+context/admission, private v2, grants and metadata trace boundaries. No implementation
+of those production boundaries changed. The fixture's Python lock demonstrates
+single use only within this process; it is not authenticated trust. Chunk sources
+already own their bytes and can block; fake time/deadlines cannot demonstrate hard
+I/O cancellation or a bounded decoder worker. The restricted decoder is unsuitable
+for real provider PNGs. Cleanup uses explicit sweep/access/close, not an idle timer;
+Python allocation copies are not securely erased. These gaps are explicit live/
+production gates, not passing claims. Exact targets remain test-only/private data.
+
+## Validation
+
+- `cargo test --locked --offline -- --test-threads=1`: **308 passed, 0 failed,
+  1 ignored** (existing optional recording-overhead test).
+- In `scripts/`, `python3 -m unittest -v test_screenshot_observation.py
+  test_compare_routing.py`: **18 passed** (16 CU-01 and 2 existing comparison tests).
+- `cargo fmt --check`: passed.
+- `cargo clippy --locked --offline --all-targets -- -D warnings`: passed.
+- Scoped whitespace and relative Markdown link checks: passed.
+- Production `src/`, `tests/` and Cargo manifests/lock match the main baseline.
+
+[Command and source evidence](../evaluations/screenshot-observation-2026-10-21.json).
+No authenticated InstaBox/public provider call, live screenshot, cloud operation,
+credential/private-session read, model disclosure, merge or installed CLI refresh.
+CU-01 design/fixture slice is validated; full runtime/live observation remains
+pending the explicit gates. RE-02 live trial is independently pending authorization.
