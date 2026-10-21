@@ -1,3 +1,35 @@
+# Aggregate tool-exchange admission — 2026-10-21
+
+Maintainer authorized RC-03 on a new branch, then its PR, merges of the open
+implementation PRs and closure of Tauri draft #13. Current branch:
+`feat/aggregate-tool-admission`, parent `fd419fb6`, same preserved checkout.
+No new conversation thread could be created through the available tools.
+
+The guard checks original/current requests, instructions and the new assistant/
+actual-result prefix before the first tool and between results. Over-budget
+prefixes stop pending tools and further inference, retaining all actual results
+and mutations. No synthetic outcomes, per-tool truncation, budget increase or
+private v2 change. Skipped incomplete batches still require `/new`. A prefix
+that fits cannot guarantee future results fit; this is not a total-memory bound.
+
+**288 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt and strict all-target
+Clippy passed.** The original runtime fails the later-mutation regression.
+[PR #21](https://github.com/404khai/astrid/pull/21) publishes implementation
+`b87218d4` and targets main after its dependencies merged; [RC-03 review](reviews/aggregate-tool-admission-2026-10-21.md),
+[active plan](plans/remote-mobile-cli.md), [milestone](milestones/runtime-recovery.md).
+#19 merged as `a0b42bed54c4d19acb42a310eba70d22334c6fd3`; #20 was retargeted
+and merged as `413c82203dbd2f68efbc76f310ba183edac3c033`. Fetched main's
+source tree matched each reviewed dependency exactly. #13 is closed, not merged;
+its branch remains at `8baf6af826ce4e4fed200d31e35b93d4e00f06b2` and paused
+source is preserved. RC-03 has passed local checks and is published; consult
+PR #21 for final GitHub merge disposition. Next work is RE-01's concrete remote
+target-authority ADR, then its smallest mocked InstaBox adapter.
+No live inference/InstaBox actions, provider/private-session reads or successor
+implementation. Original unrelated `.gitignore`, local checkpoint history,
+user assets and recovery data remain preserved.
+
+---
+
 # Recovery PR published; live token usage — 2026-10-18
 
 Committed recovery as `dc7cbfbc` and opened

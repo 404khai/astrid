@@ -77,3 +77,24 @@ missing or invalid values remain unavailable. RE-01 still needs target authority
 
 Publication: implementation `36ccc11d`, [PR #20](https://github.com/404khai/astrid/pull/20)
 stacked on recovery PR #19. Neither PR was merged by this task.
+
+
+## RC-03 — Aggregate exchange admission, 2026-10-21
+
+Implementation authorized by the maintainer's new branch/thread request;
+`feat/aggregate-tool-admission`, parent `fd419fb6`, same preserved checkout.
+Implemented and validated. Check the mandatory exchange prefix before more tool execution and
+after the final result; stop pending work on overflow without rewriting results,
+replaying effects or changing budgets. Incomplete batches remain inspection-only;
+a result that crosses the allowance is retained, so this is not a guaranteed-fit
+or total-memory bound. [Review/contract](../reviews/aggregate-tool-admission-2026-10-21.md).
+**288 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt/strict all-target
+Clippy passed.** [Pinned evidence](../evaluations/aggregate-tool-admission-2026-10-21.json).
+The original-runtime regression executes the forbidden later mutation. RE-01 follows
+this slice and still needs its target-authority contract.
+
+
+RC-03 publication: `b87218d4`, [PR #21](https://github.com/404khai/astrid/pull/21)
+targeting main after #19/#20 merged. GitHub PR state records its final merge.
+Tauri draft #13 was closed at the maintainer's request, preserving source/branch.
+Next: RE-01 authority contract, then mocked adapter; no live remote grant yet.

@@ -1,3 +1,19 @@
+# RC-03 implementation and PR cleanup authorization — 2026-10-21
+
+Maintainer requested a new branch/thread for RC-03, then a PR, merging the open
+implementation PRs and deleting the paused Tauri draft. Work is on
+`feat/aggregate-tool-admission` from `fd419fb6`, same checkout, no worktree.
+The session cannot create a separate conversation UI thread; no thread creation
+is claimed. RC-03 checks mandatory accumulated tool-exchange admission before
+further execution, preserving original results, mutations, permissions and
+incomplete-batch rejection. No synthetic outcomes or automatic budget increases.
+Publish/merge #19, #20 and the RC-03 PR in dependency order after validation;
+close draft #13 without deleting its preserved branch or desktop source. This
+supersedes earlier no-merge directions only for this explicitly authorized cleanup.
+No remote-target contract, live VM action, Phase 9, daemon, PTY or desktop code.
+See [active plan](docs/plans/remote-mobile-cli.md) and
+[RC-03 review](docs/reviews/aggregate-tool-admission-2026-10-21.md).
+
 # RC-02 continuation authorization — 2026-10-18
 
 Maintainer instructed: commit changes, make a PR, then start the next item in

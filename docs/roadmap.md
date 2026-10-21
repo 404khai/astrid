@@ -1,3 +1,13 @@
+# RC-03 scoped continuation — 2026-10-21
+
+The maintainer authorized aggregate tool-exchange admission on a new branch,
+then PR publication and merging the open implementation PRs, with closure of
+the paused Tauri draft. [Plan](plans/remote-mobile-cli.md),
+[review](reviews/aggregate-tool-admission-2026-10-21.md).
+RC-03 precedes RE-01; no remote authority or phase transition is implied.
+
+---
+
 # Active scoped direction — 2026-10-18
 
 The maintainer requested runtime recovery and honest budget/usage visibility

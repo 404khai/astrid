@@ -40,8 +40,8 @@ trust need their concrete ADR before dependent implementation.
 | --- | --- | --- | --- |
 | RC-01 | Accepted ADR 0020 | Oversized previous-submission follow-up fits unchanged allowance; no replay; retained originals, omission lineage and checked events | Done; [milestone/evidence](../milestones/runtime-recovery.md) |
 | RC-02 | RC-01; metadata projection compatibility review | Normal CLI displays valid known input/output/cached counts, unknowns and aggregate coverage; budgets separately labeled | Done; [compatibility/review](../reviews/live-token-usage-2026-10-18.md) |
-| RC-03 | RC-01/02 | Bound one multi-tool exchange before further costly work; test many individually legal large outputs, Unicode and latest-exchange overflow | Draft; investigate output admission separately, preserve original results |
-| RE-01 | RC-01/02; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Draft; smallest safe remote adapter below |
+| RC-03 | RC-01/02 | Bound one multi-tool exchange before further costly work; test many individually legal large outputs, Unicode and latest-exchange overflow | Done; [RC-03 guard/review](../reviews/aggregate-tool-admission-2026-10-21.md) |
+| RE-01 | RC-01/02/03; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Draft; smallest safe remote adapter below |
 | RE-02 | RE-01 | Authorized isolated live trial: exact selected running machine, harmless `printf`/`pwd`, denial/timeout/cancel and attribution inspected separately | Draft; exact live request including possible wake requires authorization |
 | CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Draft; no desktop action implied |
 | CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | Draft; isolated harmless desktop trial after explicit live scope |
@@ -54,7 +54,10 @@ trust need their concrete ADR before dependent implementation.
 
 Recommended first slice is RC-01, implemented under the separately accepted
 amendment. Finish its deterministic validation before remote work. RC-02 is now validated and complete after
-[recovery PR #19](https://github.com/404khai/astrid/pull/19); then RE-01. MO-01 can use mocks independently; its apparent working
+[recovery PR #19](https://github.com/404khai/astrid/pull/19). The maintainer authorized
+RC-03 on 2026-10-21 before RE-01, resolving the earlier prose/table ordering
+inconsistency. Complete aggregate-exchange admission, then the RE-01 authority
+contract and mocked adapter. MO-01 can use mocks independently; its apparent working
 state must never imply a real run. Do not combine these tickets in one large PR.
 
 ## Smallest safe InstaBox runtime adapter (RE-01 design)
@@ -224,7 +227,8 @@ remote writes and worktree isolation remain deferred to separately scoped work.
 
 ## Review and stopping conditions
 
-RC-01 must pass cancellation/history/permission regression suites before RE-01.
+RC-01–03 have passed their deterministic recovery/admission checks. RE-01 still
+requires its concrete target-authority contract before dependent code.
 A screenshot capability waits for bounded image admission. A real mobile connection
 waits for the Host trust/lifetime contract. Terminal work cannot silently implement
 a scheduler, durable jobs or Phase 9. Preserve private sessions, credentials,
