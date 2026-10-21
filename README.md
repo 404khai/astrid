@@ -161,6 +161,13 @@ Missing/invalid counts stay unavailable; reported zero stays zero. Cached tokens
 are a subset of input, and cumulative run usage is not current context occupancy.
 `astrid trace` retains the same usage for later inspection.
 
+During a multi-tool response, Astrid checks the mandatory accumulated exchange
+before another tool executes. If actual results exceed local admission, pending
+tools are skipped and the run fails explicitly; completed results and edits stay
+intact. No replacement tool outcomes are invented. An incomplete batch still
+requires `/new`. The crossing result is retained, so this guard is not a promise
+that every result or session fits in memory.
+
 The active meter updates from context selection/preflight, including compaction.
 The idle prompt says `last` because it describes the last prepared request in the
 selected session, not unsent text or all retained history. Plain output includes

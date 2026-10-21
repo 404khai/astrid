@@ -295,6 +295,63 @@ pub enum ContextError {
     Accounting(#[from] crate::model::ModelError),
 }
 
+/// Measure only the mandatory content accumulated for a newly committed tool
+/// exchange. This can be an incomplete prefix: it is never a provider request,
+/// context selection, or invented result for any still-pending tool.
+pub(crate) fn check_exchange_prefix(
+    provider: &dyn crate::model::ModelProvider,
+    request: &crate::model::ModelRequest<'_>,
+    assistant_start: usize,
+    budget: &ContextBudget,
+    cancel: &crate::cancellation::Cancellation,
+) -> Result<(), ContextError> {
+    use crate::model::{Message, ModelRequest};
+    if cancel.is_cancelled() {
+        return Err(ContextError::Cancelled);
+    }
+    if !budget.validate() {
+        return Err(ContextError::InvalidBudget);
+    }
+    let history = request.messages;
+    let current_task = history
+        .iter()
+        .rposition(|m| matches!(m, Message::User(_)))
+        .ok_or_else(|| ContextError::InvalidHistory("missing current task".into()))?;
+    if !matches!(history.first(), Some(Message::User(_)))
+        || !matches!(history.get(assistant_start), Some(Message::Assistant(_)))
+        || current_task >= assistant_start
+    {
+        return Err(ContextError::InvalidHistory(
+            "invalid tool exchange prefix".into(),
+        ));
+    }
+    let mut mandatory = vec![history[0].clone()];
+    if current_task != 0 {
+        mandatory.push(history[current_task].clone());
+    }
+    mandatory.extend_from_slice(&history[assistant_start..]);
+    let measured = provider.measure_request(&ModelRequest {
+        messages: &mandatory,
+        ..*request
+    });
+    if cancel.is_cancelled() {
+        return Err(ContextError::Cancelled);
+    }
+    let snapshot = measured?.ok_or(ContextError::AccountingUnavailable)?;
+    if !budget.admits(&snapshot) {
+        return Err(ContextError::ProtectedOverflow {
+            details: format!(
+                "accumulated tool exchange: {} serialized bytes / {} byte ceiling; non-opaque bytes/4 heuristic {} / {} input allowance. Provider fit unknown. Remaining tools were not executed; original results are retained. Incomplete batches require /new.",
+                snapshot.serialized_request_bytes,
+                budget.max_request_bytes,
+                snapshot.non_opaque_json_size_token_heuristic,
+                budget.estimated_context_tokens - budget.response_reserve_tokens,
+            ),
+        });
+    }
+    Ok(())
+}
+
 /// Validate closure independently of policy; every multi-tool batch stays whole.
 pub(crate) fn exchange_ranges(
     messages: &[crate::model::Message],

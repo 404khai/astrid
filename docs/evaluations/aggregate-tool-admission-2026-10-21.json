@@ -1,0 +1,70 @@
+{
+  "date": "2026-10-21",
+  "parent_commit": "fd419fb6e515ce8d47d29e0e45a2126830181ff3",
+  "branch": "feat/aggregate-tool-admission",
+  "ticket": "RC-03",
+  "source_sha256": {
+    "src/context.rs": "4ab3e349e34bbd2e191d8bb55b58de6ab2968c46e8cd06d5849b1ebe0bda265b",
+    "src/runtime.rs": "c396a0d6e8465f2ed68d2fff0065123c0922af5e410dc16fa90409809679b3d8",
+    "tests/exchange_admission.rs": "95a53c973c25dc3b4272b3e7d694ad2590d83d6538145515c7c6654fc624fa60"
+  },
+  "red": {
+    "source": "parent runtime plus new regression; modified source restored byte-for-byte in finally",
+    "command": "cargo test --locked --offline --test exchange_admission aggregate_escaped_unicode_outputs -- --test-threads=1",
+    "exit_code": 101,
+    "failure": "remaining tool executed after aggregate overflow",
+    "log": "/tmp/astrid-aggregate-red.log"
+  },
+  "validation": {
+    "targeted": {
+      "command": "cargo test --locked --offline --test exchange_admission --test context_budget --test sessions -- --test-threads=1",
+      "passed": 20,
+      "failed": 0,
+      "log": "/tmp/astrid-aggregate-targeted.log"
+    },
+    "rust_full": {
+      "command": "cargo test --locked --offline -- --test-threads=1",
+      "passed": 288,
+      "failed": 0,
+      "ignored": 1,
+      "exit_code": 0,
+      "log": "/tmp/astrid-aggregate-tests.log"
+    },
+    "format": {
+      "command": "cargo fmt --check",
+      "exit_code": 0
+    },
+    "python": {
+      "command": "python3 -m unittest test_compare_routing.py",
+      "cwd": "scripts",
+      "passed": 2,
+      "failed": 0
+    },
+    "clippy": {
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "/tmp/astrid-aggregate-clippy.log"
+    },
+    "index_links": {
+      "checked": 100,
+      "missing": 0
+    },
+    "whitespace": "git diff --cached --check passed"
+  },
+  "limits": [
+    "Crossing result retained unchanged; guard stops further execution, not a guaranteed-fit or total-memory bound",
+    "Pending skipped tools have no fabricated outcomes; incomplete-batch continuation still rejects",
+    "Private v2 sessions, provenance, permissions, trace schema and numeric defaults unchanged",
+    "No live inference or InstaBox action; provider/private-session contents not read"
+  ],
+  "github_operations": {
+    "authorization": "Maintainer requested PR, merge open implementation PRs, delete Tauri draft",
+    "inspected_open_prs": [
+      19,
+      20,
+      13
+    ],
+    "tauri_pr_13": "close without deleting preserved source/branch; GitHub historical PR record remains",
+    "merges": "pending final validation and RC-03 publication"
+  }
+}

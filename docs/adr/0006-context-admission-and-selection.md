@@ -101,3 +101,13 @@ historical-submission/latest-exchange interaction: retain the question and lates
 actual complete exchange while permitting earlier exchanges in that submission
 to be compacted. Original history and incomplete-batch denial remain unchanged.
 The original decision text above is retained as history.
+
+
+## Earlier enforcement during tool batches — 2026-10-21
+
+RC-03 checks mandatory accumulated exchange prefixes before further tool
+execution and after the final result. This is a pure accounting guard, not
+admission or dispatch of an incomplete request. Overflow stops pending work with
+original results retained, existing failure/skip events and unchanged
+incomplete-batch rejection. No selection rule or budget is revised.
+[Implementation review and limits](../reviews/aggregate-tool-admission-2026-10-21.md).

@@ -396,6 +396,32 @@ impl Execution {
         }
         self.tool = None;
     }
+    async fn stop_over_budget_batch(
+        &mut self,
+        remaining: &[(ToolCallId, crate::model::ToolCall)],
+        error: crate::context::ContextError,
+        cancel: &Cancellation,
+    ) -> RunOutcome {
+        if cancel.is_cancelled() || matches!(error, crate::context::ContextError::Cancelled) {
+            self.cancel_batch(remaining, false, None).await;
+            self.emit(EventKind::TurnCancelled).await;
+            return RunOutcome::Cancelled;
+        }
+        for (id, _) in remaining {
+            self.tool = Some(*id);
+            self.emit(EventKind::ToolCallSkipped {
+                reason: "run_failed".into(),
+            })
+            .await;
+        }
+        self.tool = None;
+        let message = error.to_string();
+        self.emit(EventKind::TurnFailed {
+            message: message.clone(),
+        })
+        .await;
+        failure("context", message)
+    }
 }
 struct StreamSink<'a>(
     &'a mut Execution,
@@ -908,6 +934,7 @@ async fn drive(
                 effort: decision.effective_effort,
             },
         );
+        let assistant_start = session.messages.len();
         session.messages.push(Message::Assistant(response.clone()));
         let item = session.context.add(
             crate::context::ContextOrigin::Assistant {
@@ -929,12 +956,48 @@ async fn drive(
         }
         e.tool = None;
         *tool_count += batch.len();
+        // Inspect the next deterministic route without dispatching it or emitting
+        // a fictitious routing decision. At the invocation ceiling use this route.
+        let admission_route = crate::routing::select(
+            provider,
+            &config.model,
+            config.routing.as_ref(),
+            number.saturating_add(1).min(config.max_model_calls),
+        );
+        let admission_provider = crate::routing::RequestProvider {
+            inner: provider,
+            options: crate::routing::RequestOptions {
+                effort: admission_route.effective_effort,
+                replay: session.replay_mode,
+            },
+        };
+        let check_exchange = |session: &Session| {
+            config.context_budget.as_ref().map_or(Ok(()), |budget| {
+                crate::context::check_exchange_prefix(
+                    &admission_provider,
+                    &ModelRequest {
+                        options: Default::default(),
+                        model: &admission_route.effective_model,
+                        instructions: &instructions,
+                        messages: &session.messages,
+                    },
+                    assistant_start,
+                    budget,
+                    cancel,
+                )
+            })
+        };
         for (index, (id, call)) in batch.iter().enumerate() {
             e.tool = Some(*id);
             if cancel.is_cancelled() {
                 e.cancel_batch(&batch[index..], true, None).await;
                 e.emit(EventKind::TurnCancelled).await;
                 return RunOutcome::Cancelled;
+            }
+            if let Err(error) = check_exchange(session) {
+                return e
+                    .stop_over_budget_batch(&batch[index..], error, cancel)
+                    .await;
             }
             let permission = tools.permission(call);
             let mut denied = false;
@@ -1166,6 +1229,11 @@ async fn drive(
                 e.emit(EventKind::TurnCancelled).await;
                 return RunOutcome::Cancelled;
             }
+        }
+        if !batch.is_empty()
+            && let Err(error) = check_exchange(session)
+        {
+            return e.stop_over_budget_batch(&[], error, cancel).await;
         }
         e.emit(EventKind::TurnCompleted).await;
         if cancel.is_cancelled() {
