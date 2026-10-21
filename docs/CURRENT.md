@@ -46,6 +46,27 @@ added. 71 binary tests passed (including two new diagnostic tests); strict
 all-target Clippy and formatting passed. The reported live root cause remains
 unidentified from the pasted output; no authenticated retry was performed.
 
+Capture transport follow-up: the next pasted result localized failure to capture,
+but transport parsing still collapsed HTTP rejection, command exit/timeout,
+provider truncation and invalid encoding into one message. These now have fixed
+safe categories; raw response bodies/guest stderr are still discarded. Limits,
+grants, private history and unknown-outcome/no-retry behavior are unchanged.
+The previously audited exec contract caps stdout at 1 MiB, so base64 can truncate
+an otherwise <=1 MiB PNG; no chunking, resize or larger allowance is inferred.
+
+The maintainer supplied an exact target and separately approved only one running-
+state GET plus `command -v import base64 head tr; test -S /tmp/.X11-unix/X1`, cwd
+`/data/home`, timeout 2 s, one attempt/no retry, with possible auto-wake and unknown
+post-admission cancellation. This is not screenshot/input/model/lifecycle approval.
+It was NOT dispatched: no INSTABOX_API_KEY in the tool process environment.
+No .env/private session or authenticated API was read/called; the cause on that
+machine remains unverified. The approved command can be run in the maintainer's
+own configured terminal; no key should be pasted into chat.
+
+Validation: 15 focused computer tests and all 71 binary tests passed; strict
+all-target Clippy, formatting and whitespace passed. Eleven mocked capture cases
+verify safe classification, no raw stderr/content, no retry and no frame admission.
+
 Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
 stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs
 remain unmerged. No live operation or successor implementation was performed.

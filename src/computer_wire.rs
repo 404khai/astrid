@@ -21,9 +21,57 @@ pub enum WireError {
     NotRunning,
     #[error("computer request cancelled")]
     Cancelled,
-    #[error("computer transport failed or response invalid; outcome may be unknown")]
+    #[error("computer HTTP request rejected (status {0})")]
+    HttpStatus(u16),
+    #[error("computer transport deadline exceeded")]
+    RequestTimeout,
+    #[error("computer response byte limit exceeded")]
+    ResponseLimit,
+    #[error("computer response invalid")]
+    ResponseInvalid,
+    #[error("computer command exited with status {0}")]
+    CommandExit(i32),
+    #[error("computer command timed out")]
+    CommandTimeout,
+    #[error("computer output truncated by provider")]
+    Truncated,
+    #[error("capture stdout is not valid base64")]
+    CaptureEncoding,
+    #[error("capture PNG byte limit exceeded")]
+    CaptureLimit,
+    #[error("computer transport failed; outcome may be unknown")]
     Unknown,
 }
+impl WireError {
+    fn transport(error: reqwest::Error) -> Self {
+        if error.is_timeout() {
+            Self::RequestTimeout
+        } else {
+            Self::Unknown
+        }
+    }
+    /// Fixed host categories only. Never include raw HTTP bodies or guest stderr.
+    pub(crate) fn capture_failure(self) -> &'static str {
+        match self {
+            Self::HttpStatus(401 | 403) => "capture HTTP authentication or permission rejected",
+            Self::HttpStatus(_) => "capture HTTP request rejected",
+            Self::RequestTimeout => "capture transport deadline exceeded",
+            Self::ResponseLimit => "capture HTTP response byte limit exceeded",
+            Self::ResponseInvalid => "capture response invalid",
+            Self::CommandTimeout => "capture command timed out (2-second limit)",
+            Self::Truncated => {
+                "capture output truncated by provider (base64 may exceed stdout limit)"
+            }
+            Self::CommandExit(127) => "capture command not found (exit 127)",
+            Self::CommandExit(_) => "capture command exited unsuccessfully",
+            Self::CaptureEncoding => "capture stdout is not valid base64",
+            Self::CaptureLimit => "capture PNG byte limit exceeded",
+            Self::Cancelled => "observation cancelled",
+            _ => "capture connection or configuration failed; remote outcome unknown",
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Plan {
@@ -139,18 +187,18 @@ impl ComputerWire {
                 .header("X-API-Key", self.key.clone())
                 .send()
                 .await
-                .map_err(|_| WireError::Unknown)?;
+                .map_err(WireError::transport)?;
             if response.status() != 200 {
-                return Err(WireError::Unknown);
+                return Err(WireError::HttpStatus(response.status().as_u16()));
             }
             let mut bytes = Vec::new();
-            while let Some(chunk) = response.chunk().await.map_err(|_| WireError::Unknown)? {
+            while let Some(chunk) = response.chunk().await.map_err(WireError::transport)? {
                 if bytes.len().saturating_add(chunk.len()) > cap {
-                    return Err(WireError::Unknown);
+                    return Err(WireError::ResponseLimit);
                 }
                 bytes.extend_from_slice(&chunk);
             }
-            serde_json::from_slice(&bytes).map_err(|_| WireError::Unknown)
+            serde_json::from_slice(&bytes).map_err(|_| WireError::ResponseInvalid)
         };
         tokio::select! {biased;_=cancel.cancelled()=>Err(WireError::Cancelled),value=fetch=>value}
     }
@@ -223,8 +271,14 @@ impl ComputerWire {
                 cancel,
             )
             .await?;
-        if result.exit_code != 0 || result.timed_out || result.truncated {
-            return Err(WireError::Unknown);
+        if result.timed_out {
+            return Err(WireError::CommandTimeout);
+        }
+        if result.truncated {
+            return Err(WireError::Truncated);
+        }
+        if result.exit_code != 0 {
+            return Err(WireError::CommandExit(result.exit_code));
         }
         Ok(result)
     }
@@ -237,13 +291,13 @@ impl ComputerWire {
             .exec(machine, &Plan::capture(), 1_500_000, cancel)
             .await?;
         if result.stdout.len() > crate::computer_png::MAX_PNG.div_ceil(3) * 4 {
-            return Err(WireError::Unknown);
+            return Err(WireError::CaptureLimit);
         }
         let bytes = STANDARD
             .decode(result.stdout)
-            .map_err(|_| WireError::Unknown)?;
+            .map_err(|_| WireError::CaptureEncoding)?;
         if bytes.len() > crate::computer_png::MAX_PNG {
-            return Err(WireError::Unknown);
+            return Err(WireError::CaptureLimit);
         }
         Ok(bytes)
     }

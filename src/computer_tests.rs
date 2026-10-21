@@ -657,3 +657,124 @@ async fn disclosure_requires_fixed_destination_exact_model_current_frame_and_ato
     assert!(!supported_model("gpt-5.6-sol-unverified-snapshot"));
     assert!(!supported_model("gpt-4.1"));
 }
+
+#[tokio::test]
+async fn capture_failures_keep_distinct_safe_categories_without_stderr_or_retries() {
+    let normal = json!({"stdout":"","stderr":"private-guest-screen-or-error-content","exitCode":0,"timedOut":false,"truncated":false});
+    let cases = [
+        (
+            401,
+            normal.clone(),
+            "capture HTTP authentication or permission rejected",
+        ),
+        (
+            403,
+            normal.clone(),
+            "capture HTTP authentication or permission rejected",
+        ),
+        (429, normal.clone(), "capture HTTP request rejected"),
+        (
+            200,
+            json!({"unexpected":"private-response-content"}),
+            "capture response invalid",
+        ),
+        (
+            200,
+            {
+                let mut v = normal.clone();
+                v["timedOut"] = json!(true);
+                v["exitCode"] = json!(124);
+                v
+            },
+            "capture command timed out (2-second limit)",
+        ),
+        (
+            200,
+            {
+                let mut v = normal.clone();
+                v["truncated"] = json!(true);
+                v
+            },
+            "capture output truncated by provider (base64 may exceed stdout limit)",
+        ),
+        (
+            200,
+            {
+                let mut v = normal.clone();
+                v["exitCode"] = json!(127);
+                v
+            },
+            "capture command not found (exit 127)",
+        ),
+        (
+            200,
+            {
+                let mut v = normal.clone();
+                v["exitCode"] = json!(1);
+                v
+            },
+            "capture command exited unsuccessfully",
+        ),
+        (
+            200,
+            {
+                let mut v = normal.clone();
+                v["stdout"] = json!("invalid@@base64-private-content");
+                v
+            },
+            "capture stdout is not valid base64",
+        ),
+        (
+            200,
+            {
+                let mut v = normal.clone();
+                v["stdout"] = json!(STANDARD.encode(vec![0; MAX_PNG + 1]));
+                v
+            },
+            "capture PNG byte limit exceeded",
+        ),
+        (
+            200,
+            {
+                let mut v = normal.clone();
+                v["stderr"] = json!("x".repeat(1_500_001));
+                v
+            },
+            "capture HTTP response byte limit exceeded",
+        ),
+    ];
+    for (status, response, expected) in cases {
+        let wire = MockHttp::start(move |n, _, _| {
+            assert!(n < 2, "no retry");
+            if n == 0 {
+                (
+                    200,
+                    "application/json",
+                    json!({"id":ID,"state":"running"}).to_string(),
+                )
+            } else {
+                (status, "application/json", response.to_string())
+            }
+        })
+        .await;
+        let mut run = service(&wire).begin(RunId::default());
+        let cancel = Cancellation::default();
+        let prepared = run
+            .prepare(ToolCallId::default(), &observe_call("screenshot"), &cancel)
+            .unwrap();
+        let permit = prepared.approve().unwrap();
+        let ToolExecution::Finished(result) = run.execute(prepared, permit, &cancel).await else {
+            panic!("finished")
+        };
+        let ToolOutcome::Success { data } = result.outcome else {
+            panic!("report")
+        };
+        assert_eq!(data["failure"], expected);
+        assert_eq!(data["remote_outcome"], "unknown");
+        assert_eq!(data["successful"], false);
+        assert!(!data.to_string().contains("private-"));
+        assert!(run.frame.lock().unwrap().is_none());
+        assert!(run.stopped());
+        assert_eq!(wire.requests.lock().unwrap().len(), 2);
+    }
+}

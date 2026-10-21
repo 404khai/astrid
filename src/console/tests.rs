@@ -1408,6 +1408,16 @@ fn remote_result_and_cancel_projection_preserve_attribution_and_uncertainty() {
 #[test]
 fn computer_result_summary_surfaces_safe_failure_stage_without_losing_uncertainty() {
     for failure in [
+        "capture command not found (exit 127)",
+        "capture command exited unsuccessfully",
+        "capture command timed out (2-second limit)",
+        "capture output truncated by provider (base64 may exceed stdout limit)",
+        "capture HTTP authentication or permission rejected",
+        "capture HTTP request rejected",
+        "capture response invalid",
+        "capture stdout is not valid base64",
+        "capture PNG byte limit exceeded",
+        "capture HTTP response byte limit exceeded",
         "screenshot unavailable or unsupported capture tool",
         "screenshot decode failed, cancelled or exceeded bounds",
         "captured frame already stale or native geometry invalid",

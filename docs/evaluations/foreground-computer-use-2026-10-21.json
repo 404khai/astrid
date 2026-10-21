@@ -92,5 +92,36 @@
     "clippy": "Strict all-target passed",
     "format": "cargo fmt --check passed",
     "reported_live_root_cause": "Unavailable from generic pasted summary; no private session read or authenticated retry"
+  },
+  "capture_diagnostic_followup": {
+    "scope": "Fixed safe transport failure categories, no authority/limit/retry changes",
+    "validation": {
+      "focused_computer_passed": 15,
+      "binary_passed": 71,
+      "failed": 0,
+      "clippy": "strict all-target passed",
+      "fmt": "passed",
+      "whitespace": "passed"
+    },
+    "mock_capture_cases": 11,
+    "approved_live_diagnostic": {
+      "exact_target_supplied": true,
+      "scope": "One exact-target running GET and one exec: command -v import base64 head tr; test -S /tmp/.X11-unix/X1",
+      "cwd": "/data/home",
+      "timeout_seconds": 2,
+      "maximum_attempts": 1,
+      "retry": false,
+      "possible_auto_wake_disclosed": true,
+      "unknown_post_admission_cancellation_disclosed": true,
+      "dispatched": false,
+      "reason": "INSTABOX_API_KEY absent from tool process environment; no .env/private session reads or network calls"
+    },
+    "live_root_cause": "Unverified; no screenshot/action/inference authorized or performed",
+    "source_sha256": {
+      "src/computer_wire.rs": "0156f6bec2fb90579e7b1eb388f92c18b67ccf54260d2c4b602c4529f65fa792",
+      "src/computer.rs": "c5adf5b4182fa85ed9d80f2b4a219f4b8d03b51cff15a19de56dda8187c9a55c",
+      "src/computer_tests.rs": "aea6bd005e5ed2e5fc07370df4fa850346ebdb3893dd0c563496a84f984a40f7",
+      "src/console/state.rs": "610fdc7cdda4cc5de2cad1575d44e710d1dc77b190b325cc6afa35097518799c"
+    }
   }
 }

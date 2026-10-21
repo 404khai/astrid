@@ -224,9 +224,7 @@ impl ComputerRun {
                                 .wire
                                 .capture(&self.owner.machine_id, cancel)
                                 .await
-                                .map_err(
-                                    |_| "screenshot unavailable or unsupported capture tool",
-                                )?;
+                                .map_err(crate::computer_wire::WireError::capture_failure)?;
                             self.traffic = self.traffic.saturating_add(bytes.len());
                             if self.traffic > 2 * MAX_PNG {
                                 return Err("observation traffic exhausted");

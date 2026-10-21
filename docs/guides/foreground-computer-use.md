@@ -70,6 +70,25 @@ Existing context-byte limits can reject even a legally sized PNG; this mode neit
 shrinks it nor raises budgets. Image tokens use a documented estimate plus margin,
 not bytes/4; actual image-only provider tokens/cost are unavailable.
 
+## Capture failures
+
+The foreground summary now retains fixed safe categories instead of hiding every
+capture error behind a generic unsupported-tool message. It never prints raw HTTP
+bodies or guest stderr. The remote outcome remains unknown; no automatic retry.
+
+| Category | What is known |
+| --- | --- |
+| Command not found, exit 127 | A pipeline executable is unavailable; an approved tool-path check can identify it. No automatic install/fallback. |
+| Command exited unsuccessfully | The provider returned nonzero; desktop/capture/resource prerequisites need separately scoped diagnosis. |
+| Command timed out | The fixed 2-second provider limit was reached; it is not increased automatically. |
+| Output truncated by provider | Exec stdout is capped at 1 MiB in the audited public contract; base64 expansion can hit it before the PNG's 1 MiB limit. No silent resize/chunked recapture. |
+| HTTP rejection, response/encoding/byte error | Transport/account/protocol failure; no valid frame admitted and no image sent. |
+
+The maintainer's one approved diagnostic checks only tool paths and the display-1
+socket; it does not capture, click, start a desktop or authorize model disclosure.
+The agent process lacked an environment key, so that diagnostic was not dispatched.
+Do not paste credentials into chat; use the existing configured terminal.
+
 ## Exact live trial contract still needed
 
 Before any authenticated call, specify the existing machine ID and already-running
