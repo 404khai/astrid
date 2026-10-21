@@ -1,3 +1,28 @@
+# Bounded desktop actions — decision preparation, 2026-10-21
+
+Maintainer authorized CU-02 and its PR. Created `feat/bounded-desktop-actions`
+from fetched main `2daf811c` in this preserved checkout, no worktree. Read-only
+GitHub recheck found #24 already merged upstream; no merge performed here.
+
+[ADR 0023](adr/0023-bounded-desktop-actions.md) contains the concrete separate
+per-action/native-coordinate/freshness and fixed-limit proposal. The explicit
+maintainer decision is pending, so no dependent action authority code has been
+implemented. [Public API audit and acceptance matrix](reviews/bounded-desktop-actions-2026-10-21.md),
+[milestone](milestones/bounded-desktop-actions.md), [active plan](plans/remote-mobile-cli.md).
+Public OpenAPI and SDK 0.5.3 again show exec-backed input operations and no direct
+action REST endpoints. Proposed Rust controls use mock transport and host-attested
+frame metadata; this would not satisfy CU-01's still-gated real observation path.
+
+Baseline **308 Rust passed, 0 failed, 1 ignored**; unchanged-runtime evidence only.
+No live/authenticated machine/provider operation, credential/private-session read,
+image disclosure/persistence, runtime observation integration, action loop or merge.
+Private v2/history/continuation/provenance, complete exchanges, context admission,
+cancellation and ADRs 0008/0009/0021/0022 remain preserved. Unrelated dirty files,
+historical CURRENT content and user/recovery assets remain excluded from commits.
+CU-02 is not complete. No MO-01 work is started.
+
+---
+
 # Screenshot observation contract and fixtures — 2026-10-21
 
 CU-01 uses parent-created `feat/screenshot-observation` from main `7d7f45d5`,

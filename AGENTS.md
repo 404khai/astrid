@@ -1,3 +1,25 @@
+# CU-02 bounded desktop actions authorization — 2026-10-21
+
+Maintainer requested “Work on this next, open pr when done CU-02 — Bounded desktop
+actions. Add separately authorized clicks, typing, scrolling and keys, with
+stale-frame checks and execution limits.” Use `feat/bounded-desktop-actions` from
+fetched main `2daf811c`, same preserved checkout, no worktree. #24 was found already
+merged upstream. This supersedes the CU-01 stop/action exclusion only for CU-02;
+no PR merge or successor work is authorized. Conventional commits and PR against main.
+
+[ADR 0023](docs/adr/0023-bounded-desktop-actions.md) prepares the consequential
+per-action authority/native-coordinate/freshness contract; dependent code awaits
+its explicit decision. CU-01's accepted ADR 0022 live transport, production decoder,
+runtime integration and image persistence/provider disclosure gates remain binding.
+No live/authenticated machine metadata, screenshot, action, model inference or
+cloud operation without separate exact target/action trial authorization. No target
+has been supplied. Never read .env/private sessions or discover targets from keys.
+Preserve private v2/provenance/continuation, original results/history, complete
+exchanges/context admission, cancellation and ADRs 0008/0009/0021. No remote workers,
+Host/mobile networking, Phase 9, daemon, PTY, provisioning/lifecycle/ports/secrets
+transfer or desktop client. Preserve unrelated checkout data. Stop after CU-02's
+slice and unmerged PR; no MO-01 implementation.
+
 # CU-01 screenshot observation authorization — 2026-10-21
 
 Maintainer requested CU-01 on parent-created `feat/screenshot-observation` from
