@@ -49,3 +49,12 @@ of this slice. Stop after its reviewable PR.
 Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
 stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs
 remain unmerged. No live operation or successor implementation was performed.
+
+## Response completion follow-up — decision pending
+
+User-supplied output shows visual interpretation followed by the original image
+expiry interrupting SSE before provider completion. This is partial evidence, not
+end-to-end success. [Proposed ADR 0025](../adr/0025-image-upload-response-deadlines.md)
+prepares ten-second image/upload cleanup plus a separate 60-second overall visual
+attempt response limit, explicit buffer release and unchanged stale-action gates.
+No dependent implementation or live call is authorized by the proposal itself.

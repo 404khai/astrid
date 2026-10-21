@@ -204,3 +204,18 @@ ignored**; strict all-target Clippy, formatting, whitespace and scoped documenta
 links passed. The focused computer suite passed 17 tests. Python was not rerun for
 this Rust-only repair. The detached-terminal fixture was updated to assert an
 unavailable-input error rather than false; it still cannot grant permission.
+
+## Useful visual text followed by deadline — proposed response-bound amendment
+
+The maintainer supplied streamed descriptive output followed by a visual image
+deadline failure. Code inspection confirms generate_visual wraps the entire
+provider stream in the frame expiry. It therefore cannot call a useful partial
+answer completed. ADR 0024 explicitly accepts expiry ending this wait; changing
+that behavior requires a narrow contract amendment. [ADR 0025](../adr/0025-image-upload-response-deadlines.md)
+is Proposed and defines upload admission, application-buffer release, a fixed
+60-second total visual provider-attempt deadline and tests before implementation.
+No runtime/provider code or bounds changed in this design follow-up. No image,
+raw screen description or exact target is stored here, and no live call was made.
+Documentation links/whitespace were checked; runtime tests were not rerun for this
+documentation-only proposal. The last implementation validation remains 351 Rust
+passed, 1 existing ignored, with strict Clippy passed.

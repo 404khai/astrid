@@ -81,6 +81,18 @@ all-target Clippy, formatting and whitespace passed. Full-suite results are in t
 integration evidence. User-supplied installation/capture output is partial live
 evidence only; provider image delivery and desktop actions remain unverified.
 
+Visual completion decision pending: user-supplied output shows a screen
+interpretation followed by `visual image deadline` before provider completion.
+Code inspection confirms the ten-second frame timer wraps the entire model stream.
+[ADR 0025](adr/0025-image-upload-response-deadlines.md) is Proposed: keep ten-second
+image/approval/upload cleanup, explicitly release application image/request buffers,
+and permit a fixed 60-second total visual provider-attempt response deadline.
+All other grants, budgets, action freshness, history/privacy and live gates remain.
+This changes ADR 0024's accepted whole-wait clause, so no dependent code is written
+until an explicit decision. No image/raw description is retained; no live call or
+runtime test was run for this documentation-only design. Prior 351-test evidence
+remains the last implementation result.
+
 Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
 stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs
 remain unmerged. No live operation or successor implementation was performed.

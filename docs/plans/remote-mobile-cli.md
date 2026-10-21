@@ -103,6 +103,13 @@ separate and cannot create machines or transfer secrets.
 
 ## Computer-use investigation and bounded design
 
+Visual response follow-up: user-supplied observation-only output includes a model
+screen description followed by the ten-second visual-image deadline. No complete
+visual exchange is established. [ADR 0025](../adr/0025-image-upload-response-deadlines.md)
+is Proposed: separate bounded upload/image cleanup from a fixed 60-second provider
+response allowance. This conflicts with ADR 0024's whole-wait expiry clause and
+requires an explicit decision before code. No deadlines are changed by the design.
+
 Integration update, 2026-10-21: the maintainer explicitly accepted ADR 0024 option 1
 and requested actual CU integration. Real adapters, safe PNG helper/native receipts,
 foreground CLI tools and per-frame OpenAI disclosure are implemented with unchanged

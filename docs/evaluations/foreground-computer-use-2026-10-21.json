@@ -152,5 +152,17 @@
       "src/computer_tests.rs": "f8d4aca69ce67ec6a587802d53db40f601eebf1c99bc8c2ad4757bb634f5239e",
       "src/console/pty_tests.rs": "52480e638cd5318c11585748654a184ae17453bf254a097565d580e85fc5920c"
     }
+  },
+  "visual_response_deadline_proposal": {
+    "adr": "0025",
+    "status": "Proposed, explicit decision pending",
+    "observed_evidence": "User-supplied descriptive stream followed by visual image deadline; no terminal provider completion established",
+    "code_finding": "generate_visual applies frame expiry to entire generate_input future",
+    "proposed_image_upload_seconds": 10,
+    "proposed_total_visual_attempt_seconds": 60,
+    "runtime_changed": false,
+    "live_calls": 0,
+    "runtime_tests_rerun": false,
+    "validation": "Documentation links and whitespace only; last code validation unchanged"
   }
 }
