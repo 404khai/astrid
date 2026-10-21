@@ -490,7 +490,32 @@ pub(crate) async fn select(
     if !budget.validate() {
         return Err(ContextError::InvalidBudget);
     }
-    let groups = exchange_ranges(history)?;
+    let mut groups = exchange_ranges(history)?;
+    // ADR 0020: protect the actual latest exchange, not the whole previous
+    // submission. Keep its question as an anchor while making the earlier
+    // complete exchanges eligible for bounded condensation. Validation above
+    // still rejects unmatched tool batches before any accounting or dispatch.
+    let latest = history
+        .iter()
+        .rposition(|m| matches!(m, Message::Assistant(_)));
+    let mut latest_question = None;
+    if let Some(latest) = latest
+        && let Some(index) = groups.iter().position(|range| range.contains(&latest))
+    {
+        let range = groups[index].clone();
+        let mut replacement = Vec::new();
+        let mut earlier_start = range.start;
+        if matches!(history[range.start], Message::User(_)) {
+            latest_question = Some(range.start);
+            replacement.push(range.start..range.start + 1);
+            earlier_start += 1;
+        }
+        if earlier_start < latest {
+            replacement.push(earlier_start..latest);
+        }
+        replacement.push(latest..range.end);
+        groups.splice(index..=index, replacement);
+    }
     let measure = |messages: &[Message]| -> Result<ContextSnapshot, ContextError> {
         if cancel.is_cancelled() {
             return Err(ContextError::Cancelled);
@@ -513,8 +538,13 @@ pub(crate) async fn select(
     let task_group = groups
         .iter()
         .position(|range| range.contains(&current_task));
+    let question_group = latest_question
+        .and_then(|question| groups.iter().position(|range| range.contains(&question)));
     let mut selected = vec![false; groups.len()];
     if let Some(index) = task_group {
+        selected[index] = true;
+    }
+    if let Some(index) = question_group {
         selected[index] = true;
     }
     let latest_exchange = groups.iter().rposition(|range| {
@@ -577,7 +607,10 @@ pub(crate) async fn select(
     });
     for index in candidates {
         tokio::task::yield_now().await;
-        if Some(index) == task_group || Some(index) == latest_exchange {
+        if Some(index) == task_group
+            || Some(index) == latest_exchange
+            || Some(index) == question_group
+        {
             continue;
         }
         selected[index] = true;
@@ -628,7 +661,10 @@ pub(crate) async fn select(
             let group = item
                 .message_index
                 .and_then(|index| groups.iter().position(|range| range.contains(&index)));
-            let protected = group.is_none() || group == task_group || group == latest_exchange;
+            let protected = group.is_none()
+                || group == task_group
+                || group == latest_exchange
+                || group == question_group;
             let retained = protected || group.is_some_and(|index| selected[index]);
             ContextDecision {
                 item_id: item.id,
@@ -1038,6 +1074,85 @@ mod tests {
             Err(ContextError::ProtectedOverflow { .. })
         ));
     }
+    #[tokio::test]
+    async fn followup_compacts_previous_submission_without_protecting_its_entire_transcript() {
+        for prior_followup in [false, true] {
+            let mut history = vec![Message::User("original task".into())];
+            if prior_followup {
+                add_exchange(&mut history, "initial.rs", "initial answer", false);
+                history.push(Message::User("previous question".into()));
+            }
+            add_exchange(
+                &mut history,
+                "large.rs",
+                &"large old result ".repeat(30_000),
+                true,
+            );
+            add_exchange(&mut history, "latest.rs", "latest small result", false);
+            history.push(Message::User("explain the cancelled work".into()));
+            let before = serde_json::to_vec(&history).unwrap();
+            let ledger = ledger(&history);
+            let budget = ContextBudget {
+                max_request_bytes: 14_000,
+                ..Default::default()
+            };
+            let selected = select(
+                &provider(),
+                "test",
+                "instructions",
+                &history,
+                &ledger,
+                &budget,
+                &Cancellation::default(),
+            )
+            .await
+            .unwrap();
+            assert!(budget.admits(&selected.metadata.snapshot));
+            let summary = selected.metadata.summary.as_ref().unwrap();
+            assert!(summary.incomplete);
+            assert!(!summary.source_items.is_empty());
+            assert!(!summary.text.contains("PRIVATE-REASONING-SENTINEL"));
+            assert_eq!(serde_json::to_vec(&history).unwrap(), before);
+            let tool_results = selected
+                .messages
+                .iter()
+                .filter_map(|m| match m {
+                    Message::Tool(result) => Some(result),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            assert!(
+                tool_results
+                    .iter()
+                    .all(|result| !serde_json::to_string(result).unwrap().contains("large.rs"))
+            );
+            assert!(
+                tool_results
+                    .iter()
+                    .any(|result| serde_json::to_string(result).unwrap().contains("latest.rs"))
+            );
+            assert!(
+                selected.messages.iter().any(
+                    |m| matches!(m, Message::User(text) if text == "explain the cancelled work")
+                )
+            );
+            if prior_followup {
+                assert!(
+                    selected
+                        .messages
+                        .iter()
+                        .any(|m| matches!(m, Message::User(text) if text == "previous question"))
+                );
+            }
+            let messages = selected
+                .messages
+                .into_iter()
+                .filter(|m| !matches!(m, Message::Summary(_)))
+                .collect::<Vec<_>>();
+            assert!(exchange_ranges(&messages).is_ok());
+        }
+    }
+
     #[tokio::test]
     async fn followup_selection_keeps_current_task_and_historical_questions_with_answers() {
         let mut history = vec![Message::User("original task".into())];

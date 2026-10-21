@@ -28,6 +28,189 @@ fn tools(root: &std::path::Path) -> Tools {
     Tools::new(Workspace::new(root).unwrap(), Duration::from_secs(5)).unwrap()
 }
 
+struct CancelThirdCall<'a> {
+    provider: &'a dyn astrid::model::ModelProvider,
+    calls: std::sync::atomic::AtomicUsize,
+    cancel: Cancellation,
+}
+#[async_trait]
+impl astrid::model::ModelProvider for CancelThirdCall<'_> {
+    fn provider_name(&self) -> Option<&'static str> {
+        self.provider.provider_name()
+    }
+    fn capabilities(&self, model: &str) -> astrid::routing::ModelCapability {
+        self.provider.capabilities(model)
+    }
+    fn measure_request(
+        &self,
+        request: &astrid::model::ModelRequest<'_>,
+    ) -> Result<Option<astrid::context::ContextSnapshot>, astrid::model::ModelError> {
+        self.provider.measure_request(request)
+    }
+    async fn generate(
+        &self,
+        request: &astrid::model::ModelRequest<'_>,
+        sink: &mut dyn astrid::model::TextSink,
+    ) -> Result<astrid::model::ModelResponse, astrid::model::ModelError> {
+        if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 2 {
+            self.cancel.cancel();
+            return std::future::pending().await;
+        }
+        self.provider.generate(request, sink).await
+    }
+}
+
+#[tokio::test]
+async fn cancelled_run_with_complete_exchanges_can_explain_oversized_prior_work() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("large"), "old evidence ".repeat(4000)).unwrap();
+    std::fs::write(root.path().join("small"), "latest evidence").unwrap();
+    let tools = tools(root.path());
+    let server = Server::start(vec![
+        reply(
+            &[call("large-read", "read_file", json!({"path":"large"}))],
+            "inspect",
+        ),
+        reply(
+            &[call("small-read", "read_file", json!({"path":"small"}))],
+            "inspect latest",
+        ),
+        reply(&[], "explanation"),
+    ])
+    .await;
+    let cancel = Cancellation::default();
+    let provider = CancelThirdCall {
+        provider: &server.provider,
+        calls: Default::default(),
+        cancel: cancel.clone(),
+    };
+    let first = runtime::run(
+        &provider,
+        &tools,
+        &mut Confirmation::new(false),
+        config("work", PermissionMode::Auto),
+        cancel,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(first.outcome, RunOutcome::Cancelled);
+    let original = serde_json::to_value(&first.session.messages).unwrap();
+    let length = first.session.messages.len();
+    let mut followup = config("why did you stop?", PermissionMode::Auto);
+    followup.context_budget.as_mut().unwrap().max_request_bytes = 14_000;
+    let second = runtime::run_in_session(
+        &server.provider,
+        &tools,
+        &mut Confirmation::new(false),
+        followup,
+        Cancellation::default(),
+        None,
+        first.session,
+    )
+    .await
+    .unwrap();
+    assert_eq!(second.outcome, RunOutcome::Completed);
+    assert_eq!(
+        serde_json::to_value(&second.session.messages[..length]).unwrap(),
+        original
+    );
+    let requests = server.finish().await;
+    assert_eq!(requests.len(), 3);
+    assert!(!requests[2]["input"].to_string().contains("large-read"));
+    assert!(requests[2]["input"].to_string().contains("small-read"));
+}
+
+#[tokio::test]
+async fn oversized_prior_tool_transcript_allows_followup_without_replaying_committed_edits() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(root.path().join("counter"), "one").unwrap();
+    std::fs::write(root.path().join("large"), "old evidence ".repeat(4000)).unwrap();
+    let tools = tools(root.path());
+    let server = Server::start(vec![
+        reply(
+            &[call(
+                "edit-once",
+                "edit_file",
+                json!({"path":"counter", "old_text":"one", "new_text":"two"}),
+            )],
+            "edit",
+        ),
+        reply(
+            &[call("large-read", "read_file", json!({"path":"large"}))],
+            "inspect",
+        ),
+        reply(&[], "finished; counter is two"),
+        reply(&[], "explanation"),
+    ])
+    .await;
+    let first = runtime::run(
+        &server.provider,
+        &tools,
+        &mut Confirmation::new(false),
+        config("work", PermissionMode::Auto),
+        Cancellation::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(first.outcome, RunOutcome::Completed);
+    let original = serde_json::to_value(&first.session.messages).unwrap();
+    let original_len = first.session.messages.len();
+    let mut followup = config("explain", PermissionMode::Auto);
+    followup.context_budget.as_mut().unwrap().max_request_bytes = 14_000;
+    let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+    let consume = async {
+        let mut events = Vec::new();
+        while let Some(event) = rx.recv().await {
+            events.push(event);
+        }
+        events
+    };
+    let mut permissions = Confirmation::new(false);
+    let (second, events) = tokio::join!(
+        runtime::run_in_session(
+            &server.provider,
+            &tools,
+            &mut permissions,
+            followup,
+            Cancellation::default(),
+            Some(tx),
+            first.session
+        ),
+        consume
+    );
+    let second = second.unwrap();
+    assert_eq!(second.outcome, RunOutcome::Completed);
+    assert_eq!(
+        serde_json::to_value(&second.session.messages[..original_len]).unwrap(),
+        original
+    );
+    assert_eq!(
+        std::fs::read_to_string(root.path().join("counter")).unwrap(),
+        "two"
+    );
+    let mut replay = ExecutionState::new(second.session.id, second.state.run_id);
+    for event in &events {
+        replay.transition(event).unwrap();
+    }
+    assert_eq!(replay, second.state);
+    assert!(events.iter().any(|event| matches!(&event.kind, EventKind::ContextSelected { selection } if selection.summary.as_ref().is_some_and(|summary| summary.incomplete && !summary.source_items.is_empty()))));
+    assert!(
+        !events
+            .iter()
+            .any(|event| matches!(event.kind, EventKind::ToolCallStarted))
+    );
+    let requests = server.finish().await;
+    assert_eq!(requests.len(), 4);
+    assert!(!requests[3]["input"].to_string().contains("large-read"));
+    assert!(
+        requests[3]["input"]
+            .to_string()
+            .contains("finished; counter is two")
+    );
+}
+
 #[tokio::test]
 async fn followup_pruning_and_replay_keep_historical_submission_whole() {
     let root = tempfile::tempdir().unwrap();

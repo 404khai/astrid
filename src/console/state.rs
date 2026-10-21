@@ -111,12 +111,21 @@ impl Presentation {
     }
     pub(super) fn apply(&mut self, event: &ExecutionEvent) {
         match &event.kind {
-            EventKind::RunStarted { task, model, .. } => {
+            EventKind::RunStarted {
+                task,
+                model,
+                max_model_calls,
+                ..
+            } => {
                 self.model = single_line(model);
                 self.context_meter = Default::default();
                 self.run = event.run_id.to_string()[..5].into();
                 self.line(&format!("› {}", single_line(task)), Ink::Accent);
                 self.line("", Ink::Normal);
+                self.line(
+                    &format!("  budget       up to {max_model_calls} model calls"),
+                    Ink::Dim,
+                );
                 self.state = "running";
             }
             EventKind::TurnStarted { number } => self.turn = *number,

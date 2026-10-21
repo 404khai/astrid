@@ -5,7 +5,11 @@ changes. AGENTS.md controls scope; accepted ADRs control architectural contracts
 code and tests establish what actually exists. A planning document does not
 advance the active phase.
 
-Active implementation: [Phase 8](plans/phase-8.md), explicitly authorized with
+Current scoped extension: [runtime recovery](milestones/runtime-recovery.md) and
+[remote/mobile/CLI planning](plans/remote-mobile-cli.md), authorized 2026-10-18.
+ADR 0020 is accepted; first repair passed validation (279 Rust passed, fmt/strict Clippy passed).
+
+Phase baseline: [Phase 8](plans/phase-8.md), explicitly authorized with
 accepted ADRs 0017–0019 on 2026-10-16; implementation/review complete on
 `feat/task-scheduler-workers`, pending maintainer acceptance with explicit limitations.
 See the [implementation review](reviews/phase-8.md). No Phase 9 transition. Phase 7 review recommends closure with limitations;

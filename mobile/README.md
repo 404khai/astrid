@@ -1,7 +1,7 @@
 # Astrid mobile concept
 
 An isolated iOS-first Expo SDK 57 concept on `experiment/mobile`. All app files
-and generated native builds live in this folder. Astrid's runtime remains Phase 4.
+and generated native builds live in this folder. The Phase 4 statement from the original experiment is historical; current runtime direction is recorded in `../docs/CURRENT.md`.
 
 ## Native simulator app
 
@@ -64,3 +64,14 @@ The running app showed the Home list and native tab bar. The large native sheet
 opened, prompt entry enabled submit, and closing returned to Home. The simulator
 UI tool could not reliably deliver a scroll gesture; logo relocation still needs
 a manual swipe check.
+
+
+## Current integration direction — 2026-10-18
+
+Reuse this existing app for iOS **and Android**, following the
+[implementation plan](../docs/plans/remote-mobile-cli.md#mobile-and-minimum-astrid-host-proposal).
+The current SwiftUI imports are iOS-specific, not evidence of Android support.
+MO-01 introduces shared React Native Meister conversation components and platform
+adapters; real streaming, permissions and InstaBox cards wait for the authenticated
+Host contract. Runtime and provider/InstaBox credentials stay on the Host.
+No networking or native app change was made in the planning/recovery slice.

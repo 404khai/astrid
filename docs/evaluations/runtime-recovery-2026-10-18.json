@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-18",
+  "baseline": "8dea67652f574d1ff245113d84831795b57bccc5",
+  "branch": "feat/tui-redesign",
+  "scope": "RC-01 follow-up context recovery; bounded CLI budget presentation; remote/mobile/CLI plan",
+  "decision": "ADR 0020 explicitly approved in this session",
+  "source_sha256": {
+    "src/context.rs": "c4996297046b496241f5cdf135353e2fe2e34062d64df1491d9dbf774f34dbe1",
+    "src/events.rs": "6cd12a32bc41ae8a261cb9f8248804c509c8d74231a21178e1e7d268a44fc46f",
+    "src/console/context_meter.rs": "10882182a7141bf274fbacb4fd5dda253d7027a35c8dc8b04abe37c474bb7d65",
+    "src/console/state.rs": "8f3731c539a61c1df522c8d5c2c5840c765d313f0f0917dd4c12c69213dbebca",
+    "src/console/tests.rs": "37af60f74aaf10785d260dc217e219eb26b4134ce20def9cb071f34eaaad8fd6",
+    "tests/sessions.rs": "ba66666daa3b64796cb45ff4fe12eb628ffe4d28c82e64644fb55613778a2c4f"
+  },
+  "regression_red": {
+    "command": "cargo test --locked --offline --lib followup_compacts_previous_submission -- --test-threads=1",
+    "source": "original HEAD selector plus new regression; repaired source restored byte-for-byte in finally",
+    "exit_code": 101,
+    "failure": "ProtectedOverflow",
+    "log": "/tmp/astrid-recovery-red.log"
+  },
+  "validation": {
+    "rust_full": {
+      "command": "cargo test --locked --offline -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 279,
+      "failed": 0,
+      "ignored": 1,
+      "log": "/tmp/astrid-recovery-tests.log"
+    },
+    "format": {
+      "command": "cargo fmt --check",
+      "exit_code": 0
+    },
+    "python": {
+      "command": "python3 -m unittest test_compare_routing.py",
+      "cwd": "scripts",
+      "passed": 2,
+      "failed": 0
+    },
+    "clippy": {
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "/tmp/astrid-recovery-clippy.log"
+    },
+    "local_links": {
+      "checked": 116,
+      "missing": 0,
+      "scope": "changed/new documents; new CURRENT/AGENTS sections only"
+    },
+    "whitespace": "git diff --check passed"
+  },
+  "live_inference": false,
+  "live_instabox": false,
+  "private_session_or_credential_reads": false,
+  "limitations": [
+    "Incomplete tool batches still reject continuation; no synthetic outcomes or replay",
+    "Mandatory latest exchange/question/instructions may still overflow; budgets unchanged",
+    "Live provider usage projection, typed remote execution, Host, mobile runtime networking and PTY multiplexing not implemented",
+    "No installed CLI binary refresh, commit or publication"
+  ]
+}

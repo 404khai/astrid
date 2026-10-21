@@ -1,3 +1,16 @@
+# Active scoped direction — 2026-10-18
+
+The maintainer requested runtime recovery and honest budget/usage visibility
+before typed InstaBox remote tools, a plan for the existing Expo iOS/Android client
+and authenticated Host, and later terminal infrastructure research. The
+[dependency-ordered plan](plans/remote-mobile-cli.md) owns this extension's tickets;
+[first recovery milestone](milestones/runtime-recovery.md) records implementation.
+[ADR 0020](adr/0020-followup-context-recovery.md) was explicitly accepted in this
+session. This does not accept a remote-trust contract, resume M02, introduce
+concurrent writes/shell or advance Phase 9. Older delivery orders below are history.
+
+---
+
 Authorization update — 2026-10-15: the maintainer now explicitly requests Phase 6
 closure review followed by Phase 7 in a new main-based branch/thread. This supersedes
 earlier pending-Phase-7 statements below, conditional on the Phase 6 evidence review.
