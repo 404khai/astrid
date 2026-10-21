@@ -68,5 +68,13 @@
     "src/runtime.rs": "1760c2e5956e00a2bae25fb370a087c936e87f139c7096000af369bf4415ca7b",
     "src/openai.rs": "75a9fe01e644bf2010b20a052dc99a0bd113ad716f9cd8051cf41991c3e84db0",
     "src/events.rs": "83ff6db80e4c4a30554ab6104bd9a0779cec5b934cf147e055fa835a87164ed5"
+  },
+  "publication": {
+    "pr": 26,
+    "url": "https://github.com/404khai/astrid/pull/26",
+    "base": "main",
+    "dependency_pr": 25,
+    "implementation_commit": "17d5f70c",
+    "merged": false
   }
 }

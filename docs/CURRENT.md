@@ -37,6 +37,10 @@ UX requires separate review. No mobile/Host/workers/background loop, image
 persistence, provisioning, ports, secret transfer or successor work. Stop after
 the integration PR, left unmerged.
 
+Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
+stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs
+remain unmerged. No live operation or successor implementation was performed.
+
 ---
 
 # Bounded headless desktop actions — 2026-10-21
