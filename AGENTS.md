@@ -1,3 +1,25 @@
+# RE-01 contract and mocked adapter authorization — 2026-10-21
+
+Maintainer requested RE-01 in this new thread on existing
+`feat/instabox-tool-adapter`, based on freshly fetched main `cc0fa964`, same
+checkout, no worktree. Define the concrete remote-target contract before dependent
+code, then implement one foreground exact-machine `instabox_exec` tool with mocked
+HTTP, validate, commit conventionally and open a conventional-title PR against
+main. Do not merge it. This supersedes RC-03's remote-contract exclusion only for
+this slice. Consequential contract decisions still follow the escalation policy;
+[ADR 0021](docs/adr/0021-remote-target-authority.md) is explicitly Accepted by the
+maintainer on 2026-10-21 with atomic single-use grant consumption immediately
+before POST admission, no local OS sandbox claim, and private-only exact-target
+attribution pending any future privacy/schema decision. Proceed with RE-01.
+RC-01/02/03 and cleanup are complete; no further cleanup is needed.
+
+Keep principal/run/call/target/canonical-argument remote grants separate from local
+presets and resume. Keep credentials host-side and preserve private v2 provenance,
+actual results, complete exchanges/cancellation, ADRs 0008/0009 and read-only workers.
+No live inference/cloud/VM operations, creation/lifecycle/ports/secret transfer,
+screenshots/computer use, remote workers, Host/mobile networking, Phase 9, daemon,
+PTY or desktop implementation. Stop after this slice and its unmerged PR.
+
 # RC-03 implementation and PR cleanup authorization — 2026-10-21
 
 Maintainer requested a new branch/thread for RC-03, then a PR, merging the open

@@ -606,6 +606,19 @@ pub(super) fn summary(outcome: &ToolOutcome) -> String {
     match outcome {
         ToolOutcome::Error { code, message } => format!("{code}: {message}"),
         ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } => {
+            if data["target"] == "instabox" {
+                if data["remote_outcome"] == "unknown" {
+                    return "remote outcome unknown; termination unconfirmed; no automatic retry"
+                        .into();
+                }
+                if data["remote_outcome"] == "not_dispatched" {
+                    return "remote command not dispatched".into();
+                }
+                return format!(
+                    "remote exit {} · timeout {} · truncated {}",
+                    data["exit_status"], data["timed_out"], data["output_truncated"]
+                );
+            }
             if data["timed_out"] == true {
                 return if data["stdout"].is_null() && data["stderr"].is_null() {
                     "output unavailable after timeout".into()

@@ -296,6 +296,7 @@ async fn unsupported_effort_and_invalid_stage_order_fail_before_any_request_or_m
     assert!(!policy().valid("unknown-model", 4, &server.provider));
     let request = ModelRequest {
         options: RequestOptions {
+            instabox_exec: false,
             effort: Some(ReasoningEffort::High),
             replay: ReplayMode::ProviderContinuation,
         },

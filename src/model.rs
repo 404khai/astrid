@@ -84,7 +84,8 @@ impl ToolResult {
         matches!(
             self.outcome,
             ToolOutcome::Error { .. } | ToolOutcome::TimedOut { .. }
-        )
+        ) || (self.name == "instabox_exec"
+            && matches!(&self.outcome, ToolOutcome::Success { data } if data["successful"] != true))
     }
 }
 

@@ -26,3 +26,4 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0018](0018-worker-authority-and-results.md) | Read-only worker grants and attributed visible-result reconciliation | Accepted 2026-10-16 | Implemented; [review/evidence](../reviews/phase-8.md) |
 | [0019](0019-batch-events-and-traces.md) | Explicit batch projection delivery and metadata trace correlation | Accepted 2026-10-16 | Implemented; [review/evidence](../reviews/phase-8.md) |
 | [0020](0020-followup-context-recovery.md) | Follow-up selection without whole-transcript protection | Accepted 2026-10-18 | Implemented; scoped amendment to 0006/0010; [evidence](../milestones/runtime-recovery.md) |
+| [0021](0021-remote-target-authority.md) | Foreground exact-target remote execution authority | Accepted 2026-10-21 | Implemented; [review/evidence](../reviews/instabox-tool-adapter-2026-10-21.md) |

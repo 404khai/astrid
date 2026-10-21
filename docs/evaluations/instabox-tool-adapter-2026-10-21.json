@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-21",
+  "ticket": "RE-01",
+  "baseline": "cc0fa964cfb964259614b5913b0bdb2cd9142881",
+  "branch": "feat/instabox-tool-adapter",
+  "contract": "docs/adr/0021-remote-target-authority.md",
+  "contract_acceptance_commit": "f43c33db",
+  "scope": "Foreground host-installed typed tool, deterministic mocked provider and loopback HTTP only",
+  "checks": {
+    "rust": {
+      "command": "cargo test --all-targets -- --test-threads=1",
+      "passed": 302,
+      "failed": 0,
+      "ignored": 1,
+      "ignored_reason": "Existing optional recording-overhead experiment",
+      "log_sha256": "67aa08925c23b5baf53a5f0cc3b7f466f9b28b5f894ca57a057febbafac71cad"
+    },
+    "binding_recheck": {
+      "command": "cargo test --lib remote::tests",
+      "passed": 13,
+      "failed": 0,
+      "note": "After full suite, tightened only the mismatched-binding test to require the permission_denied category; all thirteen tests rechecked."
+    },
+    "python": {
+      "command": "python3 -m unittest discover -s scripts -p 'test_*.py'",
+      "passed": 2,
+      "failed": 0
+    },
+    "format": {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0
+    },
+    "clippy": {
+      "command": "cargo clippy --all-targets -- -D warnings",
+      "exit_code": 0
+    },
+    "whitespace": {
+      "command": "git diff --check; git diff --cached --check",
+      "exit_code": 0
+    }
+  },
+  "initial_failure": {
+    "command": "cargo test --all-targets",
+    "test": "observation_never_runs_fsmonitor_or_changes_index",
+    "assertion": "Expected staged and unstaged dirty entry absent",
+    "isolated_rerun": "Passed",
+    "two_complete_serialized_reruns": "302 passed, 0 failed, 1 ignored each",
+    "observer_source_changed": false,
+    "cause": "Not established; bounded subprocess timing is a possible explanation"
+  },
+  "retry_policy": {
+    "implementation": "reqwest::retry::never() explicitly disables default protocol-NACK retries",
+    "source": "https://docs.rs/reqwest/0.12.28/reqwest/struct.ClientBuilder.html#method.retry",
+    "version": "0.12.28"
+  },
+  "limitations": {
+    "live_model_or_vm_validation": false,
+    "normal_cli_installs_remote_implicitly": false,
+    "new_session_or_trace_schema_migration": false,
+    "persistent_exact_target_attribution": false,
+    "remote_workers": false,
+    "os_account_sandbox": false,
+    "remote_termination_guarantee": false
+  },
+  "next_proposed_slice": "RE-02: separately authorized isolated existing-machine live trial and foreground CLI broker connection; not implemented",
+  "source_sha256": {
+    "src/console/state.rs": "075dfac8ad579ea512ed1c59af63ac718a539daa3f68ee5c301a974bd1d3d792",
+    "src/context.rs": "4a2d22c48ca8d96d067500fb94efc7dceb26d04e6160e780efb1703942727b74",
+    "src/events.rs": "d25f7d46a329155e59140e2fe424b2dac4e610489c8efe008ab26211705a6cab",
+    "src/instabox.rs": "f5440015a8dfdb2a4890e4315ad5b0bb3706c3ff46d34c011b789254208ae5bc",
+    "src/instabox_cli.rs": "aaa5cb883e57d70924fd1669459290fa2366d6b36009fa8ad4f1b14c4ea0d1cf",
+    "src/lib.rs": "98c8f8381e25952773c3c3f75064f9c40ff4292b8831490f199d393045464b9b",
+    "src/main.rs": "073459699336a4253f3aaa859a3a1fc5089fbab266c06e91573c22aae30dc43b",
+    "src/model.rs": "7f63e2084c1313b8f3571e675a6698ad02cb4c60f8dad275386d79aadd004340",
+    "src/observability.rs": "7e5906758f93bb55d6b25b25aa8506c22df26aafd420f086e24d7fee206f38ea",
+    "src/openai.rs": "b7dd5f209f619cf72f1d1030022c8141213b942886f67b7f2ed1be186a01b9be",
+    "src/remote.rs": "0dbbc9ccd1ecaa71db9f69c97a1ab2c147b18d4028dfd24309a99b5d3363f525",
+    "src/routing.rs": "5d76eef5251fcc5946038f6942bd40cefa6379abed54a575936e5c96099c205f",
+    "src/runtime.rs": "cf478253c9ad585c43b870254d7c816e8523b47e5c7a9cc66030d556fea10eec",
+    "src/tools.rs": "8b733109381ba362595db5b32ba611fce7756f9b2d5208ca23d04bf5e4b0cd98",
+    "tests/routing.rs": "3fd918e923669b6103f932b98990033ba200bbe65173e835db18f9188a940361",
+    "tests/support/instabox_mock.rs": "280bd678625343b50b26ab927e1497cc780b7115be5fd2d00b949d68f422c2e1",
+    "tests/support/instabox_runtime_mock.rs": "eca32cdb90bc7bb35315fa0743aeadd786a4eb5ba49d17e7fc68d8b73ed4b940"
+  }
+}

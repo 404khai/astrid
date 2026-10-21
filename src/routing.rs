@@ -50,6 +50,8 @@ pub enum ReplayReason {
 }
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RequestOptions {
+    /// Tool advertisement only; authority is rechecked by the foreground runtime.
+    pub instabox_exec: bool,
     pub effort: Option<ReasoningEffort>,
     pub replay: ReplayMode,
 }

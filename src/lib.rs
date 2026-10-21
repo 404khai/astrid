@@ -22,3 +22,6 @@ pub mod workspace;
 pub mod batch_manifest;
 pub mod batch_trace;
 pub mod scheduler;
+
+pub mod instabox;
+pub mod remote;

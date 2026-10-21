@@ -1,3 +1,44 @@
+# Foreground exact-target InstaBox tool — 2026-10-21
+
+RE-01 is implemented on `feat/instabox-tool-adapter`, from fetched main `cc0fa964`,
+in the same preserved checkout. The maintainer explicitly accepted
+[ADR 0021](adr/0021-remote-target-authority.md) with atomic single-use consumption
+at POST admission, the local OS scope clarification and future audit privacy/schema
+work deferred. The accepted contract was committed before dependent code.
+
+The host installs one exact target, opaque client and separate per-call broker.
+Grants bind principal/run/runtime-call/provider-call/target and exact canonical
+command/cwd/timeout. No authenticated metadata before approval; final checks and
+atomic consumption admit at most one POST. Local presets, resumed sessions and
+read-only workers grant no typed remote authority. No retry/replay; dispatched
+cancellation/deadline/transport/malformed responses preserve unknown outcome.
+Actual outputs and exit status are retained only when observed, and incomplete
+cancelled batches still reject continuation. Exact targets stay in private
+approval/result data; metadata traces omit commands/outputs/paths/errors/credentials.
+No private v2 schema/continuation or budget changes; ADR 0008 off semantics remain.
+
+**302 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt, strict all-target
+Clippy and whitespace passed.** Initial parallel Git-observation assertion failure
+passed isolated and full serialized reruns without observer changes; see
+[review](reviews/instabox-tool-adapter-2026-10-21.md),
+[evidence](evaluations/instabox-tool-adapter-2026-10-21.json),
+[active plan](plans/remote-mobile-cli.md), [milestone](milestones/runtime-recovery.md).
+
+This is a mocked foreground host-installed runtime adapter. Normal CLI sessions
+still do not implicitly select a target, load an InstaBox key or install a broker;
+standalone InstaBox CLI remains supported. No live provider/cloud/VM action or
+credential/private-session content read. No remote workers, computer use, mobile
+networking, Phase 9, daemon, PTY or desktop work. Preserve Meister primary/Astrix
+specialized and Rust harness authority. Implementation `5ec7fdd6` is published as
+[PR #22](https://github.com/404khai/astrid/pull/22), targeting main and left unmerged.
+Next proposed slice is RE-02's separately authorized exact isolated live trial and
+foreground CLI broker connection; do not start it here.
+
+Unrelated `.gitignore`, historical CURRENT content, user assets and recovery files
+remain preserved and unstaged.
+
+---
+
 # Aggregate tool-exchange admission — 2026-10-21
 
 Maintainer authorized RC-03 on a new branch, then its PR, merges of the open

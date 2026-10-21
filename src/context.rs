@@ -490,7 +490,11 @@ fn summary_text(
                         path_truncated || path.as_ref().is_some_and(|path| path.len() > 128);
                     let (status, detail, coverage, truncated) = match &result.outcome {
                         ToolOutcome::Success { data } => (
-                            "success",
+                            if result.is_error() {
+                                "error"
+                            } else {
+                                "success"
+                            },
                             data.get("content")
                                 .and_then(|value| value.as_str())
                                 .map_or_else(

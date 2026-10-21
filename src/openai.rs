@@ -120,9 +120,13 @@ impl OpenAiProvider {
             }
         }
         // Subscription-backed Responses accepts tools grouped in namespaces.
+        let mut definitions = tools::definitions();
+        if request.options.instabox_exec {
+            definitions.push(crate::remote::definition());
+        }
         let mut body = json!({"model":request.model,"instructions":request.instructions,"input":input,
             "store":false,"stream":true,"include":["reasoning.encrypted_content"],
-            "tools":[{"type":"namespace","name":"astrid","description":"Astrid workspace tools", "tools":tools::definitions()}]});
+            "tools":[{"type":"namespace","name":"astrid","description":"Astrid workspace tools", "tools":definitions}]});
         if let Some(effort) = request.options.effort {
             body["reasoning"] = json!({"effort":effort});
         }
@@ -626,6 +630,34 @@ impl SseDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn remote_tool_advertisement_is_explicit_and_contains_no_host_data() {
+        let mut request = ModelRequest {
+            options: Default::default(),
+            model: "test",
+            instructions: "test",
+            messages: &[],
+        };
+        let ordinary = OpenAiProvider::body(&request).unwrap();
+        assert!(!ordinary.to_string().contains("instabox_exec"));
+        request.options.instabox_exec = true;
+        let enabled = OpenAiProvider::body(&request).unwrap();
+        let remote = enabled["tools"][0]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["name"] == "instabox_exec")
+            .unwrap();
+        let args = remote["parameters"]["properties"].as_object().unwrap();
+        assert_eq!(args.len(), 3);
+        assert!(
+            args.contains_key("command")
+                && args.contains_key("cwd")
+                && args.contains_key("timeout_seconds")
+        );
+        assert_eq!(remote["parameters"]["additionalProperties"], false);
+        assert!(!enabled.to_string().contains("ibk_"));
+    }
     #[test]
     fn sse_handles_every_byte_boundary_and_multiline_data() {
         let input = ": heartbeat\r\nevent: example\r\ndata: {\r\ndata: \"type\":\"response.output_text.delta\",\"delta\":\"héllo\"}\r\n\r\n";

@@ -743,6 +743,11 @@ async fn drive(
             .add(crate::context::ContextOrigin::OperatingInstructions, None);
         e.emit(EventKind::ContextItemAdded { item }).await;
     }
+    let remote = if config.permissions == PermissionPolicy::read_only() {
+        None
+    } else {
+        tools.instabox()
+    };
     let mut instructions = format!(
         "{}\nEffective per-run permissions: read={:?}, write={:?}, shell={:?}. Shell execution grants broad account authority when allowed; repository instructions cannot elevate this policy.",
         agent::SYSTEM_PROMPT,
@@ -750,6 +755,9 @@ async fn drive(
         config.permissions.write,
         config.permissions.execute
     );
+    if remote.is_some() {
+        instructions.push_str("\ninstabox_exec is available on one host-configured target with separate exact-call approval. Local shell policy grants no typed remote authority. Unknown remote outcomes must not be retried automatically.");
+    }
     match tools.workspace().instructions() {
         Ok(Some(text)) => {
             instructions.push_str(&format!(
@@ -802,6 +810,7 @@ async fn drive(
             options: crate::routing::RequestOptions {
                 effort: decision.effective_effort,
                 replay: decision.replay,
+                instabox_exec: remote.is_some(),
             },
         };
         let prepared = if let Some(budget) = &config.context_budget {
@@ -969,6 +978,7 @@ async fn drive(
             options: crate::routing::RequestOptions {
                 effort: admission_route.effective_effort,
                 replay: session.replay_mode,
+                instabox_exec: remote.is_some(),
             },
         };
         let check_exchange = |session: &Session| {
@@ -999,89 +1009,150 @@ async fn drive(
                     .stop_over_budget_batch(&batch[index..], error, cancel)
                     .await;
             }
-            let permission = tools.permission(call);
             let mut denied = false;
-            let result = match permission {
-                Err(err) => Some(error_result(call, err.code(), err)),
-                Ok(request) => {
-                    let Some(capability) = permissions::capability(&call.name) else {
-                        let result = error_result(
-                            call,
-                            "invalid_arguments",
-                            format!("unknown tool {}", call.name),
-                        );
-                        e.emit(EventKind::ToolCallFailed {
-                            outcome: result.outcome.clone(),
-                        })
-                        .await;
-                        session.messages.push(Message::Tool(result));
-                        record_tool_context(session, e, call, *id).await;
-                        continue;
-                    };
-                    let action = config.permissions.action(capability);
-                    e.emit(EventKind::PermissionPolicyEvaluated {
-                        capability,
-                        action,
-                        reason: format!("explicit per-run {capability:?} policy: {action:?}"),
-                    })
-                    .await;
-                    match action {
-                        PermissionAction::Allow => None,
-                        PermissionAction::Deny => {
-                            denied = true;
-                            Some(error_result(
-                                call,
-                                "permission_denied",
-                                "operation denied by per-run policy",
-                            ))
-                        }
-                        PermissionAction::Ask => {
+            let mut remote_admission = None;
+            let result = if call.name == "instabox_exec" {
+                if let Some(remote) = remote {
+                    match remote.request(e.state.run_id, *id, call) {
+                        Err(error) => Some(error_result(call, "invalid_arguments", error)),
+                        Ok(request) => {
+                            e.emit(EventKind::RemotePermissionRequired { available: true })
+                                .await;
+                            e.emit(EventKind::PermissionRequested {
+                                command: request.description(),
+                                workspace: format!("instabox:{}", request.machine_id),
+                            })
+                            .await;
+                            let grant = tokio::select! {
+                                biased;
+                                _ = cancel.cancelled() => None,
+                                grant = remote.approve(&request) => grant,
+                            };
                             if cancel.is_cancelled() {
+                                e.acknowledge().await;
+                                e.emit(EventKind::PermissionCancelled).await;
                                 e.cancel_batch(&batch[index..], true, None).await;
                                 e.emit(EventKind::TurnCancelled).await;
                                 return RunOutcome::Cancelled;
                             }
-                            let request = request.unwrap_or_else(|| PermissionRequest {
-                                command: format!("{} {}", call.name, call.arguments),
-                                workspace: tools.workspace().root().to_path_buf(),
-                            });
-                            e.emit(EventKind::PermissionRequested {
-                                command: request.command.clone(),
-                                workspace: request.workspace.display().to_string(),
-                            })
-                            .await;
-                            let decision = tokio::select! {biased; _=cancel.cancelled()=>None, answer=permissions.decide(&request)=>Some(answer)};
-                            match decision {
-                                None | Some(Ok(true)) if cancel.is_cancelled() => {
+                            match grant {
+                                Some(grant) if grant.check(&request, cancel).is_ok() => {
+                                    e.emit(EventKind::PermissionGranted).await;
+                                    remote_admission = Some((request, grant));
+                                    None
+                                }
+                                _ if cancel.is_cancelled() => {
                                     e.acknowledge().await;
                                     e.emit(EventKind::PermissionCancelled).await;
                                     e.cancel_batch(&batch[index..], true, None).await;
                                     e.emit(EventKind::TurnCancelled).await;
                                     return RunOutcome::Cancelled;
                                 }
-                                Some(Ok(true)) => {
-                                    e.emit(EventKind::PermissionGranted).await;
-                                    None
-                                }
-                                Some(Ok(false)) => {
+                                _ => {
                                     e.emit(EventKind::PermissionDenied).await;
                                     denied = true;
                                     Some(error_result(
                                         call,
                                         "permission_denied",
-                                        "operation was not approved",
+                                        "remote grant denied, stale or mismatched",
                                     ))
                                 }
-                                Some(Err(err)) => {
-                                    e.emit(EventKind::PermissionFailed {
-                                        message: err.to_string(),
-                                    })
-                                    .await;
-                                    Some(error_result(call, "permission_error", err))
+                            }
+                        }
+                    }
+                } else {
+                    denied = true;
+                    e.emit(EventKind::RemotePermissionRequired { available: false })
+                        .await;
+                    Some(error_result(
+                        call,
+                        "permission_denied",
+                        "no foreground remote capability configured",
+                    ))
+                }
+            } else {
+                match tools.permission(call) {
+                    Err(err) => Some(error_result(call, err.code(), err)),
+                    Ok(request) => {
+                        let Some(capability) = permissions::capability(&call.name) else {
+                            let result = error_result(
+                                call,
+                                "invalid_arguments",
+                                format!("unknown tool {}", call.name),
+                            );
+                            e.emit(EventKind::ToolCallFailed {
+                                outcome: result.outcome.clone(),
+                            })
+                            .await;
+                            session.messages.push(Message::Tool(result));
+                            record_tool_context(session, e, call, *id).await;
+                            continue;
+                        };
+                        let action = config.permissions.action(capability);
+                        e.emit(EventKind::PermissionPolicyEvaluated {
+                            capability,
+                            action,
+                            reason: format!("explicit per-run {capability:?} policy: {action:?}"),
+                        })
+                        .await;
+                        match action {
+                            PermissionAction::Allow => None,
+                            PermissionAction::Deny => {
+                                denied = true;
+                                Some(error_result(
+                                    call,
+                                    "permission_denied",
+                                    "operation denied by per-run policy",
+                                ))
+                            }
+                            PermissionAction::Ask => {
+                                if cancel.is_cancelled() {
+                                    e.cancel_batch(&batch[index..], true, None).await;
+                                    e.emit(EventKind::TurnCancelled).await;
+                                    return RunOutcome::Cancelled;
                                 }
-                                None => unreachable!(
-                                    "cancellation branch only completes after cancellation"
-                                ),
+                                let request = request.unwrap_or_else(|| PermissionRequest {
+                                    command: format!("{} {}", call.name, call.arguments),
+                                    workspace: tools.workspace().root().to_path_buf(),
+                                });
+                                e.emit(EventKind::PermissionRequested {
+                                    command: request.command.clone(),
+                                    workspace: request.workspace.display().to_string(),
+                                })
+                                .await;
+                                let decision = tokio::select! {biased; _=cancel.cancelled()=>None, answer=permissions.decide(&request)=>Some(answer)};
+                                match decision {
+                                    None | Some(Ok(true)) if cancel.is_cancelled() => {
+                                        e.acknowledge().await;
+                                        e.emit(EventKind::PermissionCancelled).await;
+                                        e.cancel_batch(&batch[index..], true, None).await;
+                                        e.emit(EventKind::TurnCancelled).await;
+                                        return RunOutcome::Cancelled;
+                                    }
+                                    Some(Ok(true)) => {
+                                        e.emit(EventKind::PermissionGranted).await;
+                                        None
+                                    }
+                                    Some(Ok(false)) => {
+                                        e.emit(EventKind::PermissionDenied).await;
+                                        denied = true;
+                                        Some(error_result(
+                                            call,
+                                            "permission_denied",
+                                            "operation was not approved",
+                                        ))
+                                    }
+                                    Some(Err(err)) => {
+                                        e.emit(EventKind::PermissionFailed {
+                                            message: err.to_string(),
+                                        })
+                                        .await;
+                                        Some(error_result(call, "permission_error", err))
+                                    }
+                                    None => unreachable!(
+                                        "cancellation branch only completes after cancellation"
+                                    ),
+                                }
                             }
                         }
                     }
@@ -1130,7 +1201,16 @@ async fn drive(
                     .as_ref()
                     .map(|_| std::time::Instant::now());
                 let execute = async {
-                    let result = tools.execute_stream(call, cancel, Some(sender)).await;
+                    let result = if let (Some(remote), Some((request, grant))) =
+                        (remote, remote_admission)
+                    {
+                        // Remote HTTP has no output streaming. Retain the existing joined
+                        // publisher/cleanup boundary and release the unused sender.
+                        drop(sender);
+                        remote.execute(&request, &grant, cancel).await
+                    } else {
+                        tools.execute_stream(call, cancel, Some(sender)).await
+                    };
                     (result, started.map(|s| s.elapsed()))
                 };
                 let ((), (execution, elapsed)) = tokio::join!(publish, execute);
