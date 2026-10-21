@@ -19,6 +19,7 @@ mod terminal;
 #[cfg(test)]
 mod tests;
 mod theme;
+mod usage_meter;
 mod widgets;
 mod wordmark;
 

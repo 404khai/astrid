@@ -407,9 +407,27 @@ impl TextSink for StreamSink<'_> {
     fn telemetry_enabled(&self) -> bool {
         self.0.recorder.is_some()
     }
-    async fn telemetry(&mut self, telemetry: crate::observability::Telemetry) {
+    async fn telemetry(&mut self, mut telemetry: crate::observability::Telemetry) {
+        if !self.telemetry_enabled() {
+            return;
+        }
+        if telemetry.usage.is_some() {
+            let model = self.0.model.expect("active stream has model");
+            if self.0.state.models[&model].usage.is_some() {
+                return;
+            }
+            telemetry.usage = telemetry.usage.map(|usage| usage.normalized());
+        }
         if let Some(recorder) = &self.0.recorder {
-            recorder.telemetry(self.0.state.sequence, self.0.model, self.0.tool, telemetry);
+            recorder.telemetry(
+                self.0.state.sequence,
+                self.0.model,
+                self.0.tool,
+                telemetry.clone(),
+            );
+        }
+        if let Some(usage) = telemetry.usage {
+            self.0.emit(EventKind::ModelUsageReported { usage }).await;
         }
     }
     async fn request_prepared(

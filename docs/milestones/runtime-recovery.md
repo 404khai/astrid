@@ -3,7 +3,7 @@
 Date: 2026-10-18
 Authorization: Implementation authorized by the current maintainer request;
 [ADR 0020](../adr/0020-followup-context-recovery.md) separately accepted in this session.
-Implementation: RC-01 Complete; budget presentation Complete; RC-02 live usage projection Draft.
+Implementation: RC-01 Complete; budget presentation Complete; RC-02 live usage projection Complete.
 Acceptance: RC-01 Passed with the explicit limitations below.
 This scoped milestone does not advance Phase 9 or resume paused M02.
 
@@ -33,12 +33,14 @@ ceiling, planning response reserve and exact request bytes/ceiling alongside the
 existing local utilization estimate. These are configuration/admission values,
 not an enforced provider output-token limit or known model-window occupancy.
 
-Remaining work: expose provider-reported input/output/cached counts in the normal
-run projection, with explicit unavailable/invalid states and completeness for
-aggregates. Current `observability::Usage` already validates counts; traces/stats
-can inspect known values via `astrid trace <run-id>` and `astrid stats` (only retained/recorded coverage). `ExecutionEvent` and `ModelResponse` do not currently
-carry usage to the console. Choose a bounded headless metadata projection rather
-than reading trace files during rendering or conflating estimates with usage.
+RC-02 implementation now exposes provider-reported input/output/cached counts in
+the normal run projection, with explicit unavailable/invalid states and per-metric
+reporting-call coverage. `observability::Usage` validates counts; traces/stats
+inspect retained/recorded coverage via `astrid trace <run-id>` and `astrid stats`.
+`ExecutionEvent::ModelUsageReported` supplies bounded headless metadata to the
+console without changing `ModelResponse` or private session v2. The existing
+observability opt-in remains binding.
+[Compatibility and review](../reviews/live-token-usage-2026-10-18.md).
 Test absent, zero, malformed, partial and cancelled-call telemetry; cached is a
 subset of input. Never derive account quota percentage or cost without a basis.
 
@@ -61,3 +63,17 @@ The ignored case is the existing optional recording-overhead experiment.
 transfer is part of acceptance.
 
 [Dependency-ordered direction](../plans/remote-mobile-cli.md).
+
+
+## RC-02 validation — 2026-10-18
+
+Separate branch `feat/live-token-usage`, parent recovery commit `dc7cbfbc` / PR #19.
+**283 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt and strict all-target
+Clippy passed.** The ignored case remains the optional recording-overhead test.
+[Commands/source hashes](../evaluations/live-token-usage-2026-10-18.json),
+[compatibility and solo review](../reviews/live-token-usage-2026-10-18.md).
+No live inference/InstaBox acceptance or installed binary refresh. Usage is opt-in;
+missing or invalid values remain unavailable. RE-01 still needs target authority.
+
+Publication: implementation `36ccc11d`, [PR #20](https://github.com/404khai/astrid/pull/20)
+stacked on recovery PR #19. Neither PR was merged by this task.

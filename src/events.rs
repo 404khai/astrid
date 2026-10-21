@@ -99,6 +99,10 @@ pub enum EventKind {
     ModelCallCompleted {
         text: String,
     },
+    /// Optional provider-reported metadata, never an estimate or completion signal.
+    ModelUsageReported {
+        usage: crate::observability::Usage,
+    },
     ModelCallFailed {
         message: String,
     },
@@ -187,6 +191,8 @@ pub struct ModelState {
     pub turn_id: TurnId,
     pub first_text: bool,
     pub context: Option<crate::context::ContextSnapshot>,
+    #[serde(default)]
+    pub usage: Option<crate::observability::Usage>,
     #[serde(default)]
     pub route: Option<crate::routing::RouteDecision>,
 }
@@ -391,6 +397,7 @@ impl ExecutionState {
             | EventKind::ModelFirstTextDelta
             | EventKind::ModelTextDelta { .. }
             | EventKind::ModelCallCompleted { .. }
+            | EventKind::ModelUsageReported { .. }
             | EventKind::ModelCallFailed { .. }
             | EventKind::ModelCallCancelled => require(
                 e.turn_id.is_some() && e.model_call_id.is_some() && e.tool_call_id.is_none(),
@@ -628,6 +635,7 @@ impl ExecutionState {
                         turn_id: turn()?,
                         first_text: false,
                         context: None,
+                        usage: None,
                         route: None,
                     },
                 );
@@ -663,6 +671,15 @@ impl ExecutionState {
                         && !self.cancellation_acknowledged,
                 )?;
                 m.context = Some(snapshot.clone());
+            }
+            EventKind::ModelUsageReported { usage } => {
+                let m = self
+                    .models
+                    .get_mut(&model()?)
+                    .ok_or_else(|| TransitionError("unknown model".into()))?;
+                require(m.status == Status::Running && m.usage.is_none())?;
+                require(*usage == usage.normalized())?;
+                m.usage = Some(usage.clone());
             }
             EventKind::ModelFirstTextDelta
             | EventKind::ModelTextDelta { .. }

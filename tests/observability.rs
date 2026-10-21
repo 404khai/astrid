@@ -35,6 +35,237 @@ fn usage_reply(text: &str) -> Vec<serde_json::Value> {
     events.last_mut().unwrap()["response"]["usage"] = json!({"input_tokens":12,"output_tokens":3,"input_tokens_details":{"cached_tokens":0},"total_tokens":15});
     events
 }
+
+#[tokio::test]
+async fn live_usage_is_correlated_replayable_optional_and_matches_existing_trace_counts() {
+    use astrid::events::{EventKind, ExecutionState};
+    for (enabled, payload, expected) in [
+        (
+            true,
+            json!({"input_tokens":12,"output_tokens":3,"input_tokens_details":{"cached_tokens":4}}),
+            Usage {
+                input_tokens: Some(12),
+                output_tokens: Some(3),
+                cached_tokens: Some(4),
+                invalid: false,
+            },
+        ),
+        (
+            true,
+            json!({"input_tokens":0,"output_tokens":0,"input_tokens_details":{"cached_tokens":0}}),
+            Usage {
+                input_tokens: Some(0),
+                output_tokens: Some(0),
+                cached_tokens: Some(0),
+                invalid: false,
+            },
+        ),
+        (
+            true,
+            json!({"input_tokens":12}),
+            Usage {
+                input_tokens: Some(12),
+                ..Default::default()
+            },
+        ),
+        (true, json!(null), Usage::default()),
+        (
+            true,
+            json!({"input_tokens":1,"input_tokens_details":{"cached_tokens":2}}),
+            Usage {
+                invalid: true,
+                ..Default::default()
+            },
+        ),
+        (false, json!({"input_tokens":12}), Usage::default()),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let storage = tempfile::tempdir().unwrap();
+        let store = storage.path().join("traces");
+        let mut response = reply(&[], "TEXT-SENTINEL");
+        response.last_mut().unwrap()["response"]["usage"] = payload;
+        let server = Server::start(vec![response]).await;
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let t = tools(root.path());
+        let mut permission = Confirmation::new(false);
+        let consume = async {
+            let mut events = Vec::new();
+            while let Some(event) = rx.recv().await {
+                events.push(event);
+            }
+            events
+        };
+        let (result, events) = tokio::join!(
+            runtime::run(
+                &server.provider,
+                &t,
+                &mut permission,
+                config(enabled.then(|| Options::new(store.clone()))),
+                Cancellation::default(),
+                Some(tx)
+            ),
+            consume
+        );
+        let result = result.unwrap();
+        assert_eq!(result.outcome, RunOutcome::Completed);
+        let reports = events
+            .iter()
+            .filter(|e| matches!(e.kind, EventKind::ModelUsageReported { .. }))
+            .collect::<Vec<_>>();
+        assert_eq!(reports.len(), usize::from(enabled));
+        let mut replay = ExecutionState::new(result.session.id, result.state.run_id);
+        for event in &events {
+            if matches!(event.kind, EventKind::ModelUsageReported { .. }) {
+                assert!(
+                    event.model_call_id.is_some()
+                        && event.turn_id.is_some()
+                        && event.tool_call_id.is_none()
+                );
+                let mut invalid = event.clone();
+                invalid.kind = EventKind::ModelUsageReported {
+                    usage: Usage {
+                        input_tokens: Some(1),
+                        cached_tokens: Some(2),
+                        ..Default::default()
+                    },
+                };
+                let before = replay.clone();
+                assert!(replay.transition(&invalid).is_err());
+                assert_eq!(replay, before);
+            }
+            replay.transition(event).unwrap();
+            if matches!(event.kind, EventKind::ModelUsageReported { .. }) {
+                let mut duplicate = event.clone();
+                duplicate.sequence += 1;
+                let before = replay.clone();
+                assert!(replay.transition(&duplicate).is_err());
+                assert_eq!(replay, before);
+            }
+        }
+        assert_eq!(replay, result.state);
+        assert_eq!(
+            result.state.models.values().next().unwrap().usage,
+            enabled.then_some(expected.clone())
+        );
+        if enabled {
+            let trace =
+                observability::read_trace(&store, &result.recording.run_id.to_string()).unwrap();
+            assert!(trace.complete);
+            let summary = trace.summary();
+            assert_eq!(
+                summary.models.values().next().unwrap().usage,
+                Some(expected.clone())
+            );
+            let mut stats = observability::Stats::default();
+            stats.add(&summary);
+            assert_eq!(stats.observed_model_calls, 1);
+            assert_eq!(
+                stats.known_input_tokens,
+                u128::from(expected.input_tokens.unwrap_or(0))
+            );
+        } else {
+            assert!(!store.exists());
+        }
+        assert_eq!(server.finish().await.len(), 1);
+    }
+}
+
+struct ReportingProvider {
+    first: Usage,
+    cancel: Option<Cancellation>,
+}
+#[async_trait]
+impl ModelProvider for ReportingProvider {
+    async fn generate(
+        &self,
+        _: &ModelRequest<'_>,
+        sink: &mut dyn TextSink,
+    ) -> Result<astrid::model::ModelResponse, astrid::model::ModelError> {
+        for usage in [
+            self.first.clone(),
+            Usage {
+                input_tokens: Some(999),
+                ..Default::default()
+            },
+        ] {
+            sink.telemetry(Telemetry {
+                phase: None,
+                elapsed_us: None,
+                usage: Some(usage),
+            })
+            .await;
+        }
+        if let Some(cancel) = &self.cancel {
+            cancel.cancel();
+            std::future::pending().await
+        } else {
+            Err(astrid::model::ModelError::Protocol(
+                "synthetic interruption".into(),
+            ))
+        }
+    }
+}
+
+#[tokio::test]
+async fn cancelled_and_failed_calls_keep_first_report_without_double_counting_or_invalid_numbers() {
+    use astrid::events::{EventKind, ExecutionState};
+    for invalid in [false, true] {
+        let root = tempfile::tempdir().unwrap();
+        let storage = tempfile::tempdir().unwrap();
+        let store = storage.path().join("traces");
+        let cancel = Cancellation::default();
+        let provider = ReportingProvider {
+            first: Usage {
+                input_tokens: Some(12),
+                invalid,
+                ..Default::default()
+            },
+            cancel: (!invalid).then_some(cancel.clone()),
+        };
+        let mut conf = config(Some(Options::new(store.clone())));
+        conf.context_budget = None;
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let t = tools(root.path());
+        let mut permission = Confirmation::new(false);
+        let consume = async {
+            let mut events = Vec::new();
+            while let Some(event) = rx.recv().await {
+                events.push(event);
+            }
+            events
+        };
+        let (result, events) = tokio::join!(
+            runtime::run(&provider, &t, &mut permission, conf, cancel, Some(tx)),
+            consume
+        );
+        let result = result.unwrap();
+        if invalid {
+            assert!(matches!(result.outcome, RunOutcome::Failed { .. }));
+        } else {
+            assert_eq!(result.outcome, RunOutcome::Cancelled);
+        }
+        assert_eq!(
+            events
+                .iter()
+                .filter(|e| matches!(e.kind, EventKind::ModelUsageReported { .. }))
+                .count(),
+            1
+        );
+        let mut replay = ExecutionState::new(result.session.id, result.state.run_id);
+        for event in &events {
+            replay.transition(event).unwrap();
+        }
+        assert_eq!(replay, result.state);
+        let expected = provider.first.normalized();
+        let trace =
+            observability::read_trace(&store, &result.recording.run_id.to_string()).unwrap();
+        assert!(trace.complete);
+        assert_eq!(
+            trace.summary().models.values().next().unwrap().usage,
+            Some(expected)
+        );
+    }
+}
 #[test]
 fn settings_are_private_atomic_and_resolve_without_enabling_on_invalid_input() {
     let temp = tempfile::tempdir().unwrap();

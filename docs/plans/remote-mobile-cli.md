@@ -14,7 +14,7 @@ harness. CLI and mobile are clients; InstaBox is an execution target.
 | Context | `src/context.rs`, `tests/context_budget.rs`, ADRs 0006/0007/0010 | Historical grouping pins the prior transcript; fix selection, not token defaults. Latest multi-tool aggregate can still exceed admission. |
 | Cancellation | `src/runtime.rs`; `tests/runtime.rs`, `tests/sessions.rs` | Completed exchanges survive; unmatched terminal batches reject follow-up. Model cancellation without such a batch can continue. Preserve both cases. |
 | Persistence/routing | `src/session_store.rs`, ADR 0016; `tests/session_store.rs`, `tests/routing.rs` | V2 provenance supports conservative visible-history routing. Do not assume every legacy/one-shot session is resumable; validate actual replay mode, origins and completeness. |
-| Usage | `src/observability.rs`, `src/console/context_meter.rs`, `src/main.rs` | Traces/stats retain known input/output/cached usage; console shows a local non-opaque bytes/4 estimate. Live events lack provider usage. Reserve is planning headroom. |
+| Usage | `src/observability.rs`, `src/console/context_meter.rs`, `src/main.rs` | Traces/stats retain known input/output/cached usage; console shows a local non-opaque bytes/4 estimate. RC-02 adds opt-in live provider usage and per-metric coverage; reserve remains planning headroom. |
 | InstaBox | `src/instabox.rs`, `tests/instabox_cli.rs`, `tests/support/instabox_mock.rs`; [merge review](../reviews/instabox-completion-2026-10-18.md) | Standalone CLI GET discovery and explicit exact-machine exec exist. Agent tool integration does not. Adapter is binary-private and mixes command parsing, credentials and HTTP. |
 | Tools/authority | `src/tools.rs`, `src/permissions.rs`, `src/runtime.rs`, `src/openai.rs` | Fixed tool definitions, read/write/execute policy and command/workspace approval request assume local tools. Remote execution needs explicit target authority; adding a tool name to local Execute is insufficient. |
 | Scheduler | `src/scheduler.rs`, accepted ADRs 0017–0019; [review](../reviews/phase-8.md) | Process-local bounded DAG with fresh read-only workers; no remote worker grant, concurrent writes/shell, daemon or durable jobs. Terminal persistence cannot supply these guarantees. |
@@ -39,7 +39,7 @@ trust need their concrete ADR before dependent implementation.
 | Ticket | Dependencies | Behavior / independently testable exit | Status |
 | --- | --- | --- | --- |
 | RC-01 | Accepted ADR 0020 | Oversized previous-submission follow-up fits unchanged allowance; no replay; retained originals, omission lineage and checked events | Done; [milestone/evidence](../milestones/runtime-recovery.md) |
-| RC-02 | RC-01; metadata projection compatibility review | Normal CLI displays valid known input/output/cached counts, unknowns and aggregate coverage; budgets separately labeled | Partial presentation improvement; remaining projection Draft |
+| RC-02 | RC-01; metadata projection compatibility review | Normal CLI displays valid known input/output/cached counts, unknowns and aggregate coverage; budgets separately labeled | Done; [compatibility/review](../reviews/live-token-usage-2026-10-18.md) |
 | RC-03 | RC-01/02 | Bound one multi-tool exchange before further costly work; test many individually legal large outputs, Unicode and latest-exchange overflow | Draft; investigate output admission separately, preserve original results |
 | RE-01 | RC-01/02; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Draft; smallest safe remote adapter below |
 | RE-02 | RE-01 | Authorized isolated live trial: exact selected running machine, harmless `printf`/`pwd`, denial/timeout/cancel and attribution inspected separately | Draft; exact live request including possible wake requires authorization |
@@ -53,8 +53,8 @@ trust need their concrete ADR before dependent implementation.
 | CL-02 | CL-01; measured reuse experiment | Isolated tmux/Herdr subprocess prototype compares attach, resize, disconnect, output backpressure and status; no core coupling | Draft; full multiplexer deferred |
 
 Recommended first slice is RC-01, implemented under the separately accepted
-amendment. Finish its deterministic validation before remote work. The next slice
-is RC-02, then RE-01. MO-01 can use mocks independently; its apparent working
+amendment. Finish its deterministic validation before remote work. RC-02 is now validated and complete after
+[recovery PR #19](https://github.com/404khai/astrid/pull/19); then RE-01. MO-01 can use mocks independently; its apparent working
 state must never imply a real run. Do not combine these tickets in one large PR.
 
 ## Smallest safe InstaBox runtime adapter (RE-01 design)

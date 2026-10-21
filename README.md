@@ -155,8 +155,11 @@ window occupancy. The denominator is configured context allowance minus response
 reserve (61,440 by default: 65,536 minus 4,096). The numerator is the existing
 non-opaque JSON bytes/4 heuristic. Opaque continuation marks the estimate `partial`;
 missing accounting/budget is unavailable, never zero. Model-window occupancy stays
-unknown. `astrid trace` separately reports provider usage when available; cumulative
-run usage is not current context occupancy.
+unknown. With observability enabled, the normal CLI prints provider-reported
+input/output/cached usage per call and known run totals with reporting-call coverage.
+Missing/invalid counts stay unavailable; reported zero stays zero. Cached tokens
+are a subset of input, and cumulative run usage is not current context occupancy.
+`astrid trace` retains the same usage for later inspection.
 
 The active meter updates from context selection/preflight, including compaction.
 The idle prompt says `last` because it describes the last prepared request in the
@@ -538,6 +541,11 @@ settings changes affect subsequent runs. Both one-shot and interactive runs use
 the same runtime recorder. Disabling recording preserves execution events,
 permissions, cancellation and context budgets, and retains existing trace files.
 Invalid settings fail explicitly, including when a run flag is present.
+
+Live usage uses the same opt-in: `astrid settings set observability on` or
+`astrid run "task" --observability on`. With telemetry off or no final provider
+usage, the CLI reports unavailable counts. An interrupted call can retain usage
+already reported by the provider; that does not imply successful completion.
 
 Settings live in `~/.config/astrid/settings.json`; traces in
 `~/.config/astrid/traces/`, with private file/directory permissions. Traces contain

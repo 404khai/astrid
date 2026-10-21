@@ -1,0 +1,67 @@
+{
+  "date": "2026-10-18",
+  "parent_commit": "dc7cbfbc",
+  "parent_pr": "https://github.com/404khai/astrid/pull/19",
+  "branch": "feat/live-token-usage",
+  "ticket": "RC-02",
+  "source_sha256": {
+    "src/console.rs": "1c1c47895a7008e9769ea9869df2b5c0439610cd78c86927ba2d39ab1070d440",
+    "src/console/usage_meter.rs": "a31839222f48ef764f34d38093d3fd7d531c0237d06083ae8a33333f43fb8821",
+    "src/console/state.rs": "356a626c1bb692ca71b83cba6eff0e3f48c0e9f77426638e9a4d9442bf290263",
+    "src/console/tests.rs": "604f6c5eddf8bdb1104d1fce8d3314ddb1f827e502b4c758c40479a2ac3c1337",
+    "src/events.rs": "2e79504c1cef79335ec5885cc4612f7ed753501ecee2d44e1328e37395e92a82",
+    "src/observability.rs": "ca342eeccba092c11f38a35ca1b01244408a543a0aed65f134708f508eda32df",
+    "src/runtime.rs": "fce81c151b455b950cc2dc28295c9294808494343e1d6d37b36986283914fcb8",
+    "tests/observability.rs": "c26837481ff3f18a6ebcd67bfe19a4a3b5bbe70c28754ba3836cc69d41e88619"
+  },
+  "validation": {
+    "rust_full": {
+      "command": "cargo test --locked --offline -- --test-threads=1",
+      "passed": 283,
+      "failed": 0,
+      "ignored": 1,
+      "exit_code": 0,
+      "log": "/tmp/astrid-live-usage-tests.log"
+    },
+    "format": {
+      "command": "cargo fmt --check",
+      "exit_code": 0
+    },
+    "python": {
+      "command": "python3 -m unittest test_compare_routing.py",
+      "cwd": "scripts",
+      "passed": 2,
+      "failed": 0
+    },
+    "clippy": {
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "/tmp/astrid-live-usage-clippy.log"
+    },
+    "index_links": {
+      "checked": 49,
+      "missing": 0
+    },
+    "whitespace": "git diff --cached --check passed"
+  },
+  "compatibility": {
+    "observability_off": "unchanged: no added optional collection or trace writes",
+    "trace_schema": 1,
+    "trace_usage_totals": "existing telemetry.usage source; new numeric event not added twice",
+    "execution_event": "additive optional ModelUsageReported; exhaustive typed consumers need handling",
+    "private_session_schema": "v2 unchanged"
+  },
+  "limitations": [
+    "Usage is unavailable with telemetry off or absent final provider data",
+    "Cancelled/failed calls can have known reported usage without committed responses",
+    "No monetary cost, quota percentage or model-window occupancy inferred",
+    "No live inference or InstaBox action; no provider/InstaBox credential or private-session content reads",
+    "RE-01 target-authority contract remains unaccepted; no remote adapter implementation"
+  ],
+  "publication": {
+    "implementation_commit": "36ccc11d",
+    "pr": "https://github.com/404khai/astrid/pull/20",
+    "base": "feat/followup-context-recovery",
+    "merged": false
+  }
+}

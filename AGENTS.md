@@ -1,3 +1,14 @@
+# RC-02 continuation authorization — 2026-10-18
+
+Maintainer instructed: commit changes, make a PR, then start the next item in
+`docs/plans/remote-mobile-cli.md`. Recovery commit `dc7cbfbc` and
+[PR #19](https://github.com/404khai/astrid/pull/19) satisfy the first two steps.
+RC-02 live usage projection is authorized on separate `feat/live-token-usage`,
+stacked on the recovery branch. Preserve ADR 0008's observability-off semantics,
+ADR 0009's metadata-only trace contract, private v2 sessions and all authority
+boundaries. Stop after validating and committing this slice; RE-01's remote
+target-authority contract is not accepted by this continuation.
+
 # Runtime recovery and next-client direction — 2026-10-18
 
 The maintainer requested root-cause context/cancellation recovery and honest
