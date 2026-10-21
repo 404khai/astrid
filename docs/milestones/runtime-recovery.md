@@ -98,3 +98,13 @@ RC-03 publication: `b87218d4`, [PR #21](https://github.com/404khai/astrid/pull/2
 targeting main after #19/#20 merged. GitHub PR state records its final merge.
 Tauri draft #13 was closed at the maintainer's request, preserving source/branch.
 Next: RE-01 authority contract, then mocked adapter; no live remote grant yet.
+
+## RE-01 follow-up — 2026-10-21
+
+RC-01/02/03 are merged (#19/#20/#21). The maintainer authorized the next
+foreground mocked remote-tool slice on `feat/instabox-tool-adapter` from main
+`cc0fa964`. [ADR 0021](../adr/0021-remote-target-authority.md) records the concrete
+exact-target authority proposal; its consequential decision is pending under
+AGENTS.md. Independent HTTP extraction retains the existing standalone CLI,
+key-loading tests and bounded executor tests. Dependent runtime tool implementation
+and the final PR await that decision. No live trial is authorized.
