@@ -8,8 +8,10 @@ merged upstream. This supersedes the CU-01 stop/action exclusion only for CU-02;
 no PR merge or successor work is authorized. Conventional commits and PR against main.
 
 [ADR 0023](docs/adr/0023-bounded-desktop-actions.md) prepares the consequential
-per-action authority/native-coordinate/freshness contract; dependent code awaits
-its explicit decision. CU-01's accepted ADR 0022 live transport, production decoder,
+per-action authority/native-coordinate/freshness contract. The maintainer explicitly
+accepted Option 1 with freshness UX, provenance, atomic admission/unknown-outcome
+and scope clarifications on 2026-10-21. Implement only the mocked headless Rust
+controller and deterministic tests under those accepted clarifications. CU-01's accepted ADR 0022 live transport, production decoder,
 runtime integration and image persistence/provider disclosure gates remain binding.
 No live/authenticated machine metadata, screenshot, action, model inference or
 cloud operation without separate exact target/action trial authorization. No target

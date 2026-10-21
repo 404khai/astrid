@@ -1,8 +1,8 @@
 # ADR 0023 — Separate bounded desktop actions and frame admission
 
 Date: 2026-10-21
-Status: Proposed — awaiting explicit maintainer decision
-Implementation: Design prepared; dependent action authority code awaits decision.
+Status: Accepted — 2026-10-21, with maintainer clarifications below
+Implementation: Mocked headless Rust controller authorized; production/live gates remain.
 Related: ADRs 0004, 0008/0009, 0016, 0018, 0021/0022;
 [active plan](../plans/remote-mobile-cli.md).
 
@@ -16,7 +16,7 @@ CU-01 has only synthetic observation fixtures; a fresh real frame cannot yet be
 obtained by the Rust runtime. This slice can implement headless Rust controls
 with mocked transport without claiming end-to-end computer use.
 
-## Proposed decision
+## Accepted decision
 
 - Add a distinct host-owned `gui.act` approval broker and nonserializable,
   noncloneable, atomic single-use action grant. Bind principal, run ID, runtime
@@ -108,11 +108,36 @@ PTY, desktop client or automatic action loop is introduced. No merge is authoriz
 
 Cost of changing later: High for authority/freshness; Medium for local bounds/API.
 
-## Decision required
+## Accepted decision question
 
 Accept the separate per-action grant, native-frame freshness contract and fixed
 limits above for a mocked headless Rust controller, keeping observation/runtime,
 live transport/trial and image persistence/provider disclosure gated?
 
-No acceptance is recorded yet; the CU-02 task request is not a resolution of these
-specific security and coordinate semantics.
+Decision evidence: The maintainer explicitly accepted Option 1 on 2026-10-21,
+authorizing the smallest headless Rust controller and deterministic mock tests,
+subject to the following clarifications, incorporated before marking Accepted.
+
+## Maintainer clarifications
+
+1. The 5 s freshness/approval bound is experimental for this mocked slice, not a
+   final production UX decision. Human approval may take longer. Reject stale
+   frames; never refresh silently or reuse an approval for a replacement frame.
+   A practical live approval/freshness strategy needs separate production review.
+2. Frame provenance uses only the trusted in-process metadata seam here. Mock
+   metadata is distinct from verified real screenshot admission. Future actionable
+   receipts must come from successfully admitted observations with validated native
+   geometry. Bound receipt installation to at most two per controller/run without
+   resetting action/window budgets; arbitrary replacements cannot expand CU-01's
+   screenshot limits. This local bound cannot verify that a trusted host actually
+   captured a screenshot or enforce its byte/operation accounting; future real
+   receipt integration must enforce the complete CU-01 admission path.
+3. All binding, cancellation, expiry, freshness and budget checks precede atomic
+   single-use grant consumption immediately before transport admission. An ack is
+   not proof of intended UI effect. Post-admission timeout/cancellation/failure is
+   unknown; no retry, synthetic completion or continuation.
+4. This accepts only the mocked headless controller/tests. No live InstaBox desktop
+   actions/transport, runtime/model tool registration, model image disclosure,
+   automatic loops, screenshot persistence, expanded permissions/limits, remote
+   workers/background execution, PR merge or live trial. All CU-01/ADR 0022 gates
+   remain. Stop after CU-02; no next milestone without separate authorization.
