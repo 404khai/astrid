@@ -42,7 +42,7 @@ trust need their concrete ADR before dependent implementation.
 | RC-02 | RC-01; metadata projection compatibility review | Normal CLI displays valid known input/output/cached counts, unknowns and aggregate coverage; budgets separately labeled | Done; [compatibility/review](../reviews/live-token-usage-2026-10-18.md) |
 | RC-03 | RC-01/02 | Bound one multi-tool exchange before further costly work; test many individually legal large outputs, Unicode and latest-exchange overflow | Done; [RC-03 guard/review](../reviews/aggregate-tool-admission-2026-10-21.md) |
 | RE-01 | RC-01/02/03; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Done (mocked); [ADR 0021](../adr/0021-remote-target-authority.md) Accepted with maintainer clarifications; [review](../reviews/instabox-tool-adapter-2026-10-21.md); 302 Rust passed, 0 failed, 1 ignored; no live grant |
-| RE-02 | RE-01 | Authorized isolated live trial: exact selected running machine, harmless `printf`/`pwd`, denial/timeout/cancel and attribution inspected separately | Draft; exact live request including possible wake requires authorization |
+| RE-02 | RE-01 | Explicit foreground CLI target selection and separate per-call approvals; isolated exact-target harmless trial, denial/timeout/cancel and attribution inspected separately | CLI validated (308 Rust passed, 0 failed, 1 ignored; 2 Python passed); [trial plan](../reviews/instabox-cli-approvals-2026-10-21.md); live pending exact target/scope authorization |
 | CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Draft; no desktop action implied |
 | CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | Draft; isolated harmless desktop trial after explicit live scope |
 | MO-01 | Existing mobile concept/reference | Shared RN Meister conversation shell, `.ios` SwiftUI adapters and Android components, mock streams/tool/approval states; both exports/typecheck | Draft; no credentials or live Host needed |
@@ -237,3 +237,25 @@ a scheduler, durable jobs or Phase 9. Preserve private sessions, credentials,
 recovery data, unrelated files and the existing CLI. Document actual mocked/live
 validation separately; no live cloud or computer action is authorized merely by
 writing these tickets.
+
+## RE-02 foreground CLI connection — 2026-10-21
+
+Latest maintainer direction authorizes CLI implementation and mocked preparation,
+superseding only the RE-01 stop restriction. `--instabox-machine <exact-m_ID>`
+opts in for one foreground invocation (`astrid` or `astrid run`). Selection loads
+only the host-side executor; each call still needs a fresh exact approval through
+the separate ADR 0021 broker. Omission installs nothing. The flag is rejected for
+notes, batch/workers and other subcommands before key/provider setup. No settings,
+environment target default, discovery, session grant or reusable run grant.
+
+Interactive runs replace the answer channel each turn. `/new` and session
+switching retain the explicit invocation target, with no authority from saved
+history; restarting without the flag disables the tool. Denial/closed input and
+cancellation fail closed. Remote commands/cwd are displayed as complete JSON
+strings so terminal control bytes cannot disappear from review. After dispatch,
+uncertainty remains unknown; local cancellation never proves remote termination.
+
+No live target has been supplied or approved. [Review and concrete trial plan](../reviews/instabox-cli-approvals-2026-10-21.md)
+separate deterministic evidence from the pending bounded live trial. RE-02 is not
+fully live-accepted. No successor slice is started. PR #22 was observed merged
+upstream; RE-02 will target main after checking that the dependency adds no diff.

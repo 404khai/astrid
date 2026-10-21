@@ -127,3 +127,26 @@ live authorization. Normal CLI sessions do not implicitly install a remote broke
 
 Published implementation `5ec7fdd6` in [PR #22](https://github.com/404khai/astrid/pull/22)
 against main; left unmerged as instructed. No successor implementation started.
+
+## RE-02 foreground connection — 2026-10-21
+
+Latest maintainer instruction separately authorizes CLI connection, mocks and a
+reviewable live plan on existing `feat/instabox-cli-approvals` from `2f8f9358`,
+superseding only RE-01's stop boundary. Explicit invocation-only target selection
+now installs a separate exact-call broker in one-shot and interactive foreground
+runs. No preset/resume/worker authority, implicit target discovery, persistent
+permission or schema change. Remote review/attribution and cancellation uncertainty
+are visible in the CLI; metadata traces retain ADR 0009's omission contract.
+
+[RE-02 review and bounded trial plan](../reviews/instabox-cli-approvals-2026-10-21.md)
+and [deterministic evidence](../evaluations/instabox-cli-approvals-2026-10-21.json).
+Live trial remains pending: no exact target/provider/action scope was supplied or
+approved. No authenticated metadata, cloud, inference or VM operations performed.
+Read-only recheck found #22 already merged upstream at `56880270`; publish RE-02
+against main after diff verification, without merging any PR. Stop at this slice.
+
+**308 Rust passed, 0 failed, 1 ignored; 2 Python passed; formatting, strict all-target Clippy and whitespace passed.** No live acceptance claim follows from these mocked checks.
+
+Implementation `5cf8eb0b` is published in [PR #23](https://github.com/404khai/astrid/pull/23),
+targeting main and left unmerged. Validation source hashes match the committed
+source. Only task documentation was updated after that validation.

@@ -1,3 +1,26 @@
+# RE-02 foreground CLI preparation authorization — 2026-10-21
+
+Maintainer requested “new thread, new branch RE-02 — Foreground CLI connection
+and isolated live trial. Connect explicit target selection and approvals; test
+harmless commands, denial, timeout, cancellation and attribution. Requires separate
+authorization for the exact live machine/actions.” Use the parent-created
+`feat/instabox-cli-approvals` from RE-01 `2f8f9358`, same checkout, no worktree.
+This supersedes RE-01's stop restriction only for CLI connection, deterministic
+mocks and a concrete reviewable trial plan. ADR 0021 remains binding; no new
+remote authority or persisted grant. Conventional commit and PR; do not merge.
+PR #22 was found merged upstream during read-only recheck, so publish against
+main after verifying the diff, without merging any PR here.
+
+Before authenticated metadata, VM commands, provider inference or cloud calls,
+obtain separate approval for the exact existing machine ID, command strings,
+cwd, timeouts, bounded trial count, cancellation behavior and possible auto-wake.
+No target supplied means live validation remains pending. Never discover a target
+from credentials or read .env/private sessions during development. No machine
+creation/lifecycle/ports/secret transfer, remote workers, computer use, Host/mobile
+networking, Phase 9, daemon, PTY or desktop work. Preserve unrelated checkout data
+and private v2, continuation, context admission and ADRs 0008/0009. Stop after this
+slice, PR and an honest live-evidence/pending-authorization report.
+
 # RE-01 contract and mocked adapter authorization — 2026-10-21
 
 Maintainer requested RE-01 in this new thread on existing

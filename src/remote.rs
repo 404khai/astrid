@@ -49,14 +49,14 @@ impl ApprovalRequest {
     /// Content-bearing approval display only, never persistent metadata.
     pub fn description(&self) -> String {
         format!(
-            "instabox_exec {}\nPrincipal: {}\nRun: {}\nCall: {} ({})\nExact command: {}\nExact cwd: {}\nTimeout: {}s\nRunning check is point-in-time; POST may auto-wake a machine paused after GET.",
+            "instabox_exec {}\nPrincipal: {}\nRun: {}\nCall: {} ({})\nExact command (JSON string): {}\nExact cwd (JSON string): {}\nTimeout: {}s\nRunning check is point-in-time; POST may auto-wake a machine paused after GET.",
             self.machine_id,
             self.principal,
             self.run_id,
             self.tool_call_id,
-            self.call_id,
-            self.args.command,
-            self.args.cwd,
+            json!(self.call_id),
+            json!(self.args.command),
+            json!(self.args.cwd),
             self.args.timeout_seconds
         )
     }

@@ -168,7 +168,7 @@ pub async fn run(command: Command) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn invocation_key() -> Result<String, Error> {
+pub(crate) fn invocation_key() -> Result<String, Error> {
     let environment = match std::env::var("INSTABOX_API_KEY") {
         Ok(value) => Some(value),
         Err(std::env::VarError::NotPresent) => None,

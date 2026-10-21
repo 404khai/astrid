@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-21",
+  "ticket": "RE-02",
+  "branch": "feat/instabox-cli-approvals",
+  "baseline": "2f8f9358",
+  "fetched_main": "56880270",
+  "dependency_pr": 22,
+  "dependency_state": "MERGED (observed upstream; no merge performed here)",
+  "baseline_tree_matches_fetched_main": true,
+  "scope": "Explicit foreground CLI target and separate exact-call approvals; deterministic fixtures only",
+  "contract": "docs/adr/0021-remote-target-authority.md",
+  "checks": {
+    "rust": {
+      "command": "cargo test --locked --all-targets -- --test-threads=1",
+      "passed": 308,
+      "failed": 0,
+      "ignored": 1,
+      "ignored_reason": "Existing optional recording-overhead experiment",
+      "log_sha256": "deed3d5c4606928d6a22b162df6e5130c4fb7aaed4ecc00b54bf45f73f0de57e"
+    },
+    "python": {
+      "command": "python3 -m unittest discover -s scripts -p 'test_*.py'",
+      "passed": 2,
+      "failed": 0,
+      "log_sha256": "801136f8863dabf7ca78d79b30d1925e65d1995335bf2fdaa8053c19a663fbd3"
+    },
+    "format": {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0
+    },
+    "clippy": {
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "6193812452046d588886b1b8863bede6f5381214f05476119bf70319f0656f25"
+    },
+    "whitespace": {
+      "command": "git diff --check; git diff --cached --check",
+      "exit_code": 0
+    }
+  },
+  "new_checks": [
+    "explicit exact-ID opt-in and default/scope separation before key loading",
+    "fresh yes/denied/error/closed UI answers",
+    "cancelled approval answer disposal before next call",
+    "control bytes preserved as visible JSON escapes",
+    "full remote approval authority label",
+    "actual output and private attribution; cancelled dispatch uncertainty visible"
+  ],
+  "dispatch_boundary_checks": "Existing RE-01 deterministic loopback/runtime tests retained: no auth before approval, denial zero requests, pre/post admission cancellation, timeout/unknown, binding/atomic single use, no retries, private attribution, trace privacy, observability off and incomplete exchange rejection",
+  "initial_test_failure": "New CLI preflight assertion expected incorrect existing key-error wording; corrected assertion, no key-loader behavior change",
+  "solo_review": "Opt-in paths, worker/notes ceiling, per-run channels, stale replies, control escaping, cancellation display, credential separation and scope reviewed; display findings fixed",
+  "source_sha256": {
+    "src/main.rs": "7b40de5e010222a1b67d2b0801c840840842da56e1f3367312d2e9ae60a2871b",
+    "src/remote_cli.rs": "88bd37e1704efa2067394d25524239e7f5f86457b450296b0424c03551937d69",
+    "src/remote.rs": "0aa4bfe4eee5a875b91afb5a8bea2e00fa3399d61d1b788d1af1b5a37a349ebd",
+    "src/instabox_cli.rs": "7915c9b00ccd70f0a3ca7268ca055d5df1a45d79791d3987c99d2d046f3f05c1",
+    "src/console/state.rs": "818352f0cad906d97c85661ed047071300f9cd9bf8b5845d2d00ba3f0a299be3",
+    "src/console/tests.rs": "9cb6c56d59cf9fceba639fe566872ca421223563c93f0ff870a264fc1949aaeb",
+    "src/console/pty_tests.rs": "74b4a7c12b2d27db8afe5cc4130af2167f5598b8818b700668895d5c5e0e1116",
+    "tests/instabox_cli.rs": "635c257708a5887c0973005da4a21746749d3ca5a448802925c309cb4e478b36"
+  },
+  "live": {
+    "authorized": false,
+    "performed": false,
+    "exact_machine_supplied": false,
+    "provider_inference": false,
+    "authenticated_metadata": false,
+    "vm_commands": false,
+    "acceptance": "Pending separate exact machine/provider/action authorization; mocked checks do not prove live behavior",
+    "plan": "docs/reviews/instabox-cli-approvals-2026-10-21.md"
+  },
+  "preserved": "Unrelated .gitignore, historical CURRENT modifications, recovery files and untracked user assets excluded from task commit",
+  "publication": {
+    "implementation_commit": "5cf8eb0b",
+    "pr": "https://github.com/404khai/astrid/pull/23",
+    "base": "main",
+    "state": "OPEN; do not merge"
+  }
+}
