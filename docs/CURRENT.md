@@ -1,3 +1,48 @@
+# Bounded headless desktop actions — 2026-10-21
+
+CU-02 is implemented on `feat/bounded-desktop-actions` from fetched main
+`2daf811c`, same preserved checkout, no worktree. PR #24 was already merged
+upstream; no PR merge is authorized or performed here. The maintainer explicitly
+accepted [ADR 0023](adr/0023-bounded-desktop-actions.md), including all four
+freshness/provenance/outcome/scope clarifications, committed as `b452ef23` before
+dependent Rust implementation. [PR #25](https://github.com/404khai/astrid/pull/25)
+is updated with the mocked controller for review against main and left unmerged.
+
+`src/desktop.rs` adds a headless action controller, separate exact-call broker/
+atomic single-use grant, typed click/type/scroll/key arguments and one-method
+mock transport seam. One native frame under experimental 5 s freshness per action;
+at most two receipt installations/actions, 30 s original run window, 3 s transport
+wait, 1024 bytes per typing action and 2048 per run. No silent recapture, approval
+reuse, budget growth or retry. Unknown post-admission outcomes and dropped callers
+close the controller; acknowledged input is not proof of UI effect or task success.
+
+Frame metadata is a trusted in-process assertion, not verified screenshot evidence.
+The host owns one controller per run/target; there is no global run registry.
+Replacement cannot reset receipt/action/window accounting. Future receipts must
+originate only from successfully admitted real observations with validated native
+geometry and full CU-01 accounting. Human approval may exceed the experimental
+5 s window; a practical live strategy needs separate review.
+
+**327 Rust passed, 0 failed, 1 ignored; 18 existing Python regression tests passed;
+fmt, strict all-target Clippy and whitespace passed.** Nineteen new Rust tests
+cover action binding/freshness/geometry/limits/atomic consumption/cancellation/
+unknown outcomes and persisted metadata privacy. [Review and next live contracts](reviews/bounded-desktop-actions-2026-10-21.md),
+[evidence](evaluations/bounded-desktop-actions-2026-10-21.json),
+[milestone](milestones/bounded-desktop-actions.md), [active plan](plans/remote-mobile-cli.md).
+
+The mocked CU-02 controller slice is complete; runtime/live CU-01/CU-02 acceptance
+remains gated on observation transport/production decode, real receipt admission,
+practical freshness approval, exact action transport and private runtime result/
+event contracts, then separately approved exact-machine trial. No target supplied.
+No live screenshot/input/metadata, model image disclosure, persistence, runtime/model
+tool registration, automatic loop, workers/background work, expanded permissions,
+Host/mobile, Phase 9, daemon, PTY, desktop client or next milestone. Private v2,
+original results/history/continuation/provenance, complete exchanges/context
+admission and ADRs 0008/0009/0021/0022 remain unchanged. Unrelated `.gitignore`,
+historical CURRENT content and user/recovery data remain outside task commits.
+
+---
+
 # Screenshot observation contract and fixtures — 2026-10-21
 
 CU-01 uses parent-created `feat/screenshot-observation` from main `7d7f45d5`,

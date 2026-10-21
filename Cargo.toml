@@ -31,4 +31,5 @@ unicode-segmentation = "1"
 ignore = "0.4"
 
 [dev-dependencies]
+tokio = { version = "1", features = ["test-util"] }
 vt100 = "0.16.2"
