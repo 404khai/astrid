@@ -146,3 +146,7 @@ Read-only recheck found #22 already merged upstream at `56880270`; publish RE-02
 against main after diff verification, without merging any PR. Stop at this slice.
 
 **308 Rust passed, 0 failed, 1 ignored; 2 Python passed; formatting, strict all-target Clippy and whitespace passed.** No live acceptance claim follows from these mocked checks.
+
+Implementation `5cf8eb0b` is published in [PR #23](https://github.com/404khai/astrid/pull/23),
+targeting main and left unmerged. Validation source hashes match the committed
+source. Only task documentation was updated after that validation.

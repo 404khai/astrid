@@ -24,8 +24,8 @@ and full RE-02 acceptance remain pending. No authenticated metadata, provider
 inference, cloud/VM operation, credential/private-session read or successor work.
 
 Read-only fetch found #22 already merged upstream at `56880270`; the dependency
-source matches our baseline. RE-02 targets main after checking its diff; no PR
-merge performed here. Preserve unrelated `.gitignore`, historical CURRENT edits,
+source matches our baseline. Implementation `5cf8eb0b` is published in [PR #23](https://github.com/404khai/astrid/pull/23),
+targeting main and left unmerged. No PR merge performed here. Preserve unrelated `.gitignore`, historical CURRENT edits,
 recovery files and untracked user assets outside the task commit.
 
 ---

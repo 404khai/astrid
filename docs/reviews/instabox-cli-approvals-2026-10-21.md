@@ -149,3 +149,9 @@ CLI connection and deterministic preparation are reviewable. The isolated live
 trial and its RE-02 exit criteria remain pending exact machine/provider/action
 authorization. Stop after publishing the unmerged PR and reporting this limit;
 no successor implementation or claim that mocked checks prove live behavior.
+
+## Publication
+
+Implementation `5cf8eb0b` is published in [PR #23](https://github.com/404khai/astrid/pull/23),
+targeting main and left unmerged. Validation source hashes match the committed
+source. Only task documentation was updated after that validation.

@@ -69,5 +69,11 @@
     "acceptance": "Pending separate exact machine/provider/action authorization; mocked checks do not prove live behavior",
     "plan": "docs/reviews/instabox-cli-approvals-2026-10-21.md"
   },
-  "preserved": "Unrelated .gitignore, historical CURRENT modifications, recovery files and untracked user assets excluded from task commit"
+  "preserved": "Unrelated .gitignore, historical CURRENT modifications, recovery files and untracked user assets excluded from task commit",
+  "publication": {
+    "implementation_commit": "5cf8eb0b",
+    "pr": "https://github.com/404khai/astrid/pull/23",
+    "base": "main",
+    "state": "OPEN; do not merge"
+  }
 }
