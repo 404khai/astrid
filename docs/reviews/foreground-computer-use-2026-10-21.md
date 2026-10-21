@@ -173,3 +173,34 @@ own configured terminal; no key should be pasted into chat.
 Validation: 15 focused computer tests and all 71 binary tests passed; strict
 all-target Clippy, formatting and whitespace passed. Eleven mocked capture cases
 verify safe classification, no raw stderr/content, no retry and no frame admission.
+
+## Yes/disclosure denial report — expiration and input classification
+
+The maintainer supplied terminal output showing dependency installation success
+and a later admitted native frame reaching disclosure approval; the output then
+reported denial/expiry despite the maintainer typing yes. This is user-supplied
+partial live evidence, not an assistant-executed or independently reproduced live
+trial. No image content is retained here; model vision/actions remain unverified.
+
+Inspection found that the disclosure deadline returned Ok(false), and any handler
+error also took the denial path. These now produce separate expiry/input-failure
+codes and PermissionFailed events. Explicit no alone produces PermissionDenied.
+A final time check rejects yes at the deadline even if the reply future wins its
+poll. The approval description includes remaining milliseconds at construction
+and makes the already-running ten-second lifetime explicit. Terminal open/EOF
+errors remain errors instead of being rewritten to false. Raw input errors are
+not echoed into disclosure results/events. No grants, retention/freshness bounds,
+model disclosure permissions, continuation or cancellation authority are expanded.
+
+A clock-controlled mocked runtime reproduces late yes and verifies expiry rather
+than denial, checked event replay, zero image HTTP and no action. Another mock
+verifies input failure remains distinct and private errors are not echoed. Existing
+prompt yes/deny, image binding, context, cancellation and persistence tests remain.
+The previous pasted result cannot establish which branch actually occurred; this
+change makes future reports specific. No authenticated retry was performed.
+
+Repair validation: **351 Rust passed, 0 failed, 1 existing overhead experiment
+ignored**; strict all-target Clippy, formatting, whitespace and scoped documentation
+links passed. The focused computer suite passed 17 tests. Python was not rerun for
+this Rust-only repair. The detached-terminal fixture was updated to assert an
+unavailable-input error rather than false; it still cannot grant permission.

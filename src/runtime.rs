@@ -962,16 +962,26 @@ async fn drive(
             None
         };
         let disclosure = if let Some(image) = visual.as_ref() {
+            let description = image.description();
             e.emit(EventKind::PermissionRequested {
-                command: image.description(),
+                command: description.clone(),
                 workspace: "provider image disclosure".into(),
             })
             .await;
             let prompt = PermissionRequest {
-                command: image.description(),
+                command: description,
                 workspace: tools.workspace().root().to_path_buf(),
             };
-            let answer = tokio::select! {biased;_=cancel.cancelled()=>None,_=tokio::time::sleep_until(image.deadline())=>Some(Ok(false)),answer=permissions.decide(&prompt)=>Some(answer)};
+            enum ImageAnswer {
+                Reply(io::Result<bool>),
+                Expired,
+                Cancelled,
+            }
+            let mut answer = tokio::select! {biased;
+                _=cancel.cancelled()=>ImageAnswer::Cancelled,
+                _=tokio::time::sleep_until(image.deadline())=>ImageAnswer::Expired,
+                answer=permissions.decide(&prompt)=>ImageAnswer::Reply(answer),
+            };
             if cancel.is_cancelled() {
                 image.release();
                 if let Some(c) = computer.as_mut() {
@@ -983,7 +993,12 @@ async fn drive(
                 e.emit(EventKind::TurnCancelled).await;
                 return RunOutcome::Cancelled;
             }
-            if matches!(answer, Some(Ok(true))) {
+            // A handler may return yes at the deadline before the timer branch
+            // is polled. Expiry still wins; it is not a human denial.
+            if tokio::time::Instant::now() >= image.deadline() {
+                answer = ImageAnswer::Expired;
+            }
+            if matches!(answer, ImageAnswer::Reply(Ok(true))) {
                 e.emit(EventKind::PermissionGranted).await;
                 let (width, height) = image.geometry();
                 e.emit(EventKind::ImageInputAdmitted {
@@ -999,8 +1014,31 @@ async fn drive(
                 if let Some(c) = computer.as_mut() {
                     c.stop();
                 }
-                e.emit(EventKind::PermissionDenied).await;
-                let message = "image disclosure denied or expired; no image sent".to_string();
+                let (event, code, message) = match answer {
+                    ImageAnswer::Reply(Ok(false)) => (
+                        EventKind::PermissionDenied,
+                        "image_permission_denied",
+                        "image disclosure declined; no image sent",
+                    ),
+                    ImageAnswer::Expired => (
+                        EventKind::PermissionFailed {
+                            message:
+                                "image frame expired before disclosure approval; no image sent"
+                                    .into(),
+                        },
+                        "image_permission_expired",
+                        "image frame expired before disclosure approval; no image sent",
+                    ),
+                    _ => (
+                        EventKind::PermissionFailed {
+                            message: "image approval input unavailable; no image sent".into(),
+                        },
+                        "image_permission_failed",
+                        "image approval input unavailable; no image sent",
+                    ),
+                };
+                e.emit(event).await;
+                let message = message.to_string();
                 e.emit(EventKind::ModelCallFailed {
                     message: message.clone(),
                 })
@@ -1009,7 +1047,7 @@ async fn drive(
                     message: message.clone(),
                 })
                 .await;
-                return failure("image_permission_denied", message);
+                return failure(code, message);
             }
         } else {
             None

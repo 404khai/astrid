@@ -19,8 +19,9 @@ Message variant, replay, saved image grant or private image continuation. Privat
 v2 original results/provenance and visible-history semantics remain; traces retain
 metadata only, observability-off unchanged. No image-only actual usage is invented.
 
-**345 Rust passed, 0 failed, 1 existing overhead test ignored; 18 Python passed.**
-Fmt, strict all-target Clippy and whitespace passed. The final focused 14-test
+**351 Rust passed, 0 failed, 1 existing overhead test ignored.** The earlier
+18 Python regressions passed; Python was not rerun for this Rust-only repair.
+Fmt, strict all-target Clippy and whitespace passed. The final focused 17-test
 computer suite revalidated the fixed cache-limited capture plan; three helper
 process tests include actual decode plus cancellation/deadline kill and reap.
 [Review](reviews/foreground-computer-use-2026-10-21.md),
@@ -66,6 +67,19 @@ own configured terminal; no key should be pasted into chat.
 Validation: 15 focused computer tests and all 71 binary tests passed; strict
 all-target Clippy, formatting and whitespace passed. Eleven mocked capture cases
 verify safe classification, no raw stderr/content, no retry and no frame admission.
+
+Disclosure approval repair: the maintainer reported typing yes before the CLI
+printed denial. The deadline had been mapped to false, and input errors also
+looked like refusal. Explicit no, expiry and unavailable input now have distinct
+codes/events; terminal open/EOF errors remain errors. A yes at the deadline still
+fails closed. The prompt shows remaining milliseconds at construction and states
+that the original ten-second capture lifetime is already running. No retention,
+freshness, disclosure or other authority is expanded; no live retry was performed.
+Clock-controlled runtime tests reproduce late yes with no image HTTP and checked
+event replay. 17 focused computer tests and all 72 CLI tests passed; strict
+all-target Clippy, formatting and whitespace passed. Full-suite results are in the
+integration evidence. User-supplied installation/capture output is partial live
+evidence only; provider image delivery and desktop actions remain unverified.
 
 Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
 stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs

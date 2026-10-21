@@ -289,14 +289,11 @@ impl PermissionHandler for TerminalPermission {
 }
 
 async fn terminal_answer() -> io::Result<bool> {
-    let Ok(tty) = OpenOptions::new()
+    let tty = OpenOptions::new()
         .read(true)
         .write(true)
         .custom_flags(libc::O_NONBLOCK)
-        .open("/dev/tty")
-    else {
-        return Ok(false);
-    };
+        .open("/dev/tty")?;
     read_permission_answer(tty).await
 }
 
@@ -316,7 +313,10 @@ async fn read_permission_answer(tty: std::fs::File) -> io::Result<bool> {
             return Err(err);
         }
         if count == 0 {
-            return Ok(false);
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "permission input closed",
+            ));
         }
         answer.extend_from_slice(&bytes[..count as usize]);
         if answer.contains(&b'\n') {
@@ -1548,7 +1548,7 @@ mod tests {
     }
     #[tokio::test]
     async fn nonblocking_permission_input_handles_fragmentation_denial_and_eof() {
-        for (answer, expected) in [("yes\n", true), ("no\n", false), ("", false)] {
+        for (answer, expected) in [("yes\n", true), ("no\n", false)] {
             let (reader, mut writer) = input();
             let supply = async {
                 for byte in answer.as_bytes() {
@@ -1559,6 +1559,18 @@ mod tests {
             };
             let (decision, ()) = tokio::join!(read_permission_answer(reader), supply);
             assert_eq!(decision.unwrap(), expected);
+        }
+    }
+    #[tokio::test]
+    async fn permission_input_eof_is_unavailable_instead_of_a_user_denial() {
+        for pending in ["", "yes"] {
+            let (reader, mut writer) = input();
+            writer.write_all(pending.as_bytes()).unwrap();
+            drop(writer);
+            assert_eq!(
+                read_permission_answer(reader).await.unwrap_err().kind(),
+                io::ErrorKind::UnexpectedEof
+            );
         }
     }
     #[tokio::test]

@@ -51,7 +51,8 @@
     "machine_screenshots_or_inputs": 0,
     "provider_inference": 0,
     "target_supplied": false,
-    "status": "Pending separate exact existing-target/action/disclosure trial authorization; RE-02 independent"
+    "status": "Pending separate exact existing-target/action/disclosure trial authorization; RE-02 independent",
+    "measurement_scope": "Assistant-executed calls only; later user-supplied CLI evidence recorded separately"
   },
   "remaining_limitations": [
     "Experimental 5-second freshness may reject normal inference/human latency; no automatic refresh",
@@ -122,6 +123,34 @@
       "src/computer.rs": "c5adf5b4182fa85ed9d80f2b4a219f4b8d03b51cff15a19de56dda8187c9a55c",
       "src/computer_tests.rs": "aea6bd005e5ed2e5fc07370df4fa850346ebdb3893dd0c563496a84f984a40f7",
       "src/console/state.rs": "610fdc7cdda4cc5de2cad1575d44e710d1dc77b190b325cc6afa35097518799c"
+    }
+  },
+  "disclosure_approval_repair": {
+    "behavior": "Separate explicit refusal, expiry, and unavailable input; terminal open/EOF no longer converted to no; at-deadline yes fails closed",
+    "bounds": "Unchanged 10-second memory-only frame lifetime from capture admission, 5-second action freshness; no extra live authority",
+    "validation": {
+      "focused_computer_passed": 17,
+      "binary_passed": 72,
+      "failed": 0,
+      "clippy": "strict all-target passed",
+      "format": "passed",
+      "whitespace": "passed",
+      "full_rust": {
+        "command": "cargo test --locked --offline -- --test-threads=1",
+        "passed": 351,
+        "failed": 0,
+        "ignored": 1
+      }
+    },
+    "user_supplied_live_evidence": "Reports prerequisite installation and native capture admission, then disclosure failure despite typed yes; no screenshot content retained, original failure cause indistinguishable from the old message",
+    "assistant_live_calls": 0,
+    "provider_image_delivery_verified": false,
+    "source_sha256": {
+      "src/runtime.rs": "39180840b0637d4eea2f5241ed74fd7ac33a73903667548f558525facaef10fb",
+      "src/computer.rs": "cfa51f3566686214fe7bae9a4d40851b83c2598b27875174fc66f1ca746ac6f7",
+      "src/main.rs": "c8e87d89a60c8b9d755a4827cc52df34263bdb7e1705bc15c37684ac77ccd270",
+      "src/computer_tests.rs": "f8d4aca69ce67ec6a587802d53db40f601eebf1c99bc8c2ad4757bb634f5239e",
+      "src/console/pty_tests.rs": "52480e638cd5318c11585748654a184ae17453bf254a097565d580e85fc5920c"
     }
   }
 }

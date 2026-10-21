@@ -89,6 +89,26 @@ socket; it does not capture, click, start a desktop or authorize model disclosur
 The agent process lacked an environment key, so that diagnostic was not dispatched.
 Do not paste credentials into chat; use the existing configured terminal.
 
+## Disclosure approval and expiry
+
+A successful capture still needs a separate provider-disclosure approval. The
+image's ten-second lifetime starts at capture admission, including preflight,
+capture, decode, context preparation and terminal rendering. It does not start
+when the approval prompt appears. `expires_in_ms` shows remaining time when the
+prompt is constructed, not a refreshed allowance or a live countdown.
+
+The CLI distinguishes explicit refusal (`image_permission_denied`), frame expiry
+(`image_permission_expired`) and unavailable/failed input (`image_permission_failed`).
+A `yes` at/after the deadline fails as expiry, never as a human refusal. Closed
+terminal input or EOF is an input error, not a `no`. Entering `yes` and Return on
+a fresh armed prompt remains required; pasted/typeahead text cannot grant authority.
+No image is sent in these failure cases, and no approval transfers to a new frame.
+
+This fixes misleading reporting, not the experimental timing UX. Ten-second image
+retention and five-second action freshness remain unchanged. A more practical
+approval/retention strategy requires a separately reviewed contract; the runtime
+does not silently retain the screen longer or recapture it.
+
 ## Exact live trial contract still needed
 
 Before any authenticated call, specify the existing machine ID and already-running

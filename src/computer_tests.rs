@@ -109,7 +109,15 @@ impl Authentication for Auth {
         BearerToken::new("test-only-provider-credential".into())
     }
 }
+#[derive(Clone, Copy, Default)]
+enum DisclosureFixture {
+    #[default]
+    Normal,
+    ExpiredYes,
+    InputError,
+}
 struct Answers {
+    disclosure: DisclosureFixture,
     values: Vec<bool>,
     commands: Vec<String>,
 }
@@ -117,6 +125,19 @@ struct Answers {
 impl PermissionHandler for Answers {
     async fn decide(&mut self, request: &PermissionRequest) -> io::Result<bool> {
         self.commands.push(request.command.clone());
+        if request.command.contains("image.disclose") {
+            match self.disclosure {
+                DisclosureFixture::ExpiredYes => {
+                    tokio::time::pause();
+                    tokio::time::advance(Duration::from_secs(10)).await;
+                    return Ok(true);
+                }
+                DisclosureFixture::InputError => {
+                    return Err(io::Error::other("private terminal error"));
+                }
+                DisclosureFixture::Normal => {}
+            }
+        }
         Ok(self
             .values
             .get(self.commands.len() - 1)
@@ -182,12 +203,7 @@ fn service(wire: &MockHttp) -> Computer {
     )
     .unwrap()
 }
-async fn execute_case(
-    answers: Vec<bool>,
-    action_status: u16,
-    record: bool,
-    byte_limit: Option<usize>,
-) -> (
+type ComputerCase = (
     runtime::RunResult,
     Vec<ExecutionEvent>,
     Answers,
@@ -195,7 +211,29 @@ async fn execute_case(
     MockHttp,
     tempfile::TempDir,
     tempfile::TempDir,
-) {
+);
+async fn execute_case(
+    answers: Vec<bool>,
+    action_status: u16,
+    record: bool,
+    byte_limit: Option<usize>,
+) -> ComputerCase {
+    execute_case_with_disclosure(
+        answers,
+        action_status,
+        record,
+        byte_limit,
+        DisclosureFixture::Normal,
+    )
+    .await
+}
+async fn execute_case_with_disclosure(
+    answers: Vec<bool>,
+    action_status: u16,
+    record: bool,
+    byte_limit: Option<usize>,
+    disclosure: DisclosureFixture,
+) -> ComputerCase {
     let wire = wire_server(action_status).await;
     let api = provider_server().await;
     let workspace = tempfile::tempdir().unwrap();
@@ -210,6 +248,7 @@ async fn execute_case(
         OpenAiProvider::with_endpoint(Arc::new(Auth), format!("{}/v1/responses", api.origin))
             .unwrap();
     let mut answers = Answers {
+        disclosure,
         values: answers,
         commands: Vec::new(),
     };
@@ -777,4 +816,68 @@ async fn capture_failures_keep_distinct_safe_categories_without_stderr_or_retrie
         assert!(run.stopped());
         assert_eq!(wire.requests.lock().unwrap().len(), 2);
     }
+}
+
+#[tokio::test]
+async fn late_yes_is_expiry_not_denial_and_never_sends_an_image() {
+    let (result, events, answers, wire, api, _, _) = execute_case_with_disclosure(
+        vec![true, true, true],
+        200,
+        false,
+        None,
+        DisclosureFixture::ExpiredYes,
+    )
+    .await;
+    assert!(
+        matches!(result.outcome,RunOutcome::Failed{ref code,..} if code=="image_permission_expired")
+    );
+    assert_eq!(answers.commands.len(), 2);
+    assert!(events.iter().any(
+        |e| matches!(&e.kind,EventKind::PermissionFailed{message} if message.contains("expired"))
+    ));
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e.kind, EventKind::PermissionDenied))
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e.kind, EventKind::ImageInputAdmitted { .. }))
+    );
+    assert_eq!(api.requests.lock().unwrap().len(), 1);
+    assert_eq!(wire.requests.lock().unwrap().len(), 2);
+    assert!(
+        !serde_json::to_string(&result.session)
+            .unwrap()
+            .contains("data:image")
+    );
+}
+
+#[tokio::test]
+async fn disclosure_input_failure_is_not_denial_and_does_not_echo_terminal_error() {
+    let (result, events, _, wire, api, _, _) = execute_case_with_disclosure(
+        vec![true, true, true],
+        200,
+        false,
+        None,
+        DisclosureFixture::InputError,
+    )
+    .await;
+    assert!(
+        matches!(result.outcome,RunOutcome::Failed{ref code,..} if code=="image_permission_failed")
+    );
+    assert!(events.iter().any(|e|matches!(&e.kind,EventKind::PermissionFailed{message} if message.contains("input unavailable"))));
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e.kind, EventKind::PermissionDenied))
+    );
+    assert!(
+        !serde_json::to_string(&events)
+            .unwrap()
+            .contains("private terminal error")
+    );
+    assert_eq!(api.requests.lock().unwrap().len(), 1);
+    assert_eq!(wire.requests.lock().unwrap().len(), 2);
 }
