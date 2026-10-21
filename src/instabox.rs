@@ -1,51 +1,13 @@
-//! Optional InstaBox integration: explicit metadata discovery and permission-gated execution on an existing machine.
-use astrid::cancellation::Cancellation;
-use clap::Subcommand;
+//! Bounded InstaBox HTTP executor. No environment, CLI parsing or key discovery.
+use crate::cancellation::Cancellation;
 use reqwest::{Client, header::HeaderValue};
 use serde::{Deserialize, Serialize};
-use std::{
-    io::Read,
-    os::unix::fs::OpenOptionsExt,
-    path::Path,
-    time::{Duration, Instant},
-};
-
+use std::time::{Duration, Instant};
 const API: &str = "https://api.instabox.sh";
 const MAX_BODY: usize = 262_144;
 
-#[derive(Subcommand)]
-pub enum Command {
-    /// Read one page of machine metadata (or one explicit ID) and account usage.
-    Discover {
-        /// Separate network discovery grant; local shell/read policy does not grant it.
-        #[arg(long)]
-        allow_discovery: bool,
-        /// Exact m_ ID; names, auto-selection, connection and execution are unsupported.
-        #[arg(long)]
-        machine: Option<String>,
-    },
-    /// Execute one exact command on one existing running machine.
-    Exec {
-        /// Exact existing machine ID. Machines are never created, started, resumed or selected implicitly.
-        #[arg(long)]
-        machine: String,
-        /// Exact command string sent to InstaBox.
-        #[arg(long)]
-        command: String,
-        /// Remote working directory.
-        #[arg(long, default_value = "/data/home")]
-        cwd: String,
-        /// Provider-side command timeout in seconds (1..=600).
-        #[arg(long, default_value_t = 60, value_parser = clap::value_parser!(u64).range(1..=600))]
-        timeout_seconds: u64,
-        /// Explicit grant for this exact request, including possible provider auto-wake after the status check.
-        #[arg(long)]
-        allow_execution: bool,
-    },
-}
-
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
-enum Error {
+pub enum Error {
     #[error("InstaBox discovery denied; explicit --allow-discovery is required")]
     Denied,
     #[error(
@@ -90,74 +52,7 @@ enum Error {
     ExecUnsuccessful,
 }
 
-// Only the invocation directory's key assignment is read. Never source shell code,
-// expand variables, search parent directories, or alter the process environment.
-fn load_key(environment: Option<String>, path: &Path) -> Result<String, Error> {
-    if let Some(key) = environment.filter(|value| !value.trim().is_empty()) {
-        return Ok(key);
-    }
-    let file = match std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(path)
-    {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(Error::MissingKey);
-        }
-        Err(_) => return Err(Error::InvalidEnvFile),
-    };
-    if !file
-        .metadata()
-        .map_err(|_| Error::InvalidEnvFile)?
-        .is_file()
-    {
-        return Err(Error::InvalidEnvFile);
-    }
-    let mut bytes = Vec::new();
-    file.take(16_385)
-        .read_to_end(&mut bytes)
-        .map_err(|_| Error::InvalidEnvFile)?;
-    if bytes.len() > 16_384 {
-        return Err(Error::InvalidEnvFile);
-    }
-    let text = std::str::from_utf8(&bytes).map_err(|_| Error::InvalidEnvFile)?;
-    let mut key = None;
-    for line in text.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let line = line.strip_prefix("export ").unwrap_or(line).trim_start();
-        let Some((name, value)) = line.split_once('=') else {
-            if line.starts_with("INSTABOX_API_KEY") {
-                return Err(Error::InvalidEnvFile);
-            }
-            continue;
-        };
-        if name.trim() != "INSTABOX_API_KEY" {
-            continue;
-        }
-        if key.is_some() {
-            return Err(Error::InvalidEnvFile);
-        }
-        let value = value.trim();
-        let value = if value.starts_with(['\'', '"']) {
-            let quote = value.as_bytes()[0] as char;
-            if value.len() < 2 || !value.ends_with(quote) {
-                return Err(Error::InvalidEnvFile);
-            }
-            &value[1..value.len() - 1]
-        } else {
-            value
-        };
-        key = Some(value.to_owned());
-    }
-    key.filter(|value| !value.is_empty())
-        .ok_or(Error::MissingKey)
-}
-
-fn valid_id(id: &str) -> bool {
+pub fn valid_id(id: &str) -> bool {
     id.len() == 28
         && id.starts_with("m_")
         && id[2..]
@@ -222,7 +117,7 @@ struct Usage {
     computed_at: Option<String>,
 }
 #[derive(Serialize)]
-struct Discovery {
+pub struct Discovery {
     target: &'static str,
     machines: Vec<Machine>,
     list_complete: bool,
@@ -232,11 +127,11 @@ struct Discovery {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-struct ExecGrant {
-    machine_id: String,
-    command: String,
-    cwd: String,
-    timeout_seconds: u64,
+pub struct ExecGrant {
+    pub machine_id: String,
+    pub command: String,
+    pub cwd: String,
+    pub timeout_seconds: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -251,7 +146,7 @@ struct ExecResponse {
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum ExecStatus {
+pub enum ExecStatus {
     Completed,
     Cancelled,
     DeadlineExceeded,
@@ -260,25 +155,25 @@ enum ExecStatus {
 
 #[derive(Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
-enum RemoteOutcome {
+pub enum RemoteOutcome {
     ObservedCompleted,
     Unknown,
 }
 
 #[derive(Debug, Serialize)]
-struct ExecReport {
-    target: &'static str,
-    machine_id: String,
-    status: ExecStatus,
-    remote_outcome: RemoteOutcome,
-    stdout: String,
-    stderr: String,
-    exit_status: Option<i32>,
-    timed_out: bool,
-    output_truncated: bool,
-    output_available: bool,
-    failure: Option<&'static str>,
-    elapsed_ms: u128,
+pub struct ExecReport {
+    pub target: &'static str,
+    pub machine_id: String,
+    pub status: ExecStatus,
+    pub remote_outcome: RemoteOutcome,
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_status: Option<i32>,
+    pub timed_out: bool,
+    pub output_truncated: bool,
+    pub output_available: bool,
+    pub failure: Option<&'static str>,
+    pub elapsed_ms: u128,
 }
 
 impl Error {
@@ -319,7 +214,7 @@ impl ExecReport {
 }
 
 impl ExecGrant {
-    fn validate(&self) -> Result<(), Error> {
+    pub fn validate(&self) -> Result<(), Error> {
         if !valid_id(&self.machine_id) {
             return Err(Error::InvalidId);
         }
@@ -340,13 +235,13 @@ impl ExecGrant {
 }
 
 // Private transport seam. Production origin is fixed, with no URL/env override.
-struct DiscoveryClient {
+pub struct DiscoveryClient {
     http: Client,
     origin: String,
     key: HeaderValue,
 }
 impl DiscoveryClient {
-    fn new(key: &str) -> Result<Self, Error> {
+    pub fn new(key: &str) -> Result<Self, Error> {
         if key.is_empty() {
             return Err(Error::MissingKey);
         }
@@ -401,7 +296,7 @@ impl DiscoveryClient {
         serde_json::from_slice(&bytes).map_err(|_| Error::InvalidResponse)
     }
 
-    async fn execute(
+    pub async fn execute(
         &self,
         granted: Option<&ExecGrant>,
         request: &ExecGrant,
@@ -495,7 +390,7 @@ impl DiscoveryClient {
         })
     }
 
-    async fn discover(
+    pub async fn discover(
         &self,
         allowed: bool,
         id: Option<&str>,
@@ -533,82 +428,6 @@ impl DiscoveryClient {
             } => result,
         }
     }
-}
-
-pub async fn run(command: Command) -> Result<(), Box<dyn std::error::Error>> {
-    match command {
-        Command::Discover {
-            allow_discovery,
-            machine,
-        } => {
-            // Deny before consulting environment or .env; never read provider/CLI credentials.
-            if !allow_discovery {
-                return Err(Error::Denied.into());
-            }
-            if machine.as_deref().is_some_and(|id| !valid_id(id)) {
-                return Err(Error::InvalidId.into());
-            }
-            let key = invocation_key()?;
-            let client = DiscoveryClient::new(&key)?;
-            let cancel = Cancellation::default();
-            let result = tokio::select! {
-                biased;
-                _ = tokio::signal::ctrl_c() => { cancel.cancel(); Err(Error::Cancelled) },
-                result = client.discover(true, machine.as_deref(), &cancel, Duration::from_secs(15)) => result,
-            }?;
-            println!("{}", serde_json::to_string_pretty(&result)?);
-        }
-        Command::Exec {
-            machine,
-            command,
-            cwd,
-            timeout_seconds,
-            allow_execution,
-        } => {
-            let request = ExecGrant {
-                machine_id: machine,
-                command,
-                cwd,
-                timeout_seconds,
-            };
-            request.validate()?;
-            // Deny before reading credentials or making even a metadata request.
-            if !allow_execution {
-                return Err(Error::ExecDenied.into());
-            }
-            let key = invocation_key()?;
-            let client = DiscoveryClient::new(&key)?;
-            let cancel = Cancellation::default();
-            let granted = request.clone();
-            let execution = client.execute(Some(&granted), &request, &cancel);
-            tokio::pin!(execution);
-            let result = tokio::select! {
-                biased;
-                result = &mut execution => result?,
-                _ = tokio::signal::ctrl_c() => {
-                    cancel.cancel();
-                    execution.await?
-                },
-            };
-            println!("{}", serde_json::to_string_pretty(&result)?);
-            if result.status != ExecStatus::Completed
-                || result.timed_out
-                || result.exit_status != Some(0)
-            {
-                return Err(Error::ExecUnsuccessful.into());
-            }
-        }
-    }
-    Ok(())
-}
-
-fn invocation_key() -> Result<String, Error> {
-    let environment = match std::env::var("INSTABOX_API_KEY") {
-        Ok(value) => Some(value),
-        Err(std::env::VarError::NotPresent) => None,
-        Err(_) => return Err(Error::InvalidKey),
-    };
-    load_key(environment, Path::new(".env"))
 }
 
 #[cfg(test)]

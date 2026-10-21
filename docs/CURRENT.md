@@ -1,3 +1,26 @@
+# Remote-target contract proposal and HTTP extraction — 2026-10-21
+
+Maintainer authorized RE-01 in this new thread on existing
+`feat/instabox-tool-adapter`, based on fetched main `cc0fa964`; no worktree or
+additional branch. RC-01/02/03 are merged and the earlier cleanup is complete.
+[ADR 0021](adr/0021-remote-target-authority.md) records the concrete remote-target
+contract proposal before dependent code. Its consequential authority decision is
+pending under AGENTS.md's escalation policy; no acceptance is inferred.
+
+Independent extraction moves bounded HTTP execution into the library while keeping
+Clap, environment/dotenv key loading and local credential tests in the CLI adapter.
+No wire, cancellation, deadline, output-cap or unknown-outcome behavior change.
+**288 Rust passed, 0 failed, 1 ignored; 2 Python passed; fmt, strict all-target
+Clippy and whitespace passed.** No live model/provider/cloud/VM calls or private
+credential/session reads. Unrelated dirty files and local historical checkpoint
+content remain preserved; only this section is staged from CURRENT.md.
+
+Next: resolve ADR 0021, implement and test the foreground mocked runtime tool,
+then commit and open the conventional-title PR against main without merging it.
+RE-02's separately authorized live trial remains a later agenda item.
+
+---
+
 # Aggregate tool-exchange admission — 2026-10-21
 
 Maintainer authorized RC-03 on a new branch, then its PR, merges of the open

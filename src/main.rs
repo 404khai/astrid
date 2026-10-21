@@ -21,6 +21,7 @@ use std::{
 
 mod batch_cli;
 mod console;
+#[path = "instabox_cli.rs"]
 mod instabox;
 mod logo;
 mod sessions;

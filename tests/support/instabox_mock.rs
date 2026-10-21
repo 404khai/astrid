@@ -7,65 +7,6 @@ use tokio::{
 const ID: &str = "m_0123456789abcdefghijklmnop";
 const USAGE: &str = r#"{"machines":5,"snapshots":10,"storedBytes":214748364800,"computedAt":null,"limits":{"maxMachines":5,"maxSnapshots":10,"maxStoredGiB":200},"private":"SECRET"}"#;
 
-#[test]
-fn dotenv_key_loading_is_local_literal_and_environment_takes_precedence() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join(".env");
-    assert_eq!(load_key(None, &path).err(), Some(Error::MissingKey));
-    for assignment in [
-        "INSTABOX_API_KEY=ibk_synthetic",
-        "export INSTABOX_API_KEY = 'ibk_synthetic'",
-        "INSTABOX_API_KEY=\"ibk_synthetic\"",
-    ] {
-        std::fs::write(&path, format!("# comment\nOTHER=ignored\n{assignment}\r\n")).unwrap();
-        assert_eq!(load_key(None, &path).unwrap(), "ibk_synthetic");
-        assert_eq!(
-            load_key(Some(String::new()), &path).unwrap(),
-            "ibk_synthetic"
-        );
-        assert_eq!(
-            load_key(Some("ibk_environment".into()), &path).unwrap(),
-            "ibk_environment"
-        );
-    }
-    std::fs::write(&path, "INSTABOX_API_KEY=$(touch forbidden)\n").unwrap();
-    assert_eq!(load_key(None, &path).unwrap(), "$(touch forbidden)");
-    assert!(!root.path().join("forbidden").exists());
-    assert_eq!(
-        load_key(None, &root.path().join("child/.env")).err(),
-        Some(Error::MissingKey)
-    );
-}
-
-#[test]
-fn dotenv_failures_do_not_echo_secrets_or_follow_symlinks() {
-    let root = tempfile::tempdir().unwrap();
-    let path = root.path().join(".env");
-    for text in [
-        "INSTABOX_API_KEY='SECRET",
-        "INSTABOX_API_KEY=SECRET\nINSTABOX_API_KEY=duplicate",
-        "INSTABOX_API_KEY SECRET",
-    ] {
-        std::fs::write(&path, text).unwrap();
-        let error = load_key(None, &path).unwrap_err();
-        assert_eq!(error, Error::InvalidEnvFile);
-        assert!(!format!("{error:?} {error}").contains("SECRET"));
-    }
-    std::fs::write(&path, "x".repeat(16_385)).unwrap();
-    assert_eq!(load_key(None, &path).err(), Some(Error::InvalidEnvFile));
-    std::fs::write(&path, [0xff]).unwrap();
-    assert_eq!(load_key(None, &path).err(), Some(Error::InvalidEnvFile));
-    std::fs::write(&path, "INSTABOX_API_KEY=\n").unwrap();
-    assert_eq!(load_key(None, &path).err(), Some(Error::MissingKey));
-    let link = root.path().join("link");
-    std::os::unix::fs::symlink(&path, &link).unwrap();
-    assert_eq!(load_key(None, &link).err(), Some(Error::InvalidEnvFile));
-    assert_eq!(
-        load_key(None, root.path()).err(),
-        Some(Error::InvalidEnvFile)
-    );
-}
-
 async fn server(
     replies: Vec<(u16, String)>,
 ) -> (DiscoveryClient, tokio::task::JoinHandle<Vec<String>>) {

@@ -108,3 +108,8 @@ exact-target authority proposal; its consequential decision is pending under
 AGENTS.md. Independent HTTP extraction retains the existing standalone CLI,
 key-loading tests and bounded executor tests. Dependent runtime tool implementation
 and the final PR await that decision. No live trial is authorized.
+
+Extraction validation: **288 Rust passed, 0 failed, 1 ignored; 2 Python passed**;
+fmt, strict all-target Clippy and whitespace passed. All existing 15 synthetic
+HTTP/key tests plus the standalone CLI preflight remain green. This is extraction
+evidence only, not remote-tool acceptance.
