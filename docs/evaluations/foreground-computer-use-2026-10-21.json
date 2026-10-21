@@ -76,5 +76,21 @@
     "dependency_pr": 25,
     "implementation_commit": "17d5f70c",
     "merged": false
+  },
+  "diagnostic_followup": {
+    "scope": "Console-only safe failure-stage/success summaries; no live retry or authority change",
+    "binary_tests": {
+      "command": "cargo test --locked --offline --bin astrid -- --test-threads=1",
+      "passed": 71,
+      "failed": 0
+    },
+    "focused_tests": {
+      "command": "cargo test --locked --offline --bin astrid computer_ -- --test-threads=1",
+      "passed": 3,
+      "failed": 0
+    },
+    "clippy": "Strict all-target passed",
+    "format": "cargo fmt --check passed",
+    "reported_live_root_cause": "Unavailable from generic pasted summary; no private session read or authenticated retry"
   }
 }

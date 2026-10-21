@@ -1404,3 +1404,58 @@ fn remote_result_and_cancel_projection_preserve_attribution_and_uncertainty() {
         }
     }
 }
+
+#[test]
+fn computer_result_summary_surfaces_safe_failure_stage_without_losing_uncertainty() {
+    for failure in [
+        "screenshot unavailable or unsupported capture tool",
+        "screenshot decode failed, cancelled or exceeded bounds",
+        "captured frame already stale or native geometry invalid",
+        "observation deadline",
+    ] {
+        let outcome = ToolOutcome::Success {
+            data: json!({"target":"instabox","successful":false,"remote_outcome":"unknown","failure":failure}),
+        };
+        let text = summary(&outcome);
+        assert!(text.contains(failure));
+        assert!(
+            text.contains("remote outcome unknown; termination unconfirmed; no automatic retry")
+        );
+    }
+    let outcome = ToolOutcome::Success {
+        data: json!({"target":"instabox","successful":false,"remote_outcome":"not_dispatched","failure":"exact target preflight failed"}),
+    };
+    assert_eq!(
+        summary(&outcome),
+        "exact target preflight failed; no operation dispatched"
+    );
+    let outcome = ToolOutcome::Success {
+        data: json!({"target":"instabox","successful":false,"remote_outcome":"unknown","failure":"untrusted-secret-screen-content"}),
+    };
+    assert!(!summary(&outcome).contains("untrusted-secret"));
+}
+
+#[test]
+fn computer_success_summary_does_not_display_null_exec_fields_or_verified_ui_effect() {
+    for (observed, expected) in [
+        (
+            json!({"width":800,"height":600}),
+            "screenshot admitted · native 800x600",
+        ),
+        (
+            json!({"installed":true,"running":false}),
+            "desktop installed true · running false",
+        ),
+        (
+            json!({"input_acknowledged":true,"ui_effect_verified":false}),
+            "input acknowledged; UI effect unverified",
+        ),
+    ] {
+        assert_eq!(
+            summary(&ToolOutcome::Success {
+                data: json!({"target":"instabox","successful":true,"remote_outcome":"observed","observed":observed})
+            }),
+            expected
+        );
+    }
+}

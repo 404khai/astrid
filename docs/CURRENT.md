@@ -37,6 +37,15 @@ UX requires separate review. No mobile/Host/workers/background loop, image
 persistence, provisioning, ports, secret transfer or successor work. Stop after
 the integration PR, left unmerged.
 
+Diagnostic follow-up: a reported observation failure exposed a CLI bug: generic
+remote summaries hid the host's categorical `failure` reason and successful CU
+results displayed null exec fields. The console now shows allowlisted failure
+stages while preserving unknown-outcome/no-retry semantics, and renders capture,
+status and input acknowledgements accurately. No raw server/screen contents are
+added. 71 binary tests passed (including two new diagnostic tests); strict
+all-target Clippy and formatting passed. The reported live root cause remains
+unidentified from the pasted output; no authenticated retry was performed.
+
 Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
 stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs
 remain unmerged. No live operation or successor implementation was performed.

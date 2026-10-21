@@ -644,17 +644,65 @@ fn target(call: &ToolCall) -> String {
         parts.join(" · ")
     }
 }
+fn computer_failure(data: &Value) -> Option<&str> {
+    let failure = data["failure"].as_str()?;
+    match failure {
+        "observe admission rejected"
+        | "exact target preflight failed"
+        | "observe grant expired or cancelled"
+        | "status response unavailable"
+        | "screenshot unavailable or unsupported capture tool"
+        | "observation traffic exhausted"
+        | "screenshot decode failed, cancelled or exceeded bounds"
+        | "captured frame already stale or native geometry invalid"
+        | "observation cancelled"
+        | "observation deadline"
+        | "action admission rejected; no input dispatched"
+        | "action outcome unknown; no retry"
+        | "computer grant mismatch" => Some(failure),
+        _ => None,
+    }
+}
+
 pub(super) fn summary(outcome: &ToolOutcome) -> String {
     match outcome {
         ToolOutcome::Error { code, message } => format!("{code}: {message}"),
         ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } => {
             if data["target"] == "instabox" {
+                // CU reports categorical host failures, not exec stdout/stderr.
+                // Surface only known categories; never echo arbitrary server content.
+                let failure = computer_failure(data);
                 if data["remote_outcome"] == "unknown" {
-                    return "remote outcome unknown; termination unconfirmed; no automatic retry"
-                        .into();
+                    let uncertainty =
+                        "remote outcome unknown; termination unconfirmed; no automatic retry";
+                    return failure.map_or_else(
+                        || uncertainty.into(),
+                        |reason| format!("{reason}; {uncertainty}"),
+                    );
                 }
                 if data["remote_outcome"] == "not_dispatched" {
-                    return "remote command not dispatched".into();
+                    return failure.map_or_else(
+                        || "remote command not dispatched".into(),
+                        |reason| format!("{reason}; no operation dispatched"),
+                    );
+                }
+                if data["remote_outcome"] == "observed" && data["successful"] == true {
+                    let observed = &data["observed"];
+                    if observed["input_acknowledged"] == true {
+                        return "input acknowledged; UI effect unverified".into();
+                    }
+                    if let (Some(width), Some(height)) =
+                        (observed["width"].as_u64(), observed["height"].as_u64())
+                    {
+                        return format!("screenshot admitted · native {width}x{height}");
+                    }
+                    if let (Some(installed), Some(running)) = (
+                        observed["installed"].as_bool(),
+                        observed["running"].as_bool(),
+                    ) {
+                        return format!("desktop installed {installed} · running {running}");
+                    }
+                    return "remote observation completed".into();
                 }
                 return format!(
                     "remote exit {} · timeout {} · truncated {}",
