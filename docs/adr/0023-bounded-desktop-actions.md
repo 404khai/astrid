@@ -2,7 +2,8 @@
 
 Date: 2026-10-21
 Status: Accepted — 2026-10-21, with maintainer clarifications below
-Implementation: Mocked headless Rust controller authorized; production/live gates remain.
+Implementation: Headless Rust controller implemented against mock transport;
+production/live gates remain.
 Related: ADRs 0004, 0008/0009, 0016, 0018, 0021/0022;
 [active plan](../plans/remote-mobile-cli.md).
 

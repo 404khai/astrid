@@ -44,7 +44,7 @@ trust need their concrete ADR before dependent implementation.
 | RE-01 | RC-01/02/03; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Done (mocked); [ADR 0021](../adr/0021-remote-target-authority.md) Accepted with maintainer clarifications; [review](../reviews/instabox-tool-adapter-2026-10-21.md); 302 Rust passed, 0 failed, 1 ignored; no live grant |
 | RE-02 | RE-01 | Explicit foreground CLI target selection and separate per-call approvals; isolated exact-target harmless trial, denial/timeout/cancel and attribution inspected separately | CLI validated (308 Rust passed, 0 failed, 1 ignored; 2 Python passed); [trial plan](../reviews/instabox-cli-approvals-2026-10-21.md); live pending exact target/scope authorization |
 | CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Contract accepted with explicit gates; synthetic fixture specification; [milestone](../milestones/screenshot-observation.md), [ADR 0022](../adr/0022-screenshot-observation.md); runtime/live exit pending |
-| CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | Authorized scoped work; [ADR 0023](../adr/0023-bounded-desktop-actions.md) proposed; [milestone](../milestones/bounded-desktop-actions.md); mocked controller pending decision, runtime/live gated |
+| CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | [ADR 0023](../adr/0023-bounded-desktop-actions.md) Accepted with clarifications; mocked Rust controller validated (327 Rust passed, 1 ignored; 18 existing Python passed); [milestone](../milestones/bounded-desktop-actions.md); runtime/live gated |
 | MO-01 | Existing mobile concept/reference | Shared RN Meister conversation shell, `.ios` SwiftUI adapters and Android components, mock streams/tool/approval states; both exports/typecheck | Draft; no credentials or live Host needed |
 | HO-01 | RC-01/02; authenticated Host ADR | Foreground single-user Host with bounded sessions, runs, event stream, cancellation and one authoritative store owner; synthetic clients | Draft; no daemon or public listener by implication |
 | MO-02 | MO-01, HO-01 | Real one-to-one Meister conversation, model/effort settings, streaming, tool cards, permissions, activity, session navigation | Draft; IOS/Android device acceptance separate |
@@ -110,8 +110,12 @@ retrieved OpenAPI and SDK 0.5.3 without credentials: status is POST, screenshot
 is an exec/file workflow, and no direct screenshot route exists in that schema.
 Only synthetic fixture specification is implemented. Live transport, production
 decoder, runtime integration, persistence/schema and model disclosure stay gated;
-CU-02 is now separately authorized for bounded action work; its concrete
-[ADR 0023](../adr/0023-bounded-desktop-actions.md) decision precedes dependent code.
+CU-02 now implements bounded headless Rust action controls against mock transport
+under [ADR 0023](../adr/0023-bounded-desktop-actions.md), explicitly Accepted with
+maintainer clarifications before dependent code. Limits are two actions/receipts,
+30 s per run, 3 s transport wait and experimental 5 s native-frame freshness; no
+silent refresh/approval reuse. This adds no real screenshot receipt/transport or
+runtime/model registration and preserves CU-01 image/privacy gates.
 The older research below is historical, not
 implementation authority. RE-02 live validation remains separately pending.
 

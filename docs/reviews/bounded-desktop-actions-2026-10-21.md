@@ -4,8 +4,8 @@ Date: 2026-10-21. Branch: `feat/bounded-desktop-actions` from freshly fetched
 main `2daf811c` (merge of #24); same preserved checkout, no worktree.
 CU-01 PR #24 was already merged upstream at 2026-10-21T18:14:30Z. No merge is
 authorized or performed by CU-02. The maintainer requested CU-02 and its PR.
-[ADR 0023](../adr/0023-bounded-desktop-actions.md) is initially Proposed; dependent
-authority implementation awaits the specific decision.
+[ADR 0023](../adr/0023-bounded-desktop-actions.md) is Accepted with all four
+maintainer clarifications, committed as `b452ef23` before dependent implementation.
 
 ## Current public upstream evidence
 
@@ -36,20 +36,20 @@ bounded responses and cancellation evidence, under a separate action grant rathe
 than a generic remote-shell grant. A click may partially move before failing;
 typing may partially insert text. Unknown outcome cannot be retried safely.
 
-## Scope and review plan
+## Implemented scope and solo review
 
 CU-01 still lacks live observation transport, production decoder, runtime receipt
 integration and model image permission. CU-02 therefore cannot honestly deliver
-an end-to-end runtime screenshot/action loop. The proposed slice is a bounded
+an end-to-end runtime screenshot/action loop. The implemented slice is a bounded
 Rust headless controller with only mock transport evidence. Native frame metadata
 is a trusted host assertion, never evidence that a screenshot was taken or sent
 to a model. No action registration, new provider input or session/event schema.
 
-Review/tests must challenge all binding dimensions, each action, stale and replaced
+Review/tests challenge all binding dimensions, each action, stale and replaced
 frames, native bounds, delayed approvals, expiry, cancellation races, single use,
 count/text/window limits, unknown outcomes, no retry and private content handling.
 Exact command transport and full runtime/live acceptance remain gated. CU-01's
-two-frame/30 s observation limits must not grow implicitly to fit CU-02.
+two-frame/30 s observation limits are unchanged.
 
 ## Deterministic acceptance matrix
 
@@ -80,15 +80,94 @@ screenshots per run may require distinct freshly approved runs for a multi-case
 trial; no implicit budget increase or resumed grant.
 
 
-## Preparation checkpoint
+## Rust controller implementation and limits
 
-Baseline `cargo test --locked --offline -- --test-threads=1`: **308 passed,
-0 failed, 1 ignored**. This is unchanged-runtime regression evidence, not CU-02
-controller or live evidence. Scoped whitespace and 50 local Markdown links pass.
-No dependent action controller implementation exists while ADR 0023 is Proposed.
-The authorization decision is pending; no acceptance is inferred from elapsed time.
+`src/desktop.rs` exposes typed `Action`/`Arguments`, a distinct `ActionApproval`
+broker and `ActionGrant`, a one-method `ActionTransport`, and one exclusive
+`ActionController` per host-owned run/target. Canonical policy `cu02-native-v1`
+binds the fixed limits; JSON rejects unknown fields. No production transport,
+SDK dependency, shell construction, key loading, runtime/model tool registration,
+provider image input, CLI flag or session/event schema is added. Existing trace
+projection code is unchanged; its new test persists only synthetic metadata.
 
-Publication checkpoint: [draft PR #25](https://github.com/404khai/astrid/pull/25)
-contains the reviewable design, targets main and is open/unmerged. ADR 0023's
-explicit decision and dependent implementation remain pending; this is not the
-completed CU-02 implementation PR.
+Host-attested metadata is capped at two installations/replacements. Action count,
+UTF-8 byte and original-window accounting never reset on a new receipt. There is
+no global run registry; the trusted host must retain one controller per run/target
+and must not construct duplicate owners. The seam cannot verify screenshots or
+CU-01 byte/decode provenance. Live integration must replace that assertion with
+receipts originating exclusively from admitted validated observations. Changing
+frame metadata does not acquire observe permission or capture an image.
+
+A frame is consumed at admission; pre-admission rejection invalidates it. Staleness
+never silently refreshes a frame or rebinds an approval. Five seconds is only an
+experimental mock bound: human approval can exceed it and a practical production
+strategy needs separate review. Focus, pointer position and concurrent external
+UI changes remain unverified; native coordinate validation is not remote atomicity.
+
+Grant consumption follows all final checks without an intervening await. Before
+awaiting transport, the controller marks itself closed and outcome unknown; even
+caller-future drop cannot reopen it. Only an observed acknowledgement before local
+deadline/cancellation can clear uncertainty. Cancellation in the same poll as an
+ack also stays unknown. Timeouts/errors close the run, preserve spent budgets,
+return categorical unknown and never retry. Ack confirms input acknowledgement,
+not the intended effect. Cooperative async transport is required; synchronous
+blocking or detached tasks would violate wait/cancellation assumptions and remain
+unapproved for production.
+
+Tokio's existing dependency gains `test-util` only in dev-dependencies for paused
+clock tests; no new package or Cargo.lock change. Tests do not sleep, authenticate,
+read private sessions/reference images or invoke any real desktop/provider.
+Development checks caught a test temporary-borrow issue, a test mutex held across
+await, and placement of the dropped-caller uncertainty flag; these were corrected
+without widening authority, bounds or production integrations.
+
+## Required contracts before a live observation/transport milestone
+
+1. **Observation transport and safe decode:** audit exact screenshot/status
+   commands, cwd, bounded body/file reads, temporary guest artifacts, cleanup and
+   possible auto-wake; choose a production decoder with finite allocation/CPU and
+   cancellable worker lifetime. Preserve CU-01 byte/pixel/count/window bounds and
+   implement idle retention cleanup even without a consumer.
+2. **Actionable provenance and ownership:** mint non-replayable real receipts only
+   after successful observation admission and validated native geometry, tied to
+   the actual run/principal/target and its single authoritative controller. Share
+   admission accounting so metadata replacement cannot bypass screenshot limits.
+3. **Practical approval/freshness:** separately review human approval delays,
+   explicitly authorized recapture and a new exact-frame action approval; never
+   reuse stale approvals. Define handling of focus, pointer, resize and external
+   changes. Crop/scale/DPI coordinates need a concrete transform contract first.
+4. **Action transport and outcomes:** review a fixed typed-action-to-wire/command
+   mapping, complete exact arguments/stdin/cwd/timeouts, bounded replies, partial
+   effects and cancellation. Preserve single-use admission/no replay and distinguish
+   input ack, observed UI effect and unknown outcomes. No guessed REST endpoint.
+5. **Runtime integration and privacy:** separately authorize tool registration and
+   define its private exact-call result envelope, required permission/cancellation
+   events and complete-exchange/context admission behavior. Preserve private v2,
+   original results/continuation, incomplete-batch rejection, ADR 0008 off and ADR
+   0009 allowlisted traces. Model image disclosure and screenshot persistence need
+   their own destination/accounting/retention/schema decisions; neither is implied.
+6. **Exact live trial:** separately approve the existing machine, scratch app,
+   screenshot/input sequence and text, commands/cwd/deadlines, trial count,
+   cancellation/cleanup and auto-wake scope described above. No live evidence here.
+
+Stop after the mocked CU-02 slice and its unmerged PR. No next milestone is started.
+
+
+## Final validation and publication
+
+- `cargo test --locked --offline -- --test-threads=1`: **327 passed, 0 failed,
+  1 ignored** (existing optional recording-overhead experiment). Includes 18 new
+  action controller tests and one new persisted metadata-trace privacy test.
+- `cargo test --locked --offline --lib desktop -- --test-threads=1`: 19 focused
+  tests passed before the final full-suite run, which covers the pinned sources.
+- From `scripts/`, `python3 -m unittest -v test_screenshot_observation.py
+  test_compare_routing.py`: **18 passed** (existing CU-01/comparison regression tests).
+- `cargo fmt --check`, locked/offline strict all-target Clippy and whitespace pass.
+- Relative documentation links checked; command/source hashes are in
+  [evidence](../evaluations/bounded-desktop-actions-2026-10-21.json).
+
+The final full run follows the corrected dropped-caller uncertainty flag. No tests
+use a real desktop or infer a live target. Mocked controller exit is satisfied;
+full runtime/live CU-02 acceptance is not claimed. [PR #25](https://github.com/404khai/astrid/pull/25)
+is updated for review against main, without merge. Unrelated `.gitignore`, local
+CURRENT history, recovery artifacts and user files remain preserved and unstaged.
