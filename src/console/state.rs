@@ -405,7 +405,13 @@ impl Presentation {
                     .tool_call_id
                     .and_then(|id| self.calls.get(&id))
                     .is_some_and(|name| name == "shell");
-                let authority = if shell {
+                let remote = event
+                    .tool_call_id
+                    .and_then(|id| self.calls.get(&id))
+                    .is_some_and(|name| name == "instabox_exec");
+                let authority = if remote {
+                    "Remote exact-call grant; possible auto-wake. Cancellation cannot prove remote termination."
+                } else if shell {
                     "Runs with your account's permissions."
                 } else {
                     "Workspace operation subject to validated paths."
@@ -464,7 +470,9 @@ impl Presentation {
                         Ink::Error
                     },
                 );
-                if name == "shell" {
+                if name == "instabox_exec" {
+                    self.remote_report(outcome);
+                } else if name == "shell" {
                     self.command_output(outcome);
                 } else if self.expanded_tool_calls {
                     self.result_preview(outcome);
@@ -481,7 +489,13 @@ impl Presentation {
                 };
                 self.line(&format!("! {name:13} {detail}"), Ink::Error);
                 if let EventKind::ToolCallCancelled { output: Some(data) } = &event.kind {
-                    self.command_output(&ToolOutcome::Success { data: data.clone() });
+                    let outcome = ToolOutcome::Success { data: data.clone() };
+                    if name == "instabox_exec" {
+                        self.line(&format!("  {}", summary(&outcome)), Ink::Warning);
+                        self.remote_report(&outcome);
+                    } else {
+                        self.command_output(&outcome);
+                    }
                 }
             }
             EventKind::CancellationRequested => {
@@ -515,6 +529,26 @@ impl Presentation {
                 );
             }
             _ => {}
+        }
+    }
+    // Private foreground content only; metadata traces use the runtime allowlist.
+    fn remote_report(&mut self, outcome: &ToolOutcome) {
+        if let ToolOutcome::Success { data } | ToolOutcome::TimedOut { data } = outcome {
+            if data["target"] != "instabox" {
+                return;
+            }
+            self.emit(&format!(
+                "  target: {}\n  run: {} · runtime call: {} · provider call: {}\n  POST admitted: {} · elapsed: {}ms\n",
+                data["machine_id"], data["run_id"], data["tool_call_id"], data["call_id"],
+                data["post_admitted"], data["elapsed_ms"]), Ink::Dim, false);
+            if data["output_available"] == true {
+                self.command_output(outcome);
+            } else {
+                self.line(
+                    "  remote stdout/stderr and exit status unavailable",
+                    Ink::Dim,
+                );
+            }
         }
     }
     fn result_preview(&mut self, outcome: &ToolOutcome) {

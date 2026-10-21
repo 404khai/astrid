@@ -392,9 +392,10 @@ fn pty_child() {
             .unwrap()
             .block_on(crate::conversation_loop(
                 &Provider,
-                &tools,
+                tools,
                 "fixture".into(),
                 &root.join("model-settings"),
+                None,
             ))
             .unwrap();
         assert!(!crossterm::terminal::is_raw_mode_enabled().unwrap());

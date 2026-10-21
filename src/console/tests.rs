@@ -1307,3 +1307,100 @@ fn original_mascot_geometry_and_eyes_share_the_welcome_with_wordmark() {
         }
     }
 }
+
+#[test]
+fn remote_approval_labels_remote_authority_and_keeps_full_review_description() {
+    let mut state = Presentation::new("test".into());
+    let id = Default::default();
+    let mut requested = event(EventKind::ToolCallRequested {
+        call: astrid::model::ToolCall {
+            call_id: "remote-call".into(),
+            name: "instabox_exec".into(),
+            arguments: "{}".into(),
+        },
+    });
+    requested.tool_call_id = Some(id);
+    state.apply(&requested);
+    let description = format!(
+        "Exact command: {} END\nExact cwd: /data/home\nTimeout: 2s",
+        "x".repeat(1024)
+    );
+    let mut approval = event(EventKind::PermissionRequested {
+        command: description.clone(),
+        workspace: "instabox:m_exact".into(),
+    });
+    approval.tool_call_id = Some(id);
+    state.apply(&approval);
+    let output = state
+        .take_output()
+        .into_iter()
+        .map(|p| p.text)
+        .collect::<String>();
+    assert!(output.contains(&description));
+    assert!(output.contains("Remote exact-call grant; possible auto-wake"));
+    assert!(output.contains("Cancellation cannot prove remote termination"));
+    assert!(!output.contains("Workspace operation subject to validated paths"));
+}
+
+#[test]
+fn remote_result_and_cancel_projection_preserve_attribution_and_uncertainty() {
+    let data = json!({"target":"instabox", "machine_id":"m_private-target",
+        "run_id":"private-run", "tool_call_id":"runtime-call", "call_id":"provider-call",
+        "post_admitted":true, "elapsed_ms":14, "remote_outcome":"observed_completed",
+        "output_available":true, "stdout":"actual stdout", "stderr":"actual stderr",
+        "exit_status":7, "timed_out":false, "output_truncated":false});
+    for cancelled in [false, true] {
+        let mut state = Presentation::new("test".into());
+        let id = Default::default();
+        let mut requested = event(EventKind::ToolCallRequested {
+            call: astrid::model::ToolCall {
+                call_id: "provider-call".into(),
+                name: "instabox_exec".into(),
+                arguments: "{}".into(),
+            },
+        });
+        requested.tool_call_id = Some(id);
+        state.apply(&requested);
+        let kind = if cancelled {
+            let mut unknown = data.clone();
+            unknown["remote_outcome"] = json!("unknown");
+            unknown["output_available"] = json!(false);
+            unknown["exit_status"] = serde_json::Value::Null;
+            unknown["stdout"] = json!("");
+            unknown["stderr"] = json!("");
+            EventKind::ToolCallCancelled {
+                output: Some(unknown),
+            }
+        } else {
+            EventKind::ToolCallFailed {
+                outcome: ToolOutcome::Success { data: data.clone() },
+            }
+        };
+        let mut result = event(kind);
+        result.tool_call_id = Some(id);
+        state.apply(&result);
+        let output = state
+            .take_output()
+            .into_iter()
+            .map(|p| p.text)
+            .collect::<String>();
+        for attribution in [
+            "m_private-target",
+            "private-run",
+            "runtime-call",
+            "provider-call",
+            "POST admitted: true",
+        ] {
+            assert!(output.contains(attribution), "{output}");
+        }
+        if cancelled {
+            assert!(output.contains("remote outcome unknown; termination unconfirmed"));
+            assert!(output.contains("exit status unavailable"));
+            assert!(!output.contains("actual stdout"));
+        } else {
+            assert!(output.contains("remote exit 7"));
+            assert!(output.contains("stdout\nactual stdout"));
+            assert!(output.contains("stderr\nactual stderr"));
+        }
+    }
+}

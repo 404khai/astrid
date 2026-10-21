@@ -1,3 +1,35 @@
+# Foreground InstaBox CLI approvals — 2026-10-21
+
+RE-02 connects invocation-only `--instabox-machine <exact-ID>` selection to
+separate exact-call approvals for one-shot and interactive CLI runs, on existing
+`feat/instabox-cli-approvals` from RE-01 `2f8f9358`, same checkout, no worktree.
+Latest maintainer direction supersedes only RE-01's stop restriction for CLI
+implementation, deterministic mocks and a reviewable live plan. ADR 0021 remains
+binding: no local preset, resume, read-only worker or selection alone grants
+remote authority. No target discovery/default/persistence or automatic retry.
+
+Commands/cwd display as complete JSON strings; remote authority, private exact
+attribution, actual output and cancellation/unknown outcome are visible in the
+foreground terminal. Fresh answer channels per run discard cancelled replies.
+Private v2 history/continuation/provenance, context/exchange admission and ADRs
+0008/0009 off/metadata-trace semantics are unchanged. Keys stay host-side.
+
+**308 Rust passed, 0 failed, 1 ignored; 2 Python passed; formatting, strict all-target Clippy and whitespace passed.**
+
+Validation is recorded in [review and concrete trial plan](reviews/instabox-cli-approvals-2026-10-21.md),
+[evidence](evaluations/instabox-cli-approvals-2026-10-21.json),
+[active plan](plans/remote-mobile-cli.md) and [milestone](milestones/runtime-recovery.md).
+No exact live machine/provider/action scope was supplied or approved: live trial
+and full RE-02 acceptance remain pending. No authenticated metadata, provider
+inference, cloud/VM operation, credential/private-session read or successor work.
+
+Read-only fetch found #22 already merged upstream at `56880270`; the dependency
+source matches our baseline. RE-02 targets main after checking its diff; no PR
+merge performed here. Preserve unrelated `.gitignore`, historical CURRENT edits,
+recovery files and untracked user assets outside the task commit.
+
+---
+
 # Foreground exact-target InstaBox tool — 2026-10-21
 
 RE-01 is implemented on `feat/instabox-tool-adapter`, from fetched main `cc0fa964`,

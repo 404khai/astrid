@@ -24,6 +24,7 @@ mod console;
 #[path = "instabox_cli.rs"]
 mod instabox;
 mod logo;
+mod remote_cli;
 mod sessions;
 use console::Console;
 use logo::LOGO;
@@ -31,6 +32,9 @@ use logo::LOGO;
 #[derive(Parser)]
 #[command(name="astrid", version, about="One delegated task, one observable model/tool loop", after_help=LOGO)]
 struct Cli {
+    /// Opt in for this foreground invocation only; each remote call still requires exact approval.
+    #[arg(long, global = true, value_parser = remote_cli::machine_id)]
+    instabox_machine: Option<String>,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -68,7 +72,7 @@ enum BatchCommand {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Experimental metadata discovery only; never connects to or wakes a VM.
+    /// Explicit metadata discovery or exact-command execution on an existing InstaBox machine.
     Instabox {
         #[command(subcommand)]
         command: instabox::Command,
@@ -436,7 +440,9 @@ fn recording_notice(result: &runtime::RunResult) {
         ),
     }
 }
-async fn interactive_loop() -> Result<(), Box<dyn std::error::Error>> {
+async fn interactive_loop(
+    remote: Option<remote_cli::ForegroundRemote>,
+) -> Result<(), Box<dyn std::error::Error>> {
     if !console::interactive_available() {
         return Err(
             "interactive startup requires a terminal; use astrid run \"task\" --model <model>"
@@ -460,14 +466,15 @@ async fn interactive_loop() -> Result<(), Box<dyn std::error::Error>> {
     let timeout = configured_limit("ASTRID_SHELL_TIMEOUT", 30)?;
     let tools = Tools::new(workspace, Duration::from_secs(timeout as u64))?;
     let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory.clone())?))?;
-    conversation_loop(&provider, &tools, model, &directory).await
+    conversation_loop(&provider, tools, model, &directory, remote.as_ref()).await
 }
 
 async fn conversation_loop(
     provider: &dyn astrid::model::ModelProvider,
-    tools: &Tools,
+    mut tools: Tools,
     mut model: String,
     model_directory: &std::path::Path,
+    remote: Option<&remote_cli::ForegroundRemote>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let max_model_calls = configured_limit("ASTRID_MAX_MODEL_CALLS", 20)?;
     let mut context_budget = astrid::context::ContextBudget::default();
@@ -659,14 +666,17 @@ async fn conversation_loop(
         let (sender, receiver) = tokio::sync::mpsc::channel(64);
         let (permission_sender, permission_receiver) = tokio::sync::mpsc::channel(1);
         let mut permissions = TerminalPermission {
-            requests: permission_sender,
+            requests: permission_sender.clone(),
         };
+        if let Some(remote) = remote {
+            tools = remote.install(tools, permission_sender)?;
+        }
         let observability = observability_options_at(model_directory, None)?;
         let session = sessions.take_active();
         let result = drive_run(
             runtime::run_in_session(
                 provider,
-                tools,
+                &tools,
                 &mut permissions,
                 RunConfig {
                     routing: routing.clone(),
@@ -709,10 +719,20 @@ async fn conversation_loop(
 }
 
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    // Reject unsupported scopes before loading any remote credentials or provider setup.
+    if cli.instabox_machine.is_some()
+        && !matches!(cli.command, None | Some(Commands::Run { notes: false, .. }))
+    {
+        return Err("--instabox-machine requires foreground startup or run without --notes".into());
+    }
+    let remote = cli
+        .instabox_machine
+        .map(remote_cli::ForegroundRemote::load)
+        .transpose()?;
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
         Some(command) => command,
-        None => return interactive_loop().await,
+        None => return interactive_loop(remote).await,
     };
     let directory = auth::default_directory()?;
     match command {
@@ -966,7 +986,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             };
             run_task(
                 &provider,
-                &tools,
+                tools,
                 RunConfig {
                     routing,
                     observability,
@@ -978,6 +998,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 },
                 notes,
                 show_context,
+                remote.as_ref(),
             )
             .await?;
         }
@@ -988,10 +1009,11 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
 /// Shared one-shot client path, with provider injection only in deterministic tests.
 async fn run_task(
     provider: &dyn astrid::model::ModelProvider,
-    tools: &Tools,
+    mut tools: Tools,
     config: RunConfig,
     notes: bool,
     show_context: bool,
+    remote: Option<&remote_cli::ForegroundRemote>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut console = Console::new(
         startup_identity(&config.model, tools.workspace(), config.permissions),
@@ -1002,11 +1024,14 @@ async fn run_task(
     let (sender, receiver) = tokio::sync::mpsc::channel(64);
     let (permission_sender, permission_receiver) = tokio::sync::mpsc::channel::<DecisionRequest>(1);
     let mut permissions = TerminalPermission {
-        requests: permission_sender,
+        requests: permission_sender.clone(),
     };
+    if let Some(remote) = remote {
+        tools = remote.install(tools, permission_sender)?;
+    }
     let execution = runtime::run(
         provider,
-        tools,
+        &tools,
         &mut permissions,
         config,
         cancel.clone(),
@@ -1426,7 +1451,7 @@ mod tests {
             max_model_calls: 4,
             permissions: policy,
         };
-        run_task(&server.provider, &tools, config.clone(), true, false)
+        run_task(&server.provider, tools, config.clone(), true, false, None)
             .await
             .unwrap();
         assert!(!root.path().join("created").exists());
@@ -1435,7 +1460,9 @@ mod tests {
         assert!(requests[1].to_string().contains("permission_denied"));
         assert!(requests[1].to_string().contains("Buy lamp."));
         let failed = Server::http(503, vec![vec![]]).await;
-        let error = run_task(&failed.provider, &tools, config, true, false)
+        let tools =
+            Tools::new(Workspace::new(root.path()).unwrap(), Duration::from_secs(2)).unwrap();
+        let error = run_task(&failed.provider, tools, config, true, false, None)
             .await
             .unwrap_err();
         assert!(error.to_string().contains("503"));
