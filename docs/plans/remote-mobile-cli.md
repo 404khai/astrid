@@ -15,8 +15,8 @@ harness. CLI and mobile are clients; InstaBox is an execution target.
 | Cancellation | `src/runtime.rs`; `tests/runtime.rs`, `tests/sessions.rs` | Completed exchanges survive; unmatched terminal batches reject follow-up. Model cancellation without such a batch can continue. Preserve both cases. |
 | Persistence/routing | `src/session_store.rs`, ADR 0016; `tests/session_store.rs`, `tests/routing.rs` | V2 provenance supports conservative visible-history routing. Do not assume every legacy/one-shot session is resumable; validate actual replay mode, origins and completeness. |
 | Usage | `src/observability.rs`, `src/console/context_meter.rs`, `src/main.rs` | Traces/stats retain known input/output/cached usage; console shows a local non-opaque bytes/4 estimate. RC-02 adds opt-in live provider usage and per-metric coverage; reserve remains planning headroom. |
-| InstaBox | `src/instabox.rs`, `tests/instabox_cli.rs`, `tests/support/instabox_mock.rs`; [merge review](../reviews/instabox-completion-2026-10-18.md) | Standalone CLI GET discovery and explicit exact-machine exec exist. Agent tool integration does not. Adapter is binary-private and mixes command parsing, credentials and HTTP. |
-| Tools/authority | `src/tools.rs`, `src/permissions.rs`, `src/runtime.rs`, `src/openai.rs` | Fixed tool definitions, read/write/execute policy and command/workspace approval request assume local tools. Remote execution needs explicit target authority; adding a tool name to local Execute is insufficient. |
+| InstaBox | `src/instabox.rs`, `tests/instabox_cli.rs`, `tests/support/instabox_mock.rs`; [merge review](../reviews/instabox-completion-2026-10-18.md) | Standalone CLI GET discovery and explicit exact-machine exec remain supported. RE-01 extracts bounded HTTP into the library and adds an opt-in host-installed foreground runtime tool; CLI key loading remains binary-side. |
+| Tools/authority | `src/tools.rs`, `src/permissions.rs`, `src/runtime.rs`, `src/openai.rs` | Local tools retain read/write/execute policy. The separately installed foreground remote broker and atomic exact-call grant implement ADR 0021; no local preset or resume grants remote authority. |
 | Scheduler | `src/scheduler.rs`, accepted ADRs 0017–0019; [review](../reviews/phase-8.md) | Process-local bounded DAG with fresh read-only workers; no remote worker grant, concurrent writes/shell, daemon or durable jobs. Terminal persistence cannot supply these guarantees. |
 | Host | `src/runtime.rs`; paused M02/ADR 0014 | Headless runtime exists; authenticated network Host does not. Superseded Tauri IPC is not a cross-device trust contract. |
 | Mobile | `mobile/src/App.tsx`, `NativeSheet.tsx`, `data.ts`, `mobile/README.md` | Existing Expo concept uses demo projects/threads and unconditional SwiftUI/SymbolView imports. No live runtime, permissions or network; Android compatibility is not established. README's Phase 4 marker is historical. |
@@ -41,7 +41,7 @@ trust need their concrete ADR before dependent implementation.
 | RC-01 | Accepted ADR 0020 | Oversized previous-submission follow-up fits unchanged allowance; no replay; retained originals, omission lineage and checked events | Done; [milestone/evidence](../milestones/runtime-recovery.md) |
 | RC-02 | RC-01; metadata projection compatibility review | Normal CLI displays valid known input/output/cached counts, unknowns and aggregate coverage; budgets separately labeled | Done; [compatibility/review](../reviews/live-token-usage-2026-10-18.md) |
 | RC-03 | RC-01/02 | Bound one multi-tool exchange before further costly work; test many individually legal large outputs, Unicode and latest-exchange overflow | Done; [RC-03 guard/review](../reviews/aggregate-tool-admission-2026-10-21.md) |
-| RE-01 | RC-01/02/03; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Authorized 2026-10-21; [ADR 0021](../adr/0021-remote-target-authority.md) decision pending; HTTP extraction validated separately |
+| RE-01 | RC-01/02/03; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Done (mocked); [ADR 0021](../adr/0021-remote-target-authority.md) Accepted with maintainer clarifications; [review](../reviews/instabox-tool-adapter-2026-10-21.md); 302 Rust passed, 0 failed, 1 ignored; no live grant |
 | RE-02 | RE-01 | Authorized isolated live trial: exact selected running machine, harmless `printf`/`pwd`, denial/timeout/cancel and attribution inspected separately | Draft; exact live request including possible wake requires authorization |
 | CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Draft; no desktop action implied |
 | CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | Draft; isolated harmless desktop trial after explicit live scope |
@@ -56,8 +56,9 @@ Recommended first slice is RC-01, implemented under the separately accepted
 amendment. Finish its deterministic validation before remote work. RC-02 is now validated and complete after
 [recovery PR #19](https://github.com/404khai/astrid/pull/19). The maintainer authorized
 RC-03 on 2026-10-21 before RE-01, resolving the earlier prose/table ordering
-inconsistency. Complete aggregate-exchange admission, then the RE-01 authority
-contract and mocked adapter. MO-01 can use mocks independently; its apparent working
+inconsistency. RC-03 is merged; the maintainer accepted ADR 0021 on 2026-10-21
+with atomic consumption, local OS scope and future auditability clarifications.
+RE-01 now implements that foreground mocked adapter. MO-01 can use mocks independently; its apparent working
 state must never imply a real run. Do not combine these tickets in one large PR.
 
 ## Smallest safe InstaBox runtime adapter (RE-01 design)
@@ -76,8 +77,9 @@ swapped by model text. A remote grant binds requesting principal, run, tool-call
 target ID and canonical arguments. Approval is distinct from local shell allow;
 permission expiry, denial, cancellation or changed arguments prevents POST.
 
-Proposed target-authority ADR must define that exact grant and metadata exposure,
-including running-state check's possible pause/wake race. First adapter remains
+Accepted [ADR 0021](../adr/0021-remote-target-authority.md) defines exact binding,
+atomic single-use consumption at POST admission, private-only target metadata and
+the running-state check's disclosed possible pause/wake race. First adapter remains
 outside scheduler workers: read-only worker grants cannot be elevated remotely.
 No run/permission/session resume confers remote authority. Desktop observe/act
 are separate later grants; remote exec itself is broad authority on that machine.
@@ -227,8 +229,8 @@ remote writes and worktree isolation remain deferred to separately scoped work.
 
 ## Review and stopping conditions
 
-RC-01–03 have passed their deterministic recovery/admission checks. RE-01 still
-requires its concrete target-authority contract before dependent code.
+RC-01–03 have passed their deterministic recovery/admission checks and are merged.
+RE-01 follows accepted ADR 0021; no live grant follows from mocked validation.
 A screenshot capability waits for bounded image admission. A real mobile connection
 waits for the Host trust/lifetime contract. Terminal work cannot silently implement
 a scheduler, durable jobs or Phase 9. Preserve private sessions, credentials,

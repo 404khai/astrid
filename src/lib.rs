@@ -24,3 +24,4 @@ pub mod batch_trace;
 pub mod scheduler;
 
 pub mod instabox;
+pub mod remote;

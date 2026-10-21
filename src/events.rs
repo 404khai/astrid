@@ -110,6 +110,10 @@ pub enum EventKind {
     ToolCallRequested {
         call: ToolCall,
     },
+    /// Separate typed remote boundary: local policy cannot supply its authority.
+    RemotePermissionRequired {
+        available: bool,
+    },
     PermissionRequested {
         command: String,
         workspace: String,
@@ -731,6 +735,7 @@ impl ExecutionState {
                 );
             }
             EventKind::PermissionPolicyEvaluated { .. }
+            | EventKind::RemotePermissionRequired { .. }
             | EventKind::ToolOutput { .. }
             | EventKind::NativeMutationRecorded { .. }
             | EventKind::PermissionRequested { .. }
@@ -761,6 +766,25 @@ impl ExecutionState {
                     .ok_or_else(|| TransitionError("unknown tool".into()))?;
                 require(!t.status.terminal())?;
                 t.status = match &e.kind {
+                    EventKind::RemotePermissionRequired { available } => {
+                        require(
+                            t.status == Status::Pending
+                                && t.permission.is_none()
+                                && t.call.name == "instabox_exec"
+                                && !self.cancellation_acknowledged,
+                        )?;
+                        let action = if *available {
+                            PermissionAction::Ask
+                        } else {
+                            PermissionAction::Deny
+                        };
+                        t.permission = Some(action);
+                        if *available {
+                            Status::Pending
+                        } else {
+                            Status::PermissionDenied
+                        }
+                    }
                     EventKind::PermissionPolicyEvaluated {
                         capability, action, ..
                     } => {

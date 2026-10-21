@@ -4,7 +4,7 @@ use tokio::{
     net::TcpListener,
 };
 
-const ID: &str = "m_0123456789abcdefghijklmnop";
+pub(crate) const ID: &str = "m_0123456789abcdefghijklmnop";
 const USAGE: &str = r#"{"machines":5,"snapshots":10,"storedBytes":214748364800,"computedAt":null,"limits":{"maxMachines":5,"maxSnapshots":10,"maxStoredGiB":200},"private":"SECRET"}"#;
 
 async fn server(
@@ -192,7 +192,7 @@ async fn pagination_and_unknown_states_never_invent_complete_or_running() {
     task.await.unwrap();
 }
 
-async fn request_server(
+pub(crate) async fn request_server(
     replies: Vec<(u16, String)>,
 ) -> (DiscoveryClient, tokio::task::JoinHandle<Vec<String>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -645,4 +645,12 @@ async fn exec_deadlines_and_cancellation_cover_metadata_and_post_response_bodies
             assert!(server.await.unwrap_err().is_cancelled());
         }
     }
+}
+
+// Library-only loopback construction seam; no production origin override.
+pub(crate) fn client_at(address: std::net::SocketAddr) -> DiscoveryClient {
+    assert!(address.ip().is_loopback());
+    let mut client = DiscoveryClient::new("ibk_test_only").unwrap();
+    client.origin = format!("http://{address}");
+    client
 }

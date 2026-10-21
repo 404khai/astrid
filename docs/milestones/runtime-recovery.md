@@ -104,12 +104,23 @@ Next: RE-01 authority contract, then mocked adapter; no live remote grant yet.
 RC-01/02/03 are merged (#19/#20/#21). The maintainer authorized the next
 foreground mocked remote-tool slice on `feat/instabox-tool-adapter` from main
 `cc0fa964`. [ADR 0021](../adr/0021-remote-target-authority.md) records the concrete
-exact-target authority proposal; its consequential decision is pending under
-AGENTS.md. Independent HTTP extraction retains the existing standalone CLI,
-key-loading tests and bounded executor tests. Dependent runtime tool implementation
-and the final PR await that decision. No live trial is authorized.
+exact-target authority contract, explicitly Accepted by the maintainer with atomic
+consumption, local OS scope and future auditability clarifications. Independent
+HTTP extraction retains the existing standalone CLI, key-loading tests and bounded
+executor tests. The host-installed foreground typed tool now follows that contract;
+[implementation review](../reviews/instabox-tool-adapter-2026-10-21.md).
+No live trial is authorized.
 
 Extraction validation: **288 Rust passed, 0 failed, 1 ignored; 2 Python passed**;
 fmt, strict all-target Clippy and whitespace passed. All existing 15 synthetic
 HTTP/key tests plus the standalone CLI preflight remain green. This is extraction
 evidence only, not remote-tool acceptance.
+
+RE-01 final mocked validation: **302 Rust passed, 0 failed, 1 ignored; 2 Python
+passed**; fmt, strict all-target Clippy and whitespace passed. The initial parallel
+run had one existing Git-observation assertion failure; isolated and complete
+serialized reruns passed without changing the Git observer. Explicitly disable
+reqwest protocol-NACK retries as well as application retries.
+[Evidence](../evaluations/instabox-tool-adapter-2026-10-21.json).
+Stop at this slice and its unmerged PR; propose RE-02 only after separate exact
+live authorization. Normal CLI sessions do not implicitly install a remote broker.

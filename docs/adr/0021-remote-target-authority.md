@@ -2,7 +2,8 @@
 
 Date: 2026-10-21
 Status: Accepted — 2026-10-21
-Implementation: Authorized mocked foreground slice, after this contract.
+Implementation: Foreground mocked adapter implemented and deterministically validated;
+[review/evidence](../reviews/instabox-tool-adapter-2026-10-21.md).
 Decision evidence: Maintainer explicitly accepted ADR 0021 with the clarifications
 below on 2026-10-21, then instructed implementation.
 Related: ADRs 0004, 0008, 0009, 0012, 0016, 0018; RE-01 in

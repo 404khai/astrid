@@ -42,6 +42,10 @@ pub enum Error {
     Cancelled,
     #[error("InstaBox execution denied; explicit --allow-execution is required")]
     ExecDenied,
+    #[error("remote execution grant expired")]
+    GrantExpired,
+    #[error("remote execution grant already consumed")]
+    GrantConsumed,
     #[error(
         "InstaBox execution requires an existing machine in running state; Astrid will not start or resume it"
     )]
@@ -177,7 +181,7 @@ pub struct ExecReport {
 }
 
 impl Error {
-    fn category(&self) -> &'static str {
+    pub(crate) fn category(&self) -> &'static str {
         match self {
             Self::Authentication => "authentication",
             Self::Forbidden => "forbidden",
@@ -185,6 +189,13 @@ impl Error {
             Self::Quota => "quota",
             Self::Unavailable => "unavailable",
             Self::InvalidResponse => "invalid_response",
+            Self::ExecDenied => "permission_denied",
+            Self::GrantExpired => "grant_expired",
+            Self::GrantConsumed => "grant_consumed",
+            Self::MachineNotRunning => "machine_not_running",
+            Self::InvalidId | Self::InvalidExecRequest => "invalid_arguments",
+            Self::Timeout => "local_deadline",
+            Self::Cancelled => "cancelled",
             _ => "transport",
         }
     }
@@ -251,6 +262,8 @@ impl DiscoveryClient {
         let mut key = HeaderValue::from_str(key).map_err(|_| Error::InvalidKey)?;
         key.set_sensitive(true);
         let http = Client::builder()
+            // Disable even reqwest's default safe protocol-NACK retries.
+            .retry(reqwest::retry::never())
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
             .connect_timeout(Duration::from_secs(5))
@@ -321,10 +334,28 @@ impl DiscoveryClient {
         metadata_wait: Duration,
         response_wait: Duration,
     ) -> Result<ExecReport, Error> {
+        self.execute_guarded(request, cancel, metadata_wait, response_wait, &|_| {
+            if granted == Some(request) {
+                Ok(())
+            } else {
+                Err(Error::ExecDenied)
+            }
+        })
+        .await
+    }
+
+    // Called only by the typed remote boundary. `admit(true)` atomically consumes
+    // its grant after preflight; no await separates consumption from POST admission.
+    pub(crate) async fn execute_guarded(
+        &self,
+        request: &ExecGrant,
+        cancel: &Cancellation,
+        metadata_wait: Duration,
+        response_wait: Duration,
+        admit: &(dyn Fn(bool) -> Result<(), Error> + Sync),
+    ) -> Result<ExecReport, Error> {
         request.validate()?;
-        if granted != Some(request) {
-            return Err(Error::ExecDenied);
-        }
+        admit(false)?;
         if cancel.is_cancelled() {
             return Err(Error::Cancelled);
         }
@@ -365,6 +396,8 @@ impl DiscoveryClient {
                     timeout_seconds: request.timeout_seconds,
                 }),
         );
+        // Final binding/expiry/cancellation check and single atomic consumption.
+        admit(true)?;
         let response = tokio::select! {
             biased;
             _ = cancel.cancelled() => return Ok(ExecReport::unknown(request, ExecStatus::Cancelled, "cancelled", started)),
@@ -432,4 +465,4 @@ impl DiscoveryClient {
 
 #[cfg(test)]
 #[path = "../tests/support/instabox_mock.rs"]
-mod tests;
+pub(crate) mod tests;
