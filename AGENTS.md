@@ -1,3 +1,24 @@
+# Foreground computer-use integration authorization — 2026-10-21
+
+Maintainer requested “Tell me what’s left to get the actual CU working, and
+implement it”, then explicitly accepted [ADR 0024](docs/adr/0024-foreground-computer-use-integration.md)
+option 1 after its concrete privacy/runtime decision. Implement one-shot foreground
+CU with real adapter code, separate observe/action/per-frame model disclosure,
+native-image request-local inputs, unchanged finite limits and no image persistence
+or replay. This supersedes prior CU-01/02 implementation-only/stop restrictions
+only for this accepted integration contract. Branch `feat/foreground-computer-use`
+is stacked on open PR #25 (`4d10f91f`), same checkout, no worktree. No PR merge.
+
+Validate with synthetic PNGs, local HTTP/inference mocks and bounded helper-process
+fixtures only. No live/authenticated metadata, screenshot/input, provider inference
+or cloud/VM operation until separate exact existing target/action trial approval;
+no target supplied. Never read .env/private sessions or infer a target from keys.
+Preserve all remaining ADR 0022/0023 limits, private v2/provenance/continuation,
+original results/history, complete exchanges/admission, cancellation and ADRs
+0008/0009/0021. No lifecycle, ports, secrets transfer, remote workers, Host/mobile
+networking, Phase 9, daemon, PTY or desktop client. Preserve unrelated checkout data.
+Conventional commits and reviewable PR; stop after this integration slice, no MO-01.
+
 # CU-02 bounded desktop actions authorization — 2026-10-21
 
 Maintainer requested “Work on this next, open pr when done CU-02 — Bounded desktop

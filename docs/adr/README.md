@@ -29,3 +29,4 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0021](0021-remote-target-authority.md) | Foreground exact-target remote execution authority | Accepted 2026-10-21 | Implemented; [review/evidence](../reviews/instabox-tool-adapter-2026-10-21.md) |
 | [0022](0022-screenshot-observation.md) | Separate screenshot observation and ephemeral image handling | Accepted 2026-10-21 with explicit gates | Synthetic fixture specification only; runtime/transport/production decoder/persistence/provider disclosure gated |
 | [0023](0023-bounded-desktop-actions.md) | Separate desktop action grants and native-frame admission | Accepted 2026-10-21 with clarifications | Implemented against mocked transport; live/runtime gates preserved |
+| [0024](0024-foreground-computer-use-integration.md) | Real foreground CU and ephemeral per-frame image disclosure | Accepted 2026-10-21 | Integration authorized; mock validation only, exact live trial pending |
