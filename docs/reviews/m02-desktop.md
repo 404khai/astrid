@@ -1,3 +1,15 @@
+# Tauri draft cleanup — 2026-10-21
+
+The maintainer requested deleting the paused Tauri draft. GitHub
+[PR #13](https://github.com/404khai/astrid/pull/13) is now closed, not merged;
+GitHub retains its historical record. The `feat/m02-tauri-desktop` branch and
+source remain preserved at `8baf6af826ce4e4fed200d31e35b93d4e00f06b2`.
+M02 remains Paused/incomplete/unaccepted; this cleanup authorizes no desktop
+implementation and does not change the superseded ADR 0014 disposition.
+Earlier draft-handoff descriptions below remain historical.
+
+---
+
 # Paused desktop record — 2026-10-15
 
 Status: **Paused**, implementation partial, acceptance Pending. Maintainer direction

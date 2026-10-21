@@ -80,3 +80,13 @@ Disposition: passed with explicit limits. **288 Rust passed, 0 failed, 1 ignored
 the existing optional recording-overhead experiment. Stop after RC-03 and the
 authorized publication/merge cleanup. Next: RE-01's concrete target-authority ADR and smallest mocked
 InstaBox adapter; no remote implementation or live grant is inferred here.
+
+
+## Publication and dependency cleanup
+
+Implementation `b87218d4` is [PR #21](https://github.com/404khai/astrid/pull/21).
+#19 and #20 merged in order with merge commits, retaining the reviewed source
+ancestry. #21 was retargeted to main after those merges. Draft #13 was closed,
+with its branch head/source verified unchanged. No unrelated files were staged.
+Final #21 merge disposition is the linked GitHub record; all three pinned code
+hashes remain unchanged by this publication-only checkpoint.

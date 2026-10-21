@@ -92,3 +92,9 @@ or total-memory bound. [Review/contract](../reviews/aggregate-tool-admission-202
 Clippy passed.** [Pinned evidence](../evaluations/aggregate-tool-admission-2026-10-21.json).
 The original-runtime regression executes the forbidden later mutation. RE-01 follows
 this slice and still needs its target-authority contract.
+
+
+RC-03 publication: `b87218d4`, [PR #21](https://github.com/404khai/astrid/pull/21)
+targeting main after #19/#20 merged. GitHub PR state records its final merge.
+Tauri draft #13 was closed at the maintainer's request, preserving source/branch.
+Next: RE-01 authority contract, then mocked adapter; no live remote grant yet.

@@ -64,7 +64,22 @@
       20,
       13
     ],
-    "tauri_pr_13": "close without deleting preserved source/branch; GitHub historical PR record remains",
-    "merges": "pending final validation and RC-03 publication"
+    "tauri_pr_13": {
+      "state": "CLOSED",
+      "merged": false,
+      "branch": "feat/m02-tauri-desktop",
+      "preserved_head": "8baf6af826ce4e4fed200d31e35b93d4e00f06b2"
+    },
+    "merges": {
+      "19": "a0b42bed54c4d19acb42a310eba70d22334c6fd3",
+      "20": "413c82203dbd2f68efbc76f310ba183edac3c033"
+    },
+    "rc03_pr": {
+      "number": 21,
+      "url": "https://github.com/404khai/astrid/pull/21",
+      "base": "main",
+      "implementation_commit": "b87218d45facffc11738781e3fbbd511ea2c6906",
+      "final_merge_disposition": "consult GitHub PR record; this evidence is committed before the authorized merge"
+    }
   }
 }
