@@ -52,6 +52,8 @@ preserved checkout, no worktree. Do not merge either PR.
   by that reviewed operation; no inventory read. Native screenshot capture uses
   fixed audited commands on display `:1`, cwd `/data/home`, provider timeout 2 s,
   capped PNG stdout (base64 over exec), no guest image file or installed package.
+  The fixed ImageMagick plan caps pixel-cache memory at 64 MiB and disables
+  mapped/disk pixel caches; resource-limit failure is not a reason to persist.
   Missing capture tools fail clearly; never install/start the desktop. Status uses
   documented `POST /v1/machines/{id}/desktop` with `{"action":"status"}` and retains
   only installed/running booleans. No invented screenshot/action REST endpoint.

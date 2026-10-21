@@ -1,5 +1,11 @@
 # CU-02 — Bounded desktop actions
 
+Integration successor update, 2026-10-21: [accepted ADR 0024](../adr/0024-foreground-computer-use-integration.md)
+now authorizes real foreground observation/action/runtime and separate ephemeral
+model disclosure. [Integration milestone](foreground-computer-use.md) records the
+implemented code and mock evidence; live trials remain separately gated. Earlier
+scope/publication statements below are historical to this initial slice.
+
 Date: 2026-10-21. Maintainer requested separately authorized click, typing, scroll
 and key actions with stale-frame checks and execution limits, then a PR.
 Branch: `feat/bounded-desktop-actions`, from fetched main `2daf811c`, same checkout.

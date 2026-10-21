@@ -297,6 +297,7 @@ async fn unsupported_effort_and_invalid_stage_order_fail_before_any_request_or_m
     let request = ModelRequest {
         options: RequestOptions {
             instabox_exec: false,
+            computer_use: false,
             effort: Some(ReasoningEffort::High),
             replay: ReplayMode::ProviderContinuation,
         },

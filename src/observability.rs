@@ -341,7 +341,9 @@ fn project(event: &ExecutionEvent, elapsed_us: u64) -> Record {
         ToolCallRequested { call } => {
             let name = match call.name.as_str() {
                 "read_file" | "write_file" | "edit_file" | "list_directory" | "glob" | "grep"
-                | "shell" | "instabox_exec" => Some(call.name.as_str()),
+                | "shell" | "instabox_exec" | "instabox_observe" | "instabox_action" => {
+                    Some(call.name.as_str())
+                }
                 _ => None,
             };
             metadata = serde_json::json!({"tool":name});
@@ -380,6 +382,7 @@ fn project(event: &ExecutionEvent, elapsed_us: u64) -> Record {
         ModelCallCancelled => "model_call_cancelled",
         RemotePermissionRequired { .. } => "remote_permission_required",
         PermissionRequested { .. } => "permission_requested",
+        ImageInputAdmitted { .. } => "image_input_admitted",
         PermissionGranted => "permission_granted",
         PermissionDenied => "permission_denied",
         PermissionCancelled => "permission_cancelled",

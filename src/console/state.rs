@@ -176,6 +176,7 @@ impl Presentation {
                     );
                 }
             }
+            EventKind::ImageInputAdmitted { .. } => {}
             EventKind::ContextPrepared { snapshot } => {
                 self.context_meter.prepared(snapshot);
                 self.line(&self.context_meter.line(), Ink::Dim);
@@ -408,8 +409,15 @@ impl Presentation {
                 let remote = event
                     .tool_call_id
                     .and_then(|id| self.calls.get(&id))
-                    .is_some_and(|name| name == "instabox_exec");
-                let authority = if remote {
+                    .is_some_and(|name| {
+                        matches!(
+                            name.as_str(),
+                            "instabox_exec" | "instabox_observe" | "instabox_action"
+                        )
+                    });
+                let authority = if event.tool_call_id.is_none() {
+                    "Provider image disclosure only; exact frame/destination. store:false is not zero provider retention."
+                } else if remote {
                     "Remote exact-call grant; possible auto-wake. Cancellation cannot prove remote termination."
                 } else if shell {
                     "Runs with your account's permissions."

@@ -7,6 +7,14 @@ production/live gates remain.
 Related: ADRs 0004, 0008/0009, 0016, 0018, 0021/0022;
 [active plan](../plans/remote-mobile-cli.md).
 
+## Integration amendment — 2026-10-21
+
+[Accepted ADR 0024](0024-foreground-computer-use-integration.md) authorizes the
+separate foreground transport/runtime and per-frame image integration. This
+controller's exact grants, limits, experimental freshness and unknown-outcome
+semantics are unchanged. Actual live trials remain separately gated. The initial
+CU-02 implementation-only scope below is historical.
+
 ## Context
 
 The maintainer requested CU-02: separately authorized clicks, typing, scrolling

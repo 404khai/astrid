@@ -1,6 +1,6 @@
-//! ADR 0023: bounded in-process action controls, exercised with mocked transport.
-//! No live transport, screenshot decoder, runtime tool, CLI or provider integration.
-//! Observation metadata is a trusted host assertion, not verified image admission.
+//! ADR 0023: bounded in-process action controls.
+//! ADR 0024 integrates these through the separately approved foreground adapter.
+//! This metadata seam alone remains a trusted host assertion, not image admission.
 use crate::{
     cancellation::Cancellation,
     events::{RunId, ToolCallId},
@@ -46,7 +46,7 @@ pub enum Modifier {
     Shift,
 }
 
-/// Typed arguments only; never converted to shell commands in this slice.
+/// Typed arguments; the separate ADR 0024 transport maps only validated variants.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Action {
@@ -68,7 +68,7 @@ pub enum Action {
     },
 }
 impl Action {
-    fn validate(&self, width: u32, height: u32) -> Result<(), Rejection> {
+    pub(crate) fn validate(&self, width: u32, height: u32) -> Result<(), Rejection> {
         let valid = match self {
             Self::Click { x, y, .. } => *x < width && *y < height,
             Self::Type { text } => {
@@ -434,6 +434,26 @@ impl ActionController {
             self.close();
         }
         ActionReport::NotDispatched(reason)
+    }
+    pub(crate) fn request_for(
+        &self,
+        tool_call_id: ToolCallId,
+        provider_call_id: String,
+        args: Arguments,
+        cancel: &Cancellation,
+    ) -> Result<ApprovalRequest, Rejection> {
+        let frame = self.frame.as_ref().ok_or(Rejection::StaleFrame)?;
+        let request = ApprovalRequest {
+            owner: self.owner.clone(),
+            tool_call_id,
+            provider_call_id,
+            args,
+            width: frame.width,
+            height: frame.height,
+            policy: POLICY,
+        };
+        self.check(&request, cancel)?;
+        Ok(request)
     }
     /// Ask and execute one action. No automated loop or runtime/model registration.
     pub async fn perform(

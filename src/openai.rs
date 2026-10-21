@@ -80,6 +80,7 @@ impl OpenAiProvider {
         Ok(Self {
             client: reqwest::Client::builder()
                 .user_agent(concat!("Astrid/", env!("CARGO_PKG_VERSION")))
+                .retry(reqwest::retry::never())
                 .connect_timeout(Duration::from_secs(30))
                 .timeout(Duration::from_secs(300))
                 .redirect(reqwest::redirect::Policy::none())
@@ -123,6 +124,9 @@ impl OpenAiProvider {
         let mut definitions = tools::definitions();
         if request.options.instabox_exec {
             definitions.push(crate::remote::definition());
+        }
+        if request.options.computer_use {
+            definitions.extend(crate::computer::definitions());
         }
         let mut body = json!({"model":request.model,"instructions":request.instructions,"input":input,
             "store":false,"stream":true,"include":["reasoning.encrypted_content"],
@@ -260,15 +264,109 @@ impl ModelProvider for OpenAiProvider {
     ) -> Result<Option<ContextSnapshot>, ModelError> {
         Ok(Some(Self::snapshot(&Self::body(request)?, request)))
     }
+    fn measure_visual_request(
+        &self,
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+    ) -> Result<Option<ContextSnapshot>, ModelError> {
+        self.check_visual_destination()?;
+        Ok(Some(Self::visual_body(request, image)?.1))
+    }
+    async fn generate_visual(
+        &self,
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+        grant: &crate::computer::DisclosureGrant,
+        cancel: &crate::cancellation::Cancellation,
+        text: &mut dyn TextSink,
+    ) -> Result<ModelResponse, ModelError> {
+        self.check_visual_destination()?;
+        let result = tokio::select! {biased;
+            _=cancel.cancelled()=>Err(ModelError::Provider("visual request cancelled; remote outcome unknown".into())),
+            _=tokio::time::sleep_until(image.deadline())=>Err(ModelError::Provider("visual image deadline; remote outcome unknown".into())),
+            result=self.generate_input(request,Some((image,grant,cancel)),text)=>result,
+        };
+        image.release();
+        result
+    }
     async fn generate(
         &self,
         request: &ModelRequest<'_>,
         text: &mut dyn TextSink,
     ) -> Result<ModelResponse, ModelError> {
+        self.generate_input(request, None, text).await
+    }
+}
+
+impl OpenAiProvider {
+    fn check_visual_destination(&self) -> Result<(), ModelError> {
+        if self.endpoint == "https://api.openai.com/v1/responses" {
+            return Ok(());
+        }
+        #[cfg(test)]
+        if let Ok(url) = reqwest::Url::parse(&self.endpoint)
+            && url.scheme() == "http"
+            && matches!(url.host_str(), Some("127.0.0.1" | "[::1]"))
+        {
+            return Ok(());
+        }
+        Err(ModelError::Provider(
+            "image disclosure destination does not match approved OpenAI endpoint".into(),
+        ))
+    }
+    fn visual_body(
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+    ) -> Result<(Value, ContextSnapshot), ModelError> {
+        if request.model != image.model() || !crate::computer::supported_model(request.model) {
+            return Err(ModelError::Provider(
+                "unverified image model binding".into(),
+            ));
+        }
+        let mut body = Self::body(request)?;
+        let mut snapshot = Self::snapshot(&body, request);
+        let image_item = json!({"role":"user","content":[{"type":"input_text","text":image.frame_text()},
+            {"type":"input_image","detail":"original","image_url":image.data_url().map_err(ModelError::Provider)?}]});
+        // Base64 wire bytes are not text tokens. Keep unchanged text accounting,
+        // add the documented patch estimate separately, and count the real body.
+        let text_bytes = serialized_bytes(
+            &json!({"role":"user","content":[{"type":"input_text","text":image.frame_text()}]}),
+        );
+        body["input"]
+            .as_array_mut()
+            .expect("constructed input")
+            .push(image_item);
+        let total = serialized_bytes(&body);
+        let extra = total - snapshot.serialized_request_bytes;
+        snapshot.serialized_request_bytes = total;
+        snapshot.non_opaque_json_size_token_heuristic += text_bytes.div_ceil(4);
+        snapshot.measurements.push(ContextMeasurement {
+            source: ContextSource::ImageInput,
+            entries: 1,
+            serialized_bytes: extra,
+            contains_opaque_data: true,
+        });
+        Ok((body, snapshot))
+    }
+    async fn generate_input(
+        &self,
+        request: &ModelRequest<'_>,
+        visual: Option<(
+            &crate::computer::VisionInput,
+            &crate::computer::DisclosureGrant,
+            &crate::cancellation::Cancellation,
+        )>,
+        text: &mut dyn TextSink,
+    ) -> Result<ModelResponse, ModelError> {
         let enabled = text.telemetry_enabled();
         let started = enabled.then(Instant::now);
-        let body = Self::body(request)?;
-        let snapshot = Self::snapshot(&body, request);
+        let (body, snapshot) = if let Some((image, _, _)) = visual {
+            Self::visual_body(request, image)?
+        } else {
+            let body = Self::body(request)?;
+            let snapshot = Self::snapshot(&body, request);
+            (body, snapshot)
+        };
         if let Some(start) = started {
             text.telemetry(crate::observability::Telemetry::timing(
                 crate::observability::Phase::Preparation,
@@ -302,6 +400,11 @@ impl ModelProvider for OpenAiProvider {
             first: false,
         };
         let result = async {
+            if let Some((image, grant, cancel)) = visual {
+                grant
+                    .consume(image, request.model, cancel)
+                    .map_err(ModelError::Provider)?;
+            }
             let response = self
                 .client
                 .post(&self.endpoint)
@@ -312,6 +415,12 @@ impl ModelProvider for OpenAiProvider {
                 .await?;
             if !response.status().is_success() {
                 let status = response.status().as_u16();
+                if visual.is_some() {
+                    return Err(ModelError::Http {
+                        status,
+                        message: "visual response rejected; body omitted".into(),
+                    });
+                }
                 let body = response.text().await?;
                 let parsed: Option<Value> = serde_json::from_str(&body).ok();
                 let message = parsed
@@ -336,6 +445,11 @@ impl ModelProvider for OpenAiProvider {
                     .trim()
                     .eq_ignore_ascii_case("text/event-stream")
             {
+                if visual.is_some() {
+                    return Err(ModelError::Protocol(
+                        "visual response content type invalid; body omitted".into(),
+                    ));
+                }
                 let content_type = content_type.to_owned();
                 let body = response.text().await?;
                 if let Ok(value) = serde_json::from_str::<Value>(&body)

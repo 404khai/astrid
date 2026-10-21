@@ -20,9 +20,16 @@ pub(crate) fn machine_id(value: &str) -> Result<String, String> {
 pub(crate) struct ForegroundRemote {
     machine: String,
     client: Arc<DiscoveryClient>,
+    computer_wire: Option<Arc<astrid::computer_wire::ComputerWire>>,
 }
 impl ForegroundRemote {
     pub(crate) fn load(machine: String) -> Result<Self, Error> {
+        Self::load_kind(machine, false)
+    }
+    pub(crate) fn load_computer(machine: String) -> Result<Self, Error> {
+        Self::load_kind(machine, true)
+    }
+    fn load_kind(machine: String, computer: bool) -> Result<Self, Error> {
         if !astrid::instabox::valid_id(&machine) {
             return Err(Error::InvalidId);
         }
@@ -31,6 +38,14 @@ impl ForegroundRemote {
         Ok(Self {
             machine,
             client: Arc::new(DiscoveryClient::new(&key)?),
+            computer_wire: if computer {
+                Some(Arc::new(
+                    astrid::computer_wire::ComputerWire::new(&key)
+                        .map_err(|_| Error::InvalidKey)?,
+                ))
+            } else {
+                None
+            },
         })
     }
 
@@ -39,6 +54,18 @@ impl ForegroundRemote {
         tools: Tools,
         requests: tokio::sync::mpsc::Sender<crate::DecisionRequest>,
     ) -> Result<Tools, Error> {
+        if let Some(wire) = &self.computer_wire {
+            let computer = astrid::computer::Computer::new(
+                format!("local-euid:{}", unsafe { libc::geteuid() }),
+                self.machine.clone(),
+                wire.clone(),
+                Arc::new(astrid::computer_png::DecodeWorker::new(
+                    std::env::current_exe().map_err(|_| Error::Transport)?,
+                )),
+            )
+            .map_err(|_| Error::InvalidExecRequest)?;
+            return Ok(tools.with_computer(computer));
+        }
         Ok(tools.with_instabox(InstaboxTool::new(
             // Host assertion for the invoking local account, never model/user text.
             format!("local-euid:{}", unsafe { libc::geteuid() }),

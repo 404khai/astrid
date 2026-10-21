@@ -86,6 +86,8 @@ impl ToolResult {
             ToolOutcome::Error { .. } | ToolOutcome::TimedOut { .. }
         ) || (self.name == "instabox_exec"
             && matches!(&self.outcome, ToolOutcome::Success { data } if data["successful"] != true))
+            || (matches!(self.name.as_str(), "instabox_observe" | "instabox_action")
+                && matches!(&self.outcome,ToolOutcome::Success{data} if data["successful"] != true))
     }
 }
 
@@ -135,6 +137,27 @@ where
 /// A narrow seam for deterministic tests, not a universal provider abstraction.
 #[async_trait]
 pub trait ModelProvider: Send + Sync {
+    fn measure_visual_request(
+        &self,
+        _request: &ModelRequest<'_>,
+        _image: &crate::computer::VisionInput,
+    ) -> Result<Option<crate::context::ContextSnapshot>, ModelError> {
+        Err(ModelError::Provider(
+            "provider does not support authorized ephemeral image input".into(),
+        ))
+    }
+    async fn generate_visual(
+        &self,
+        _request: &ModelRequest<'_>,
+        _image: &crate::computer::VisionInput,
+        _grant: &crate::computer::DisclosureGrant,
+        _cancel: &crate::cancellation::Cancellation,
+        _text: &mut dyn TextSink,
+    ) -> Result<ModelResponse, ModelError> {
+        Err(ModelError::Provider(
+            "provider does not support authorized ephemeral image input".into(),
+        ))
+    }
     /// Explicit adapter-supported request features for an exact model identifier.
     fn capabilities(&self, _model: &str) -> crate::routing::ModelCapability {
         Default::default()

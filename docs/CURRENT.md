@@ -1,3 +1,44 @@
+# Foreground computer-use integration — 2026-10-21
+
+The maintainer requested actual CU and explicitly accepted [ADR 0024](adr/0024-foreground-computer-use-integration.md)
+option 1. Contract commit `390bddec` precedes implementation on
+`feat/foreground-computer-use`, stacked on open CU-02 PR #25 (`4d10f91f`), same
+preserved checkout, no worktree. No merge or actual live operation is authorized.
+
+The fresh one-shot CLI now installs separately approved observation/action tools
+on an exact invocation-only target. Fixed InstaBox exec/status adapters capture
+PNG24 through bounded stdout pipes, validate/canonically decode in a killable
+helper, and install native receipts only after successful image admission. Typed
+click/type/scroll/key plans retain exact single-use grants, original finite limits,
+experimental five-second freshness and unknown-outcome stop/no retry semantics.
+
+A distinct per-frame approval sends one native image only to the next named
+supported OpenAI model request. Real byte and documented patch-estimate admission
+use unchanged budgets. One frame expires within ten seconds; no image persistence,
+Message variant, replay, saved image grant or private image continuation. Private
+v2 original results/provenance and visible-history semantics remain; traces retain
+metadata only, observability-off unchanged. No image-only actual usage is invented.
+
+**345 Rust passed, 0 failed, 1 existing overhead test ignored; 18 Python passed.**
+Fmt, strict all-target Clippy and whitespace passed. The final focused 14-test
+computer suite revalidated the fixed cache-limited capture plan; three helper
+process tests include actual decode plus cancellation/deadline kill and reap.
+[Review](reviews/foreground-computer-use-2026-10-21.md),
+[evidence](evaluations/foreground-computer-use-2026-10-21.json),
+[milestone](milestones/foreground-computer-use.md),
+[testing/use](guides/foreground-computer-use.md).
+
+The application path is implemented and validated with synthetic images/local
+HTTP and model mocks. Live CU and RE-02 evidence remain pending separate exact
+existing-machine/action/disclosure trial authorization; no target was supplied.
+Real guest tools, model account availability, geometry, latency and UI effects
+remain unverified. Five-second freshness may reject normal use; practical approval
+UX requires separate review. No mobile/Host/workers/background loop, image
+persistence, provisioning, ports, secret transfer or successor work. Stop after
+the integration PR, left unmerged.
+
+---
+
 # Bounded headless desktop actions — 2026-10-21
 
 CU-02 is implemented on `feat/bounded-desktop-actions` from fetched main
