@@ -7,7 +7,10 @@ code, then implement one foreground exact-machine `instabox_exec` tool with mock
 HTTP, validate, commit conventionally and open a conventional-title PR against
 main. Do not merge it. This supersedes RC-03's remote-contract exclusion only for
 this slice. Consequential contract decisions still follow the escalation policy;
-[ADR 0021](docs/adr/0021-remote-target-authority.md) records the concrete proposal.
+[ADR 0021](docs/adr/0021-remote-target-authority.md) is explicitly Accepted by the
+maintainer on 2026-10-21 with atomic single-use grant consumption immediately
+before POST admission, no local OS sandbox claim, and private-only exact-target
+attribution pending any future privacy/schema decision. Proceed with RE-01.
 RC-01/02/03 and cleanup are complete; no further cleanup is needed.
 
 Keep principal/run/call/target/canonical-argument remote grants separate from local

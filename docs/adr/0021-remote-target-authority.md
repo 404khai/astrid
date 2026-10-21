@@ -1,8 +1,10 @@
 # ADR 0021 — Foreground exact-target remote execution authority
 
 Date: 2026-10-21
-Status: Proposed — maintainer decision pending
-Implementation: Contract first; HTTP extraction may proceed independently.
+Status: Accepted — 2026-10-21
+Implementation: Authorized mocked foreground slice, after this contract.
+Decision evidence: Maintainer explicitly accepted ADR 0021 with the clarifications
+below on 2026-10-21, then instructed implementation.
 Related: ADRs 0004, 0008, 0009, 0012, 0016, 0018; RE-01 in
 [the active plan](../plans/remote-mobile-cli.md).
 
@@ -39,11 +41,16 @@ state when the host has not explicitly configured a broker, principal and target
   monotonic expiry. Check binding, expiry and cancellation after approval, before
   metadata GET, and immediately before POST. An expired/changed/denied/cancelled
   request sends no POST; no authenticated metadata request before approval.
-  Consuming a grant never authorizes replay or a second dispatch.
+  Atomically consume the grant immediately before POST admission, following final
+  identity-binding, expiry and cancellation checks. Concurrent attempts cannot
+  both consume it. A consumed grant cannot authorize another attempt after timeout,
+  transport failure, cancellation or uncertain remote outcome; no retry or replay.
 - Every local ask/auto/unbound preset, a resumed session and all read-only scheduler
   workers lack remote authority. The optional foreground broker is explicitly
   installed by the host; workers continue using only native read tools. Existing
-  broad shell account authority is not claimed to be sandboxed by this contract.
+  broad shell authority can independently access installed tools or credentials.
+  This protects Astrid's typed remote-tool boundary, not the local OS account;
+  it is not system-wide prevention of remote execution or a sandbox.
 - Approval displays exact target/command/cwd/timeout and possible auto-wake. The
   sole metadata preflight reads that exact target, validates exact ID and running
   state, and retains no account inventory, names, labels or arbitrary server text.
@@ -66,6 +73,9 @@ state when the host has not explicitly configured a broker, principal and target
   and categorical lifecycle only. Exact target attribution is available in the
   private result/approval, not persisted traces. This preserves ADR 0009's existing
   schema/allowlist without extending stored target-identification semantics.
+  Persistent execution-target attribution may require a separate privacy/schema
+  decision for remote workers, multiple machines or background recovery. Do not
+  implement that migration in RE-01.
 - Optional observability off keeps required approval/cancellation/admission events
   but collects no added telemetry or traces. No session schema change, persisted
   grant, budget increase, worker grant, background job or reconnect semantics.
@@ -85,5 +95,5 @@ API, live model, VM operation, provisioning, lifecycle, transfer, screenshot,
 Host/mobile networking, Phase 9, daemon, PTY or desktop work is authorized.
 
 Cost of changing later: High for authority; Medium for optional adapter API.
-Decision required: Accept this exact ephemeral grant, point-in-time running check
-with disclosed auto-wake race, and private-only exact-target metadata contract?
+Resolution: Accepted with atomic consumption/concurrency, local OS scope and future
+auditability clarifications above. No live machine execution or provisioning grant.
