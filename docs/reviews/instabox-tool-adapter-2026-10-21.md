@@ -124,3 +124,11 @@ connect a foreground CLI approval broker to a user-designated isolated existing
 machine and inspect harmless command attribution, denial, timeout/cancellation
 and the disclosed auto-wake race. Reconfirm the current public API before that
 trial. No trial, provisioning or automatic phase advancement follows from RE-01.
+
+## Publication
+
+Implementation `5ec7fdd6` is published in
+[PR #22](https://github.com/404khai/astrid/pull/22), targeting main and left
+unmerged. Publication documentation changes no tested source hashes. The original
+unrelated `.gitignore`, historical checkpoint modifications, recovery files and
+untracked user assets remain outside the PR.

@@ -124,3 +124,6 @@ reqwest protocol-NACK retries as well as application retries.
 [Evidence](../evaluations/instabox-tool-adapter-2026-10-21.json).
 Stop at this slice and its unmerged PR; propose RE-02 only after separate exact
 live authorization. Normal CLI sessions do not implicitly install a remote broker.
+
+Published implementation `5ec7fdd6` in [PR #22](https://github.com/404khai/astrid/pull/22)
+against main; left unmerged as instructed. No successor implementation started.

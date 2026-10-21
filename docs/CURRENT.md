@@ -29,9 +29,10 @@ still do not implicitly select a target, load an InstaBox key or install a broke
 standalone InstaBox CLI remains supported. No live provider/cloud/VM action or
 credential/private-session content read. No remote workers, computer use, mobile
 networking, Phase 9, daemon, PTY or desktop work. Preserve Meister primary/Astrix
-specialized and Rust harness authority. Open a conventional-title PR against main;
-no merge authorization. Next proposed slice is RE-02's separately authorized exact
-isolated live trial and foreground CLI broker connection; do not start it here.
+specialized and Rust harness authority. Implementation `5ec7fdd6` is published as
+[PR #22](https://github.com/404khai/astrid/pull/22), targeting main and left unmerged.
+Next proposed slice is RE-02's separately authorized exact isolated live trial and
+foreground CLI broker connection; do not start it here.
 
 Unrelated `.gitignore`, historical CURRENT content, user assets and recovery files
 remain preserved and unstaged.
