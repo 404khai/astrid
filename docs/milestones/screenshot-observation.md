@@ -44,3 +44,8 @@ passed. [Review/limits](../reviews/screenshot-observation-2026-10-21.md),
 Only design/fixture exit is satisfied. No runtime tool, transport, production PNG
 decoder, image session persistence or model image input was installed. Full CU-01
 runtime/live acceptance remains pending; no CU-02 work began.
+
+Publication: contract `1579a889` and fixtures `11971bf8` are published in
+[PR #24](https://github.com/404khai/astrid/pull/24) against main, **open and unmerged**.
+No PR was merged by this task. Only the design/fixture slice is delivered;
+runtime/live gates remain pending and CU-02 has not begun.

@@ -52,5 +52,13 @@
     "Exact existing target and separately approved bounded live trial",
     "Separate image persistence/schema/provider disclosure decisions",
     "CU-02 action/coordinate/freshness contracts"
-  ]
+  ],
+  "publication": {
+    "url": "https://github.com/404khai/astrid/pull/24",
+    "base": "main",
+    "state": "OPEN",
+    "merged": false,
+    "contract_commit": "1579a889",
+    "fixture_commit": "11971bf8"
+  }
 }

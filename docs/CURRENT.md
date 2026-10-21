@@ -32,6 +32,11 @@ Next plan item CU-02 remains future; stop here and leave its contracts unresolve
 Unrelated `.gitignore`, historical CURRENT edits and untracked user/recovery data
 remain preserved and outside the task commit.
 
+Publication: contract `1579a889` and fixtures `11971bf8` are published in
+[PR #24](https://github.com/404khai/astrid/pull/24) against main, **open and unmerged**.
+No PR was merged by this task. Only the design/fixture slice is delivered;
+runtime/live gates remain pending and CU-02 has not begun.
+
 ---
 
 # Foreground InstaBox CLI approvals — 2026-10-21

@@ -90,3 +90,8 @@ No authenticated InstaBox/public provider call, live screenshot, cloud operation
 credential/private-session read, model disclosure, merge or installed CLI refresh.
 CU-01 design/fixture slice is validated; full runtime/live observation remains
 pending the explicit gates. RE-02 live trial is independently pending authorization.
+
+Publication: contract `1579a889` and fixtures `11971bf8` are published in
+[PR #24](https://github.com/404khai/astrid/pull/24) against main, **open and unmerged**.
+No PR was merged by this task. Only the design/fixture slice is delivered;
+runtime/live gates remain pending and CU-02 has not begun.
