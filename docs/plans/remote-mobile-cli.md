@@ -43,7 +43,7 @@ trust need their concrete ADR before dependent implementation.
 | RC-03 | RC-01/02 | Bound one multi-tool exchange before further costly work; test many individually legal large outputs, Unicode and latest-exchange overflow | Done; [RC-03 guard/review](../reviews/aggregate-tool-admission-2026-10-21.md) |
 | RE-01 | RC-01/02/03; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Done (mocked); [ADR 0021](../adr/0021-remote-target-authority.md) Accepted with maintainer clarifications; [review](../reviews/instabox-tool-adapter-2026-10-21.md); 302 Rust passed, 0 failed, 1 ignored; no live grant |
 | RE-02 | RE-01 | Explicit foreground CLI target selection and separate per-call approvals; isolated exact-target harmless trial, denial/timeout/cancel and attribution inspected separately | CLI validated (308 Rust passed, 0 failed, 1 ignored; 2 Python passed); [trial plan](../reviews/instabox-cli-approvals-2026-10-21.md); live pending exact target/scope authorization |
-| CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Draft; no desktop action implied |
+| CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Contract accepted with explicit gates; synthetic fixture specification; [milestone](../milestones/screenshot-observation.md), [ADR 0022](../adr/0022-screenshot-observation.md); runtime/live exit pending |
 | CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | Draft; isolated harmless desktop trial after explicit live scope |
 | MO-01 | Existing mobile concept/reference | Shared RN Meister conversation shell, `.ios` SwiftUI adapters and Android components, mock streams/tool/approval states; both exports/typecheck | Draft; no credentials or live Host needed |
 | HO-01 | RC-01/02; authenticated Host ADR | Foreground single-user Host with bounded sessions, runs, event stream, cancellation and one authoritative store owner; synthetic clients | Draft; no daemon or public listener by implication |
@@ -101,6 +101,17 @@ sentinels absent from model inputs, tool outputs and trace JSON. Live tests rema
 separate and cannot create machines or transfer secrets.
 
 ## Computer-use investigation and bounded design
+
+CU-01 update, 2026-10-21: [ADR 0022](../adr/0022-screenshot-observation.md) is
+explicitly accepted with its gates. Its separate observe grant, one ephemeral
+frame, fixed byte/pixel/time/count limits and zero image model context supersede
+the earlier exploratory bounds below for CU-01. [Current public audit](../reviews/screenshot-observation-2026-10-21.md)
+retrieved OpenAPI and SDK 0.5.3 without credentials: status is POST, screenshot
+is an exec/file workflow, and no direct screenshot route exists in that schema.
+Only synthetic fixture specification is implemented. Live transport, production
+decoder, runtime integration, persistence/schema and model disclosure stay gated;
+CU-02 actions are not started. The older research below is historical, not
+implementation authority. RE-02 live validation remains separately pending.
 
 Official [desktop guide](https://instabox.sh/docs/desktop) and
 [integration guide](https://instabox.sh/docs/integrate), inspected 2026-10-18,

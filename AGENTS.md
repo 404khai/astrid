@@ -1,3 +1,24 @@
+# CU-01 screenshot observation authorization — 2026-10-21
+
+Maintainer requested CU-01 on parent-created `feat/screenshot-observation` from
+freshly fetched main, same preserved checkout, no worktree. This supersedes prior
+stop/computer-use exclusions only for screenshot observation design and synthetic
+fixture/mock work. Publish conventional commits and a PR against main; do not merge.
+PRs #22/#23 were already merged upstream; no merge is authorized here.
+
+After the concrete decision question, the maintainer explicitly selected “Accept
+ADR 0022 with its gates”. [ADR 0022](docs/adr/0022-screenshot-observation.md) accepts
+separate single-use observe authority, memory-only one-frame/10 s retention and
+zero model image disclosure. Live transport, production decoder, runtime integration,
+image persistence and provider/schema changes remain gated. No authenticated metadata,
+live screenshot, inference/cloud/VM action, machine lifecycle/ports/secrets transfer,
+CU-02 action loop, workers, Host/mobile networking, Phase 9, daemon, PTY or desktop
+client implementation. Never read credentials/private sessions or infer a target.
+RE-02 live validation remains independently pending exact target/scope approval.
+Preserve ADRs 0008/0009/0021, private v2/provenance/continuation, complete exchanges,
+original results, cancellation, context admission and all unrelated checkout data.
+Stop after this slice and its unmerged PR; report next item without starting it.
+
 # RE-02 foreground CLI preparation authorization — 2026-10-21
 
 Maintainer requested “new thread, new branch RE-02 — Foreground CLI connection
