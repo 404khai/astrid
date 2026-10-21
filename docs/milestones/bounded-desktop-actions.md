@@ -24,3 +24,8 @@ remote workers, Host/mobile networking, Phase 9, daemon, PTY or desktop client.
 
 Stop after this slice and its unmerged PR. The next plan item MO-01 is future work;
 do not begin it or declare the unresolved runtime/live gates satisfied.
+
+Publication checkpoint: [draft PR #25](https://github.com/404khai/astrid/pull/25)
+contains the reviewable design, targets main and is open/unmerged. ADR 0023's
+explicit decision and dependent implementation remain pending; this is not the
+completed CU-02 implementation PR.

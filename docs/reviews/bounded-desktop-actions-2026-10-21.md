@@ -87,3 +87,8 @@ Baseline `cargo test --locked --offline -- --test-threads=1`: **308 passed,
 controller or live evidence. Scoped whitespace and 50 local Markdown links pass.
 No dependent action controller implementation exists while ADR 0023 is Proposed.
 The authorization decision is pending; no acceptance is inferred from elapsed time.
+
+Publication checkpoint: [draft PR #25](https://github.com/404khai/astrid/pull/25)
+contains the reviewable design, targets main and is open/unmerged. ADR 0023's
+explicit decision and dependent implementation remain pending; this is not the
+completed CU-02 implementation PR.

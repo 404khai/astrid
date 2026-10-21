@@ -21,6 +21,11 @@ cancellation and ADRs 0008/0009/0021/0022 remain preserved. Unrelated dirty file
 historical CURRENT content and user/recovery assets remain excluded from commits.
 CU-02 is not complete. No MO-01 work is started.
 
+Publication checkpoint: [draft PR #25](https://github.com/404khai/astrid/pull/25)
+contains the reviewable design, targets main and is open/unmerged. ADR 0023's
+explicit decision and dependent implementation remain pending; this is not the
+completed CU-02 implementation PR.
+
 ---
 
 # Screenshot observation contract and fixtures — 2026-10-21
