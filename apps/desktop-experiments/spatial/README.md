@@ -12,13 +12,17 @@ Requires Rust (tested 1.96), full Xcode + macOS SDK and Metal toolchain. The exa
 GPUI release and transitive dependencies are pinned in Cargo.toml/Cargo.lock.
 Builds independently of the root crate. No Windows/Linux support is claimed.
 
+- Opens on bot home. Swipe horizontally or use Left/Right to switch the five mock bots.
+- Native sidebar button or `⌘B`: collapse/restore navigation. Bottom sidebar avatars select bots.
+- Native view control: folders / bot home. Browse spaces also opens folders; Spatial canvas opens movable cards.
+- Folder view: hover a tab to lift its folder; click to open its session. Left/Right selects, Return opens.
 - Drag blank canvas / two-finger scroll: pan. Drag a card header: move that card.
 - Pinch inward: see more; spread outward: zoom in. Native trackpad path still
   needs physical-device acceptance. ⌘ or Ctrl + scroll: pointer-centered zoom. `+` / `−`: center zoom.
 - Click a space or Focus: bring forward and frame it. Swipe horizontally or use
   Left/Right in focus to browse sessions. Return to Overview to move card headers.
 - `Tab` / `Shift-Tab`: cycle sessions; `Enter`: expand/collapse; `P`: pin/unpin.
-- `0`: fit all; `1`: home view; arrow keys: pan.
+- `0`: fit all; `1`: bot home; arrow keys in the canvas: pan.
 - `⌘K`: session search; `⌘⇧K` or `⌘P`: commands; arrows / Enter to choose.
 - `Escape`: close overlay, stop motion/drag, or leave composer.
 - `⌘R`: reset layout; `⌘Z`: recover previous layout. Pinning does not block an
@@ -51,3 +55,5 @@ full IME/focus acceptance, custom-card screen-reader support and pending manual
 interaction/resize QA. The glass redesign needs a fresh performance measurement.
 See the [current checkpoint](../../../docs/experiments/spatial-glass-redesign.md).
 Close the previous prototype window before relaunching a rebuilt bundle.
+
+See the [home and folder checkpoint](../../../docs/experiments/spatial-home-folders.md) for this follow-up and remaining device QA.

@@ -1,6 +1,9 @@
 mod art;
 mod fixtures;
+mod home;
+mod home_ui;
 mod icons;
+use home::{BOTS, View};
 mod magnify;
 mod model;
 mod native_chrome;
@@ -19,6 +22,9 @@ const EDGE: f32 = 0.;
 enum Command {
     Search,
     Palette,
+    Folders,
+    Sidebar,
+    Bot(usize),
     Overview,
     Home,
     Reset,
@@ -48,6 +54,14 @@ struct Metrics {
     benchmark: bool,
 }
 struct Spatial {
+    screen: View,
+    sidebar: bool,
+    bot: usize,
+    swipe: home::Swipe,
+    swipe_last: Option<Instant>,
+    folder_hover: Option<usize>,
+    folder_lifts: [f32; 5],
+    folder_tick: Instant,
     layout: Layout,
     chrome: Option<std::rc::Rc<native_chrome::NativeChrome>>,
     sessions: Vec<Session>,
@@ -99,6 +113,14 @@ impl Spatial {
         let mut layout = Layout::default();
         layout.camera.set_limits(0.3, 1.65);
         Self {
+            screen: View::Home,
+            sidebar: true,
+            bot: 0,
+            swipe: home::Swipe::default(),
+            swipe_last: None,
+            folder_hover: None,
+            folder_lifts: [0.; 5],
+            folder_tick: Instant::now(),
             layout,
             chrome: None,
             sessions: MockSource.sessions(),
@@ -163,6 +185,7 @@ impl Spatial {
         }
     }
     fn focus_session(&mut self, id: usize, animated: bool) {
+        self.screen = View::Canvas;
         self.sample_motion();
         let from = if self.focused_space.is_some() {
             self.carousel
@@ -195,6 +218,17 @@ impl Spatial {
     fn run(&mut self, cmd: Command, animated: bool, cx: &mut Context<Self>) {
         self.gesture = None;
         match cmd {
+            Command::Sidebar => {
+                self.sidebar = !self.sidebar;
+            }
+            Command::Bot(id) => {
+                self.bot = id % BOTS.len();
+                self.screen = View::Home;
+            }
+            Command::Folders => {
+                self.screen = View::Folders;
+                self.focused_space = None;
+            }
             Command::Search | Command::Palette => {
                 self.palette = !self.palette;
                 self.commands = matches!(cmd, Command::Palette);
@@ -204,12 +238,14 @@ impl Spatial {
                 self.artifact = None;
             }
             Command::Overview => {
+                self.screen = View::Canvas;
                 self.focused_space = None;
                 let mut target = self.layout.overview(self.viewport - v(40., 180.));
                 target.pan = target.pan + v(20., 80.);
                 self.go(target, animated);
             }
             Command::Home => {
+                self.screen = View::Home;
                 self.focused_space = None;
                 self.go(Camera::default(), animated);
             }
@@ -234,6 +270,7 @@ impl Spatial {
                 self.composing = false;
             }
             Command::Reset => {
+                self.screen = View::Canvas;
                 self.transition = None;
                 self.focused_space = None;
                 self.undo = Some(self.layout.reset());
@@ -266,8 +303,8 @@ impl Spatial {
                         self.notes.remove(0);
                     }
                     self.draft.clear();
-                    self.status = "Mock note added to Meister · No message was sent".into();
-                    self.focus_session(0, animated);
+                    self.status = "Mock note added locally · No message was sent".into();
+                    self.focus_session(self.bot, animated);
                 }
             }
             Command::Zoom(f) => {
@@ -276,6 +313,7 @@ impl Spatial {
                 self.layout.camera.zoom_at(self.viewport * 0.5, f);
             }
             Command::Empty => {
+                self.screen = View::Canvas;
                 self.focused_space = None;
                 self.undo = Some(self.layout.clone());
                 self.layout.cards.clear();
@@ -283,6 +321,7 @@ impl Spatial {
                 self.status = "Empty layout fixture · Reset or Undo to recover".into();
             }
             Command::Dense => {
+                self.screen = View::Canvas;
                 self.undo = Some(self.layout.clone());
                 for (i, c) in self.layout.cards.iter_mut().enumerate() {
                     c.pos = v(220. + i as f32 * 48., 100. + i as f32 * 52.);
@@ -368,7 +407,9 @@ impl Spatial {
         if self.commands {
             vec![
                 ("Overview · Fit all sessions", Command::Overview),
-                ("Reset view · 100% home", Command::Home),
+                ("Bot home", Command::Home),
+                ("Folder overview", Command::Folders),
+                ("Toggle sidebar", Command::Sidebar),
                 ("Reset layout · Recover with Undo", Command::Reset),
                 ("Undo layout reset", Command::Undo),
                 ("Toggle reduced motion", Command::Motion),
@@ -392,6 +433,26 @@ impl Spatial {
         let cmd = k.modifiers.platform;
         if cmd && k.key == "q" {
             cx.quit();
+            return;
+        }
+        if cmd && k.key == "b" {
+            self.run(Command::Sidebar, false, cx);
+            return;
+        }
+        if !self.palette
+            && !self.composing
+            && self.screen != View::Canvas
+            && (k.key == "left" || k.key == "right")
+        {
+            self.bot = home::adjacent(self.bot, k.key == "left");
+            if self.screen == View::Folders {
+                self.folder_hover = Some(self.bot);
+            }
+            cx.notify();
+            return;
+        }
+        if !self.palette && self.screen == View::Folders && k.key == "enter" {
+            self.run(Command::Focus(self.bot), false, cx);
             return;
         }
         if cmd && (k.key == "k" || k.key == "p") {
@@ -562,6 +623,9 @@ impl Spatial {
                 MouseButton::Left,
                 cx.listener(move |this, e: &MouseDownEvent, _, cx| {
                     cx.stop_propagation();
+                    if this.screen != View::Canvas {
+                        return;
+                    }
                     this.sample_motion();
                     this.transition = None;
                     this.layout.focus(id);
@@ -1016,6 +1080,8 @@ impl Render for Spatial {
         }
         if self.metrics.benchmark && self.metrics.frames < 240 {
             if self.metrics.frames == 0 {
+                self.screen = View::Canvas;
+                self.sidebar = false;
                 self.layout.camera = self.layout.overview(self.viewport);
             }
             let t = self.metrics.frames as f32 / 240.;
@@ -1050,6 +1116,9 @@ impl Render for Spatial {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, e: &MouseDownEvent, _, cx| {
+                    if this.screen != View::Canvas {
+                        return;
+                    }
                     this.sample_motion();
                     this.transition = None;
                     this.composing = false;
@@ -1066,12 +1135,91 @@ impl Render for Spatial {
                     cx.notify();
                 }),
             )
+            .child(
+                img(art::scene())
+                    .absolute()
+                    .size_full()
+                    .object_fit(ObjectFit::Cover),
+            )
+            .children(
+                self.layout
+                    .cards
+                    .iter()
+                    .filter(|_| self.screen == View::Canvas)
+                    .map(|c| self.card(c, cx)),
+            );
+        if self.screen == View::Canvas && self.layout.cards.is_empty() {
+            viewport = viewport.child(
+                div()
+                    .absolute()
+                    .left(px((self.viewport.x - 330.) / 2.))
+                    .top(px(self.viewport.y / 2. - 70.))
+                    .w(px(330.))
+                    .child(label("A little room for something new.", 22., INK))
+                    .child(label("This is the empty layout fixture.", 13., MUTED).my_3())
+                    .child(self.button(
+                        "restore-empty",
+                        "Restore mock sessions ↗",
+                        Command::Reset,
+                        cx,
+                    )),
+            );
+        }
+        if self.screen == View::Canvas && self.focused_space.is_none() {
+            viewport = viewport.child(self.minimap(cx));
+        }
+        if self.screen == View::Canvas {
+            viewport = viewport.child(
+                div()
+                    .absolute()
+                    .left_5()
+                    .bottom(px(26.))
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .rounded_xl()
+                    .bg(rgba(0x07131bb0))
+                    .child(self.button("zoom-out", "−", Command::Zoom(1. / 1.15), cx))
+                    .child(
+                        label(format!("{:03.0}%", camera.zoom() * 100.), 11., INK)
+                            .w(px(38.))
+                            .text_center(),
+                    )
+                    .child(self.button("zoom-in", "+", Command::Zoom(1.15), cx))
+                    .child(self.button("fit", "Fit all  0", Command::Overview, cx)),
+            );
+        }
+        let mut root = div()
+            .id("spatial-root")
+            .track_focus(&self.focus)
+            .size_full()
+            .bg(rgb(0x101923))
+            .font_family("Helvetica Neue")
+            .on_key_down(cx.listener(Self::key))
             .on_scroll_wheel(cx.listener(|this, e: &ScrollWheelEvent, _, cx| {
                 if this.gesture.is_some() {
                     return;
                 }
-                this.sample_motion();
                 let d = pv(e.delta.pixel_delta(px(24.)));
+                if this.screen != View::Canvas {
+                    if matches!(e.touch_phase, TouchPhase::Started)
+                        || this
+                            .swipe_last
+                            .is_none_or(|last| last.elapsed().as_millis() > 240)
+                    {
+                        this.swipe.reset();
+                    }
+                    this.swipe_last = Some(Instant::now());
+                    if let Some(backwards) = this.swipe.push(d.x, d.y) {
+                        this.bot = home::adjacent(this.bot, backwards);
+                        if this.screen == View::Folders {
+                            this.folder_hover = Some(this.bot);
+                        }
+                        cx.notify();
+                    }
+                    return;
+                }
+                this.sample_motion();
                 if e.modifiers.platform || e.modifiers.control {
                     this.transition = None;
                     this.focused_space = None;
@@ -1101,59 +1249,6 @@ impl Render for Spatial {
                 }
                 cx.notify();
             }))
-            .child(
-                img(art::scene())
-                    .absolute()
-                    .size_full()
-                    .object_fit(ObjectFit::Cover),
-            )
-            .children(self.layout.cards.iter().map(|c| self.card(c, cx)));
-        if self.layout.cards.is_empty() {
-            viewport = viewport.child(
-                div()
-                    .absolute()
-                    .left(px((self.viewport.x - 330.) / 2.))
-                    .top(px(self.viewport.y / 2. - 70.))
-                    .w(px(330.))
-                    .child(label("A little room for something new.", 22., INK))
-                    .child(label("This is the empty layout fixture.", 13., MUTED).my_3())
-                    .child(self.button(
-                        "restore-empty",
-                        "Restore mock sessions ↗",
-                        Command::Reset,
-                        cx,
-                    )),
-            );
-        }
-        if self.focused_space.is_none() {
-            viewport = viewport.child(self.minimap(cx));
-        }
-        viewport = viewport.child(
-            div()
-                .absolute()
-                .left_5()
-                .bottom(px(26.))
-                .flex()
-                .items_center()
-                .gap_1()
-                .rounded_xl()
-                .bg(rgba(0x07131bb0))
-                .child(self.button("zoom-out", "−", Command::Zoom(1. / 1.15), cx))
-                .child(
-                    label(format!("{:03.0}%", camera.zoom() * 100.), 11., INK)
-                        .w(px(38.))
-                        .text_center(),
-                )
-                .child(self.button("zoom-in", "+", Command::Zoom(1.15), cx))
-                .child(self.button("fit", "Fit all  0", Command::Overview, cx)),
-        );
-        let mut root = div()
-            .id("spatial-root")
-            .track_focus(&self.focus)
-            .size_full()
-            .bg(rgb(0x101923))
-            .font_family("Helvetica Neue")
-            .on_key_down(cx.listener(Self::key))
             .on_mouse_move(cx.listener(|this, e: &MouseMoveEvent, _, cx| {
                 if let Some(g) = this.gesture {
                     if e.pressed_button == Some(MouseButton::Left) {
@@ -1192,52 +1287,46 @@ impl Render for Spatial {
             )
             .child(viewport)
             .child(
-                img(art::logo())
+                label("ASTRID  /  MOCK", 10., 0xa2b7c6)
                     .absolute()
-                    .left(px(176.))
-                    .top(px(22.))
-                    .size(px(36.)),
-            )
-            .child(
-                label("MOCK WORKSPACE", 9., 0x92a9b6)
-                    .absolute()
-                    .left(px(224.))
-                    .top(px(35.)),
-            )
-            .child(
-                div()
-                    .absolute()
-                    .left(px(width * 0.5 - 104.))
-                    .top(px(66.))
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .rounded_full()
-                    .px_3()
-                    .py_1()
-                    .bg(rgba(0x661140da))
-                    .child(label("•••  Researching · demo", 11., 0xffabd6))
-                    .child(avatar(3, 0.6))
-                    .child(avatar(0, 0.6)),
+                    .left(px(if self.sidebar { 300. } else { 180. }))
+                    .top(px(34.)),
             );
+        if self.screen == View::Home {
+            root = root.child(self.home_surface(width, height, cx));
+        }
+        if self.screen == View::Folders {
+            root = root.child(self.folder_surface(width, height, window, cx));
+        }
+        if self.sidebar {
+            root = root.child(self.sidebar_surface(height, cx));
+        }
         if let Some(chrome) = &self.chrome {
             chrome.sync_overlay(self.palette, self.artifact.is_some());
-            chrome.sync_focus(self.focused_space.is_some());
-            let composer_width = (width - 180.).min(700.);
+            chrome.sync_focus(self.screen == View::Home);
+            let inset = if self.sidebar { 280. } else { 0. };
+            let content_width = width - inset;
+            let composer_width = (content_width - 140.).clamp(300., 700.);
+            let composer_left = inset + (content_width - composer_width) * 0.5;
+            let composer_bottom = if self.screen == View::Home {
+                height * 0.36 - 58.
+            } else {
+                32.
+            };
             root = root
                 .child(
                     native_chrome::host(chrome.clone(), native_chrome::Island::Composer)
                         .absolute()
-                        .left(px((width - composer_width) * 0.5))
-                        .bottom(px(32.))
+                        .left(px(composer_left))
+                        .bottom(px(composer_bottom))
                         .w(px(composer_width))
                         .h(px(58.)),
                 )
                 .child(
                     native_chrome::host(chrome.clone(), native_chrome::Island::Add)
                         .absolute()
-                        .left(px((width - composer_width) * 0.5 - 58.))
-                        .bottom(px(36.))
+                        .left(px(composer_left - 58.))
+                        .bottom(px(composer_bottom + 4.))
                         .size(px(48.)),
                 )
                 .child(
@@ -1251,8 +1340,12 @@ impl Render for Spatial {
                 .child(
                     native_chrome::host(chrome.clone(), native_chrome::Island::Search)
                         .absolute()
-                        .left(px(width * 0.5 + 132.))
-                        .top(px(69.))
+                        .left(px(if self.sidebar {
+                            222.
+                        } else {
+                            width * 0.5 + 132.
+                        }))
+                        .top(px(if self.sidebar { 88. } else { 18. }))
                         .size(px(42.)),
                 )
                 .child(
@@ -1265,7 +1358,7 @@ impl Render for Spatial {
                 .child(
                     native_chrome::host(chrome.clone(), native_chrome::Island::Sidebar)
                         .absolute()
-                        .left(px(114.))
+                        .left(px(if self.sidebar { 222. } else { 114. }))
                         .top(px(18.))
                         .size(px(44.)),
                 );
@@ -1350,14 +1443,17 @@ fn main() {
                                     view.update(cx, |this, cx| {
                                         window.focus(&this.focus);
                                         match action {
+                                            native_chrome::NativeAction::Sidebar => {
+                                                this.run(Command::Sidebar, false, cx)
+                                            }
                                             native_chrome::NativeAction::Search => {
                                                 this.run(Command::Search, false, cx)
                                             }
                                             native_chrome::NativeAction::FocusPrimary => {
-                                                this.run(Command::Focus(0), true, cx)
+                                                this.run(Command::Home, true, cx)
                                             }
                                             native_chrome::NativeAction::Overview => {
-                                                this.run(Command::Overview, true, cx)
+                                                this.run(Command::Folders, true, cx)
                                             }
                                             native_chrome::NativeAction::Palette => {
                                                 this.run(Command::Palette, false, cx)
@@ -1415,6 +1511,9 @@ fn main() {
                                             && this.artifact.is_none()
                                             && this.gesture.is_none()
                                         {
+                                            if this.screen != View::Canvas {
+                                                this.screen = View::Canvas;
+                                            }
                                             this.sample_motion();
                                             this.transition = None;
                                             this.focused_space = None;

@@ -24,6 +24,7 @@ use std::{
 #[derive(Clone, Debug)]
 pub enum NativeAction {
     Search,
+    Sidebar,
     Overview,
     FocusPrimary,
     Palette,
@@ -61,7 +62,7 @@ extern "C" fn action(target: &Object, _: Sel, sender: id) {
             };
             let event = match tag {
                 0 => NativeAction::Search,
-                1 => NativeAction::Overview,
+                1 => NativeAction::Sidebar,
                 2 => NativeAction::Palette,
                 5 => NativeAction::Accept,
                 4 => {
@@ -271,7 +272,7 @@ impl NativeChrome {
                     let _: () = msg_send![control,setTag:4isize];
                     let _: () = msg_send![control,setTarget:target];
                     let _: () = msg_send![control,setAction:sel!(perform:)];
-                    let title = ns("Overview or Meister focus");
+                    let title = ns("Folder overview or bot home");
                     let _: () = msg_send![control,setAccessibilityLabel:title];
                     let _: () = msg_send![title, release];
                     let _: () = msg_send![content,addSubview:control];
@@ -281,7 +282,7 @@ impl NativeChrome {
                         2 => (0, "Search01", "Find a mock session"),
                         3 => (2, "Settings01", "Workspace commands"),
                         5 => (2, "Add01", "Mock workspace commands"),
-                        _ => (1, "SidebarLeft", "Overview"),
+                        _ => (1, "SidebarLeft", "Toggle sidebar"),
                     };
                     controls.push(button(content, target, tag, icon, title, cx)?);
                 }
