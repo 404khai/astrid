@@ -153,3 +153,8 @@ secure transport and authentication. Replace `SessionSource` with a scoped adapt
 only after that decision; do not treat this visual state as authoritative runtime
 state or invent a universal protocol from fixtures. Production accessibility/text
 input and consistent measured frame pacing also need work. No Host work started.
+
+## Native glass redesign follow-up
+
+The subsequent maintainer request supersedes the visual treatment and basic
+input limitations above. See [native glass redesign and current checkpoint](spatial-glass-redesign.md).

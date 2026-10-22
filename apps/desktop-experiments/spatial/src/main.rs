@@ -1,7 +1,9 @@
+mod art;
 mod fixtures;
 mod icons;
 mod magnify;
 mod model;
+mod native_chrome;
 use fixtures::{MockSource, Session, SessionSource, search};
 use gpui::{prelude::*, *};
 use model::{Camera, Gesture, Layout, V, move_selection, v};
@@ -47,6 +49,7 @@ struct Metrics {
 }
 struct Spatial {
     layout: Layout,
+    chrome: Option<std::rc::Rc<native_chrome::NativeChrome>>,
     sessions: Vec<Session>,
     gesture: Option<Gesture>,
     focus: FocusHandle,
@@ -80,30 +83,11 @@ fn label(text: impl Into<SharedString>, font: f32, color: u32) -> Div {
         .text_color(rgb(color))
         .child(text.into())
 }
-fn avatar(color: u32, s: f32) -> Div {
-    div()
-        .w(px(34. * s))
-        .h(px(32. * s))
-        .rounded(px(12. * s))
-        .bg(rgb(color))
-        .flex()
-        .items_center()
-        .justify_center()
-        .gap(px(5. * s))
-        .child(
-            div()
-                .w(px(3.5 * s))
-                .h(px(9. * s))
-                .rounded_full()
-                .bg(rgb(0x061217)),
-        )
-        .child(
-            div()
-                .w(px(3.5 * s))
-                .h(px(9. * s))
-                .rounded_full()
-                .bg(rgb(0x061217)),
-        )
+fn avatar(id: usize, s: f32) -> impl IntoElement {
+    img(art::avatar(id))
+        .w(px(40. * s))
+        .h(px(40. * s))
+        .object_fit(ObjectFit::Contain)
 }
 impl Spatial {
     fn new(cx: &mut Context<Self>) -> Self {
@@ -116,6 +100,7 @@ impl Spatial {
         layout.camera.set_limits(0.3, 1.65);
         Self {
             layout,
+            chrome: None,
             sessions: MockSource.sessions(),
             gesture: None,
             focus: cx.focus_handle(),
@@ -265,6 +250,9 @@ impl Spatial {
             }
             Command::Motion => {
                 self.reduced = !self.reduced;
+                if let Some(chrome) = &self.chrome {
+                    chrome.set_reduced_motion(self.reduced);
+                }
                 self.transition = None;
                 self.status = format!(
                     "Reduced motion {} · Presentation setting only",
@@ -279,7 +267,7 @@ impl Spatial {
                     }
                     self.draft.clear();
                     self.status = "Mock note added to Meister · No message was sent".into();
-                    self.layout.focus(0);
+                    self.focus_session(0, animated);
                 }
             }
             Command::Zoom(f) => {
@@ -420,6 +408,9 @@ impl Spatial {
         }
         if k.key == "escape" {
             self.palette = false;
+            if let Some(chrome) = &self.chrome {
+                chrome.focus_canvas();
+            }
             self.artifact = None;
             self.composing = false;
             self.gesture = None;
@@ -518,7 +509,7 @@ impl Spatial {
         let z = self.layout.camera.zoom();
         let p = if self.focused_space.is_some() {
             v(
-                self.viewport.x * 0.5 + (c.id as f32 - self.carousel) * (420. * z + 32.)
+                self.viewport.x * 0.5 + (c.id as f32 - self.carousel) * (380. * z + 40.)
                     - c.size().x * z * 0.5,
                 90. + ((self.viewport.y - 205. - c.size().y * z) * 0.5).max(0.),
             )
@@ -527,7 +518,7 @@ impl Spatial {
         };
         let sz = c.size() * z;
         let selected = self.layout.selected == Some(c.id);
-        let summary = z < 0.72;
+        let summary = self.focused_space.is_none() && z < 1.05;
         let mut card = div()
             .id(("session", c.id))
             .absolute()
@@ -535,10 +526,10 @@ impl Spatial {
             .top(px(p.y))
             .w(px(sz.x))
             .h(px(sz.y))
-            .rounded(px(38. * z.max(0.8)))
-            .bg(rgb(0x080f14))
+            .rounded(px(30. * z.max(0.8)))
+            .bg(rgb(0x04090c))
             .border_1()
-            .border_color(rgb(if selected { 0x4b777c } else { 0x25343f }))
+            .border_color(rgb(if selected { 0x547078 } else { 0x17282f }))
             .shadow_lg()
             .overflow_hidden()
             .flex()
@@ -576,6 +567,9 @@ impl Spatial {
                     this.layout.focus(id);
                     this.drag_moved = false;
                     this.composing = false;
+                    if let Some(chrome) = &this.chrome {
+                        chrome.focus_canvas();
+                    }
                     if this.focused_space.is_some() {
                         this.focus_session(id, true);
                         cx.notify();
@@ -595,7 +589,7 @@ impl Spatial {
                     cx.notify();
                 }),
             )
-            .child(avatar(session.color, if summary { 0.85 } else { z }))
+            .child(avatar(session.id, if summary { 0.85 } else { z }))
             .child(
                 div()
                     .flex_1()
@@ -621,16 +615,36 @@ impl Spatial {
             });
         card = card.child(header);
         if summary {
-            card = card.child(
-                div()
-                    .px(px(16.))
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(label(session.status, 11., session.color))
-                    .child(label(session.summary, 12., INK).line_clamp(2))
-                    .child(label("MOCK SESSION", 9., MUTED)),
-            );
+            let mut body = div()
+                .px(px(20. * z))
+                .pb(px(20. * z))
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap(px(12. * z))
+                .child(label(
+                    format!("•••  {} · mock", session.status),
+                    10.,
+                    session.color,
+                ));
+            if id == 2 && z >= 0.62 {
+                body = body.child(
+                    div()
+                        .flex_1()
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .child(self.reader_preview(z)),
+                );
+            } else {
+                body = body.child(div().flex_1());
+            }
+            body = body
+                .child(
+                    label(session.summary, 14., 0xb3c1cb).line_clamp(if z < 0.55 { 1 } else { 2 }),
+                )
+                .child(label(session.identity, 10., MUTED).truncate());
+            card = card.child(body);
         } else {
             let mut body = div()
                 .id(("body", id))
@@ -722,7 +736,71 @@ impl Spatial {
                     ),
             );
         }
-        card.into_any_element()
+        if id == 2 && self.focused_space.is_none() {
+            div()
+                .absolute()
+                .left(px(p.x))
+                .top(px(p.y))
+                .w(px(sz.x))
+                .h(px(sz.y))
+                .child(
+                    div()
+                        .absolute()
+                        .left(px(-18.))
+                        .top(px(36.))
+                        .w(px(sz.x))
+                        .h(px(sz.y))
+                        .rounded(px(30.))
+                        .bg(rgba(0x030a0ee8))
+                        .border_1()
+                        .border_color(rgb(0x1d3039)),
+                )
+                .child(card.left(px(0.)).top(px(0.)))
+                .into_any_element()
+        } else {
+            card.into_any_element()
+        }
+    }
+    fn reader_preview(&self, z: f32) -> impl IntoElement {
+        div()
+            .w(px(154. * z))
+            .h(px(285. * z))
+            .rounded(px(22. * z))
+            .border_2()
+            .border_color(rgb(0x60717b))
+            .bg(rgb(0x0b1119))
+            .p(px(6. * z))
+            .flex()
+            .flex_col()
+            .gap(px(7. * z))
+            .child(
+                div()
+                    .w(px(58. * z))
+                    .h(px(8. * z))
+                    .rounded_full()
+                    .bg(rgb(0x010407))
+                    .mx_auto(),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .relative()
+                    .rounded(px(15. * z))
+                    .overflow_hidden()
+                    .child(img(art::scene()).size_full().object_fit(ObjectFit::Cover))
+                    .child(
+                        label("THE QUIET HOURS", 12. * z, INK)
+                            .absolute()
+                            .left(px(10. * z))
+                            .bottom(px(20. * z)),
+                    ),
+            )
+            .child(label("Continue reading", 10. * z, INK).px(px(7. * z)))
+            .child(
+                label("Mock reader preview", 8. * z, MUTED)
+                    .px(px(7. * z))
+                    .pb(px(7. * z)),
+            )
     }
     fn minimap(&self, cx: &Context<Self>) -> impl IntoElement {
         let camera = self.layout.camera;
@@ -853,15 +931,14 @@ impl Spatial {
                         .border_1()
                         .border_color(rgb(0x547b8c))
                         .p_3()
-                        .child(label(
-                            if self.query.is_empty() {
-                                "Type to search…".into()
-                            } else {
-                                format!("{}│", self.query)
-                            },
-                            15.,
-                            if self.query.is_empty() { MUTED } else { INK },
-                        )),
+                        .child(if let Some(chrome) = &self.chrome {
+                            native_chrome::host(chrome.clone(), native_chrome::Island::PaletteInput)
+                                .w_full()
+                                .h(px(24.))
+                                .into_any_element()
+                        } else {
+                            label(self.query.clone(), 15., INK).into_any_element()
+                        }),
                 )
                 .child(
                     label("↑ ↓ to navigate   ↵ to open   ⌘⇧K for commands", 10., MUTED)
@@ -936,9 +1013,6 @@ impl Render for Spatial {
         self.viewport = v((width - EDGE * 2.).max(1.), (height - TOP).max(1.));
         if self.first_render {
             self.first_render = false;
-            let mut target = self.layout.overview(self.viewport - v(40., 180.));
-            target.pan = target.pan + v(20., 80.);
-            self.layout.camera = target;
         }
         if self.metrics.benchmark && self.metrics.frames < 240 {
             if self.metrics.frames == 0 {
@@ -970,7 +1044,7 @@ impl Render for Spatial {
             .rounded(px(42.))
             .border_1()
             .border_color(rgb(0x263b4a))
-            .bg(rgb(0x081b27))
+            .bg(rgb(0x071621))
             .overflow_hidden()
             .cursor_grab()
             .on_mouse_down(
@@ -982,6 +1056,9 @@ impl Render for Spatial {
                     this.drag_moved = false;
                     this.layout.selected = None;
                     this.focused_space = None;
+                    if let Some(chrome) = &this.chrome {
+                        chrome.focus_canvas();
+                    }
                     this.gesture = Some(Gesture::Pan {
                         start: this.local(e.position),
                         camera: this.layout.camera,
@@ -1025,38 +1102,11 @@ impl Render for Spatial {
                 cx.notify();
             }))
             .child(
-                canvas(
-                    |_, _, _| (),
-                    move |bounds, _, window, _| {
-                        let step = (52. * camera.zoom()).max(24.);
-                        let pan = camera.pan;
-                        let start_x = pan.x.rem_euclid(step);
-                        let start_y = pan.y.rem_euclid(step);
-                        let width: f32 = bounds.size.width.into();
-                        let height: f32 = bounds.size.height.into();
-                        for ix in 0..(width / step).ceil() as usize {
-                            for iy in 0..(height / step).ceil() as usize {
-                                let p = bounds.origin
-                                    + point(
-                                        px(start_x + ix as f32 * step),
-                                        px(start_y + iy as f32 * step),
-                                    );
-                                window.paint_quad(fill(
-                                    Bounds::new(p, size(px(1.), px(1.))),
-                                    rgb(0x24404c),
-                                ));
-                            }
-                        }
-                    },
-                )
-                .absolute()
-                .size_full(),
+                img(art::scene())
+                    .absolute()
+                    .size_full()
+                    .object_fit(ObjectFit::Cover),
             )
-            .child(div().absolute().left_6().top(px(82.)).child(label(
-                "YOUR WORK, WITH ROOM TO THINK",
-                10.,
-                0x65828e,
-            )))
             .children(self.layout.cards.iter().map(|c| self.card(c, cx)));
         if self.layout.cards.is_empty() {
             viewport = viewport.child(
@@ -1075,16 +1125,19 @@ impl Render for Spatial {
                     )),
             );
         }
-        viewport = viewport.child(self.minimap(cx)).child(
+        if self.focused_space.is_none() {
+            viewport = viewport.child(self.minimap(cx));
+        }
+        viewport = viewport.child(
             div()
                 .absolute()
                 .left_5()
-                .bottom_4()
+                .bottom(px(26.))
                 .flex()
                 .items_center()
                 .gap_1()
                 .rounded_xl()
-                .bg(rgb(0x101f2b))
+                .bg(rgba(0x07131bb0))
                 .child(self.button("zoom-out", "−", Command::Zoom(1. / 1.15), cx))
                 .child(
                     label(format!("{:03.0}%", camera.zoom() * 100.), 11., INK)
@@ -1094,47 +1147,6 @@ impl Render for Spatial {
                 .child(self.button("zoom-in", "+", Command::Zoom(1.15), cx))
                 .child(self.button("fit", "Fit all  0", Command::Overview, cx)),
         );
-        let composer_width = (width - 96.).min(720.);
-        let composer = div()
-            .id("composer")
-            .absolute()
-            .bottom(px(38.))
-            .left(px((width - composer_width) / 2.))
-            .w(px(composer_width))
-            .h(px(54.))
-            .rounded_full()
-            .border_1()
-            .border_color(rgb(if self.composing { 0x6aa0a8 } else { 0x374653 }))
-            .bg(rgb(0x17232e))
-            .flex()
-            .items_center()
-            .px_4()
-            .gap_3()
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, window, cx| {
-                    cx.stop_propagation();
-                    this.composing = true;
-                    window.focus(&this.focus);
-                    cx.notify();
-                }),
-            )
-            .child(avatar(MINT, 0.8))
-            .child(
-                label(
-                    if self.draft.is_empty() {
-                        "Leave Meister a mock note…".into()
-                    } else {
-                        format!("{}{}", self.draft, if self.composing { "│" } else { "" })
-                    },
-                    14.,
-                    if self.draft.is_empty() { MUTED } else { INK },
-                )
-                .flex_1()
-                .min_w_0()
-                .truncate(),
-            )
-            .child(self.button("send", "Add note ↗", Command::Send, cx));
         let mut root = div()
             .id("spatial-root")
             .track_focus(&self.focus)
@@ -1180,98 +1192,84 @@ impl Render for Spatial {
             )
             .child(viewport)
             .child(
+                img(art::logo())
+                    .absolute()
+                    .left(px(176.))
+                    .top(px(22.))
+                    .size(px(36.)),
+            )
+            .child(
+                label("MOCK WORKSPACE", 9., 0x92a9b6)
+                    .absolute()
+                    .left(px(224.))
+                    .top(px(35.)),
+            )
+            .child(
                 div()
                     .absolute()
-                    .top(px(20.))
-                    .left(px(100.))
-                    .right(px(20.))
-                    .bg(rgba(0x091722eb))
-                    .rounded_full()
-                    .px_4()
-                    .py_2()
+                    .left(px(width * 0.5 - 104.))
+                    .top(px(66.))
                     .flex()
                     .items_center()
-                    .gap_3()
-                    .child(
-                        img(std::path::PathBuf::from(concat!(
-                            env!("CARGO_MANIFEST_DIR"),
-                            "/assets/astrid-logo.png"
-                        )))
-                        .w(px(40.))
-                        .h(px(40.)),
-                    )
-                    .when(width > 1000., |d| {
-                        d.child(div().child(label("Astrid", 20., INK)).child(label(
-                            "Spatial workspace",
-                            11.,
-                            MUTED,
-                        )))
-                    })
-                    .when(width > 1100., |d| {
-                        d.child(
-                            div()
-                                .ml_3()
-                                .rounded_full()
-                                .border_1()
-                                .border_color(rgb(0x34535b))
-                                .px_3()
-                                .py_1()
-                                .child(label("DS–00  /  MOCK DATA", 10., MINT)),
-                        )
-                    })
-                    .child(div().flex_1())
-                    .child(self.button(
-                        "search",
-                        if width > 1000. {
-                            "Find session  ⌘K"
-                        } else {
-                            "Search ⌘K"
-                        },
-                        Command::Search,
-                        cx,
-                    ))
-                    .when(width > 1200., |d| {
-                        d.child(self.button("commands", "Commands  ⌘⇧K", Command::Palette, cx))
-                    })
-                    .child(self.button("overview", "Overview", Command::Overview, cx))
-                    .child(self.button("reset", "Reset", Command::Reset, cx))
-                    .when(self.undo.is_some(), |d| {
-                        d.child(self.button("undo", "Undo", Command::Undo, cx))
-                    })
-                    .child(self.button(
-                        "motion",
-                        if width < 1000. {
-                            "Motion"
-                        } else if self.reduced {
-                            "Motion: reduced"
-                        } else {
-                            "Motion: full"
-                        },
-                        Command::Motion,
-                        cx,
-                    )),
-            )
-            .child(composer)
-            .child(
-                label(self.status.clone(), 10., MUTED)
-                    .absolute()
-                    .bottom(px(13.))
-                    .left(px(30.))
-                    .max_w(px(width - 60.))
-                    .truncate(),
-            )
-            .when(width > 1100., |d| {
-                d.child(
-                    label(
-                        "Pinch to zoom · Click a space to focus · Swipe horizontally to browse",
-                        10.,
-                        MUTED,
-                    )
-                    .absolute()
-                    .right(px(28.))
-                    .bottom(px(13.)),
+                    .gap_2()
+                    .rounded_full()
+                    .px_3()
+                    .py_1()
+                    .bg(rgba(0x661140da))
+                    .child(label("•••  Researching · demo", 11., 0xffabd6))
+                    .child(avatar(3, 0.6))
+                    .child(avatar(0, 0.6)),
+            );
+        if let Some(chrome) = &self.chrome {
+            chrome.sync_overlay(self.palette, self.artifact.is_some());
+            chrome.sync_focus(self.focused_space.is_some());
+            let composer_width = (width - 180.).min(700.);
+            root = root
+                .child(
+                    native_chrome::host(chrome.clone(), native_chrome::Island::Composer)
+                        .absolute()
+                        .left(px((width - composer_width) * 0.5))
+                        .bottom(px(32.))
+                        .w(px(composer_width))
+                        .h(px(58.)),
                 )
-            });
+                .child(
+                    native_chrome::host(chrome.clone(), native_chrome::Island::Add)
+                        .absolute()
+                        .left(px((width - composer_width) * 0.5 - 58.))
+                        .bottom(px(36.))
+                        .size(px(48.)),
+                )
+                .child(
+                    native_chrome::host(chrome.clone(), native_chrome::Island::Mode)
+                        .absolute()
+                        .right(px(86.))
+                        .top(px(18.))
+                        .w(px(90.))
+                        .h(px(44.)),
+                )
+                .child(
+                    native_chrome::host(chrome.clone(), native_chrome::Island::Search)
+                        .absolute()
+                        .left(px(width * 0.5 + 132.))
+                        .top(px(69.))
+                        .size(px(42.)),
+                )
+                .child(
+                    native_chrome::host(chrome.clone(), native_chrome::Island::Settings)
+                        .absolute()
+                        .right(px(24.))
+                        .top(px(18.))
+                        .size(px(44.)),
+                )
+                .child(
+                    native_chrome::host(chrome.clone(), native_chrome::Island::Sidebar)
+                        .absolute()
+                        .left(px(114.))
+                        .top(px(18.))
+                        .size(px(44.)),
+                );
+        }
         if self.palette || self.artifact.is_some() {
             root = root.child(self.modal(cx));
         }
@@ -1315,7 +1313,8 @@ fn main() {
                     window_min_size: Some(size(px(760.), px(560.))),
                     titlebar: Some(TitlebarOptions {
                         title: Some("Astrid — Spatial · Mock prototype".into()),
-                        ..Default::default()
+                        appears_transparent: true,
+                        traffic_light_position: Some(point(px(20.), px(34.))),
                     }),
                     ..Default::default()
                 },
@@ -1324,6 +1323,84 @@ fn main() {
                         let state = Spatial::new(cx);
                         window.focus(&state.focus);
                         state
+                    });
+                    let (native_tx, native_rx) = async_channel::bounded(32);
+                    match native_chrome::NativeChrome::new(window, cx, native_tx) {
+                        Ok(chrome) => {
+                            eprintln!(
+                                "Native chrome: {}",
+                                if chrome.liquid_glass {
+                                    "NSGlassEffectView"
+                                } else {
+                                    "NSVisualEffectView fallback"
+                                }
+                            );
+                            view.update(cx, |this, cx| {
+                                chrome.set_reduced_motion(this.reduced);
+                                this.chrome = Some(chrome);
+                                cx.notify();
+                            });
+                        }
+                        Err(error) => eprintln!("Native chrome unavailable: {error}"),
+                    }
+                    view.update(cx, |_, cx| {
+                        cx.spawn_in(window, async move |view, cx| {
+                            while let Ok(action) = native_rx.recv().await {
+                                let _ = cx.update(|window, cx| {
+                                    view.update(cx, |this, cx| {
+                                        window.focus(&this.focus);
+                                        match action {
+                                            native_chrome::NativeAction::Search => {
+                                                this.run(Command::Search, false, cx)
+                                            }
+                                            native_chrome::NativeAction::FocusPrimary => {
+                                                this.run(Command::Focus(0), true, cx)
+                                            }
+                                            native_chrome::NativeAction::Overview => {
+                                                this.run(Command::Overview, true, cx)
+                                            }
+                                            native_chrome::NativeAction::Palette => {
+                                                this.run(Command::Palette, false, cx)
+                                            }
+                                            native_chrome::NativeAction::QueryChanged => {
+                                                if this.palette {
+                                                    if let Some(chrome) = &this.chrome {
+                                                        this.query = chrome.query();
+                                                        this.result_index = 0;
+                                                    }
+                                                    cx.notify();
+                                                }
+                                            }
+                                            native_chrome::NativeAction::Navigate(backwards) => {
+                                                this.result_index = move_selection(
+                                                    this.result_index,
+                                                    this.results().len(),
+                                                    backwards,
+                                                );
+                                                cx.notify();
+                                            }
+                                            native_chrome::NativeAction::Accept => {
+                                                if let Some((_, command)) =
+                                                    this.results().get(this.result_index).cloned()
+                                                {
+                                                    this.palette = false;
+                                                    this.run(command, false, cx);
+                                                }
+                                            }
+                                            native_chrome::NativeAction::Dismiss => {
+                                                this.palette = false;
+                                                cx.notify();
+                                            }
+                                            native_chrome::NativeAction::Note(text) => {
+                                                this.draft = text;
+                                                this.run(Command::Send, false, cx);
+                                            }
+                                        }
+                                    })
+                                });
+                            }
+                        })
+                        .detach()
                     });
                     let (tx, rx) = async_channel::bounded(64);
                     if let Err(error) = magnify::install(window, tx) {

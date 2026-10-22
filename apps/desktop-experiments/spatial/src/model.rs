@@ -142,7 +142,7 @@ pub struct Card {
 }
 impl Card {
     pub fn size(&self) -> V {
-        v(420., if self.expanded { 460. } else { 220. })
+        v(380., if self.expanded { 520. } else { 330. })
     }
 }
 #[derive(Clone, Copy, Debug)]
@@ -160,11 +160,11 @@ impl Default for Layout {
     fn default() -> Self {
         Self {
             cards: [
-                v(30., 90.),
-                v(500., 0.),
-                v(970., 110.),
-                v(510., 510.),
-                v(30., 610.),
+                v(540., 100.),
+                v(1040., 205.),
+                v(40., 280.),
+                v(540., 730.),
+                v(40., 920.),
             ]
             .into_iter()
             .enumerate()

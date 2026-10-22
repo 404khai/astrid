@@ -23,7 +23,7 @@ Builds independently of the root crate. No Windows/Linux support is claimed.
 - `Escape`: close overlay, stop motion/drag, or leave composer.
 - `⌘R`: reset layout; `⌘Z`: recover previous layout. Pinning does not block an
   explicit layout reset, and Undo restores pins and positions together.
-- `M` or Motion control: reduced motion. Initial setting reads macOS reduceMotion.
+- `M` or the commands palette: reduced motion. Initial setting reads macOS reduceMotion.
 - Composer: type a local mock note and Enter. No message is sent.
 - Click artifact row: inspect static fixture. All artifacts are illustrative.
 - Palette includes empty and overlapping/long-title fixtures. Undo recovers layout.
@@ -42,7 +42,12 @@ latency. Pass it after `cargo run … -- --benchmark`.
 
 See [design, upstream investigation, and checkpoint](../../../docs/experiments/spatial-desktop.md).
 
-Current limitations: 2D rounded surfaces (no perspective curvature), basic mock
-text editing without full IME/selection, unverified screen-reader support and
-pending manual interaction/resize QA. See the checkpoint for measured pacing.
+Native glass uses macOS 26+ NSGlassEffectView, with NSVisualEffectView fallback
+on older systems. AppKit owns composer/palette editing; GPUI owns the canvas.
+Local Blobatar 2.7.0 identities and the original night scene are bundled offline.
+
+Current limitations: 2D rounded surfaces (no perspective curvature), unverified
+full IME/focus acceptance, custom-card screen-reader support and pending manual
+interaction/resize QA. The glass redesign needs a fresh performance measurement.
+See the [current checkpoint](../../../docs/experiments/spatial-glass-redesign.md).
 Close the previous prototype window before relaunching a rebuilt bundle.
