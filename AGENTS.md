@@ -1,3 +1,17 @@
+# Visual upload/response deadline amendment — 2026-10-23
+
+Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
+Use the existing `feat/foreground-computer-use` checkout, no new branch/worktree.
+[ADR 0025](docs/adr/0025-image-upload-response-deadlines.md) is explicitly Accepted:
+retain ten-second image/approval/upload/header admission and release application
+image/request buffers before a separately bounded sixty-second total visual
+provider attempt from POST admission. Implement and validate with deterministic
+mocks. Preserve five-second action freshness, all other grants/limits, private v2,
+original complete exchanges, cancellation, metadata-only/off traces and no replay.
+No authenticated/live screenshot, inference/input, lifecycle or successor work.
+Preserve the desktop experiment branch/source, dirty checkout and all build/user
+files. Conventional commits and update PR #26; no PR merge.
+
 # Foreground computer-use integration authorization — 2026-10-21
 
 Maintainer requested “Tell me what’s left to get the actual CU working, and

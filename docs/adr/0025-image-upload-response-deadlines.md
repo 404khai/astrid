@@ -1,7 +1,7 @@
 # ADR 0025 — Separate image upload and visual response deadlines
 
 Date: 2026-10-21
-Status: Proposed — maintainer decision required; no dependent implementation
+Status: Accepted — 2026-10-23; maintainer explicitly accepted option 1
 Related: accepted ADRs 0008/0009, 0016, 0021–0024;
 [foreground integration](../milestones/foreground-computer-use.md).
 
@@ -26,7 +26,7 @@ resolving buffer ownership would both conflict with that contract and risk keepi
 the JSON/base64 request alive throughout a longer response. Simply trusting visible
 text as task completion would violate the original-result/complete-exchange rules.
 
-## Proposed amendment to ADR 0024
+## Accepted amendment to ADR 0024
 
 1. Keep the original ten-second deadline for the admitted native image, human
    disclosure approval, authentication/preparation and request-body upload/response
@@ -104,6 +104,8 @@ Recommend option 1. It gives an already-approved/uploaded request time to finish
 without making image retention follow model response latency. Cost of changing
 later: High for buffer/privacy semantics; Medium for the explicit 60-second limit.
 
-Accept option 1's narrow amendment, authorizing implementation and deterministic
-mock validation while retaining every other gate? Status stays Proposed until the
-maintainer explicitly decides. No dependent code has been changed for this ADR.
+Decision evidence: on 2026-10-23 the maintainer instructed “Switch back to the
+branch for this session. I accept option 1”. This explicitly accepts the narrow
+amendment and authorizes implementation and deterministic mock validation, retaining
+every other gate. Acceptance is committed before dependent provider implementation.
+No live trial, image persistence, grant expansion, successor work or merge is implied.

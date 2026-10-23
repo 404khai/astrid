@@ -4,6 +4,14 @@ Date: 2026-10-21
 Status: Accepted — 2026-10-21; maintainer explicitly selected option 1
 Related: accepted ADRs 0008/0009, 0016, 0021–0023.
 
+## Accepted timing amendment — 2026-10-23
+
+[ADR 0025](0025-image-upload-response-deadlines.md) explicitly amends only the
+whole-visual-wait expiry clause: ten-second image/approval/upload/header admission
+and application buffer release, then at most sixty seconds total from POST
+admission for the provider response. All remaining authority, finite budgets,
+five-second action freshness, private history and privacy/live gates are unchanged.
+
 ## Context and remaining work
 
 The maintainer requested: “Tell me what’s left to get the actual CU working, and

@@ -1,3 +1,22 @@
+# Visual upload/response deadline amendment — 2026-10-23
+
+Maintainer requested return to `feat/foreground-computer-use` and explicitly
+accepted [ADR 0025](adr/0025-image-upload-response-deadlines.md) option 1. Switched
+from the preserved `experiment/gpui-spatial-workspace` branch in the same checkout;
+no new branch/worktree, merge or desktop changes. Dirty tracked bytes and all
+original untracked files were preserved; branch-specific ignored build files may
+be visible as untracked and must not be staged.
+
+Implement separate ten-second image/approval/upload/header admission with explicit
+application buffer release, and a fixed sixty-second total visual provider attempt
+from POST admission. Keep five-second action freshness, all grants/count/context
+limits, original results/private v2/complete exchanges, cancellation, metadata-only
+traces and observability-off. Deterministic mocks only; no live authenticated API,
+screenshot/input, provider inference, image persistence or successor work. Update
+PR #26 without merging. Implementation and validation remain in progress.
+
+---
+
 # Foreground computer-use integration — 2026-10-21
 
 The maintainer requested actual CU and explicitly accepted [ADR 0024](adr/0024-foreground-computer-use-integration.md)
