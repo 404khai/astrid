@@ -881,3 +881,6 @@ async fn disclosure_input_failure_is_not_denial_and_does_not_echo_terminal_error
     assert_eq!(api.requests.lock().unwrap().len(), 1);
     assert_eq!(wire.requests.lock().unwrap().len(), 2);
 }
+
+#[path = "visual_response_tests.rs"]
+mod visual_response;

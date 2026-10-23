@@ -1,19 +1,36 @@
-# Visual upload/response deadline amendment — 2026-10-23
+# Visual upload/response deadlines implemented — 2026-10-23
 
 Maintainer requested return to `feat/foreground-computer-use` and explicitly
 accepted [ADR 0025](adr/0025-image-upload-response-deadlines.md) option 1. Switched
 from the preserved `experiment/gpui-spatial-workspace` branch in the same checkout;
-no new branch/worktree, merge or desktop changes. Dirty tracked bytes and all
-original untracked files were preserved; branch-specific ignored build files may
-be visible as untracked and must not be staged.
+no new branch/worktree or desktop implementation. Dirty tracked bytes and all
+original untracked files were preserved. Branch-specific desktop build files now
+visible as untracked remain untouched and unstaged.
 
-Implement separate ten-second image/approval/upload/header admission with explicit
-application buffer release, and a fixed sixty-second total visual provider attempt
-from POST admission. Keep five-second action freshness, all grants/count/context
-limits, original results/private v2/complete exchanges, cancellation, metadata-only
-traces and observability-off. Deterministic mocks only; no live authenticated API,
-screenshot/input, provider inference, image persistence or successor work. Update
-PR #26 without merging. Implementation and validation remain in progress.
+Acceptance commit `fb332b86` precedes provider implementation. Preparation,
+authentication, exact single-use grant, bounded upload source and valid SSE headers
+must fit original ten-second image expiry. JSON/base64 application copies are
+dropped before send; tracked pending bytes and the frame are released before the
+longer response wait. Cancellation/drop clears pending source/frame ownership;
+expired/cancelled source polling cannot yield image bytes. Transport copies already
+handed off cannot be erased/recalled and are not proof of remote processing.
+
+A fixed sixty-second total visual attempt from POST admission now bounds response
+completion, including upload/header time. It never resets with streamed output.
+Only valid provider completion establishes a result; partial text stays interrupted
+on timeout/cancel, with no retry or synthetic completion/usage. Five-second action
+freshness, thirty-second operation windows, all other grants/budgets, private v2,
+original complete exchanges, context admission and metadata-only/off traces remain.
+No image persistence/replay, live calls, workers, Host/mobile or successor work.
+
+**362 full Rust passed, 0 failed, 1 existing overhead test ignored.** Final focused
+visual suite: **12 passed**, including one header-latency regression added after the
+full suite; production code unchanged after that full run. Strict all-target Clippy,
+fmt, whitespace and scoped documentation checks passed. Python was not rerun for
+Rust-only changes. [Review](reviews/visual-response-deadlines-2026-10-23.md),
+[evidence](evaluations/visual-response-deadlines-2026-10-23.json),
+[testing/use](guides/foreground-computer-use.md). Update PR #26 against main, no merge.
+Actual live completion remains separately scoped and unverified by mock evidence.
 
 ---
 

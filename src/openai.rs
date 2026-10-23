@@ -61,6 +61,19 @@ impl TextSink for MeasuredSink<'_> {
     }
 }
 
+struct VisualRequest<'a> {
+    image: &'a crate::computer::VisionInput,
+    grant: &'a crate::computer::DisclosureGrant,
+    cancel: &'a crate::cancellation::Cancellation,
+    uploaded: Option<tokio::sync::oneshot::Sender<tokio::time::Instant>>,
+}
+struct ReleaseImage<'a>(&'a crate::computer::VisionInput);
+impl Drop for ReleaseImage<'_> {
+    fn drop(&mut self) {
+        self.0.release();
+    }
+}
+
 pub struct OpenAiProvider {
     client: reqwest::Client,
     auth: Arc<dyn Authentication>,
@@ -280,14 +293,31 @@ impl ModelProvider for OpenAiProvider {
         cancel: &crate::cancellation::Cancellation,
         text: &mut dyn TextSink,
     ) -> Result<ModelResponse, ModelError> {
+        let _release = ReleaseImage(image);
         self.check_visual_destination()?;
-        let result = tokio::select! {biased;
-            _=cancel.cancelled()=>Err(ModelError::Provider("visual request cancelled; remote outcome unknown".into())),
-            _=tokio::time::sleep_until(image.deadline())=>Err(ModelError::Provider("visual image deadline; remote outcome unknown".into())),
-            result=self.generate_input(request,Some((image,grant,cancel)),text)=>result,
+        let (uploaded, mut admission) = tokio::sync::oneshot::channel();
+        let generation = self.generate_input(
+            request,
+            Some(VisualRequest {
+                image,
+                grant,
+                cancel,
+                uploaded: Some(uploaded),
+            }),
+            text,
+        );
+        tokio::pin!(generation);
+        let deadline = tokio::select! {biased;
+            _=cancel.cancelled()=>return Err(ModelError::Provider("visual request cancelled; remote outcome unknown".into())),
+            ready=&mut admission=>match ready { Ok(deadline)=>deadline,Err(_)=>return generation.await },
+            _=tokio::time::sleep_until(image.deadline())=>return Err(ModelError::Provider("visual upload deadline; remote outcome unknown".into())),
+            result=&mut generation=>return result,
         };
-        image.release();
-        result
+        tokio::select! {biased;
+            _=cancel.cancelled()=>Err(ModelError::Provider("visual response cancelled; remote outcome unknown".into())),
+            _=tokio::time::sleep_until(deadline)=>Err(ModelError::Provider("visual response deadline (60 seconds from POST admission); remote outcome unknown".into())),
+            result=&mut generation=>result,
+        }
     }
     async fn generate(
         &self,
@@ -313,6 +343,31 @@ impl OpenAiProvider {
         Err(ModelError::Provider(
             "image disclosure destination does not match approved OpenAI endpoint".into(),
         ))
+    }
+    fn visual_headers(response: &reqwest::Response) -> Result<(), ModelError> {
+        if !response.status().is_success() {
+            return Err(ModelError::Http {
+                status: response.status().as_u16(),
+                message: "visual response rejected; body omitted".into(),
+            });
+        }
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if !content_type
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .eq_ignore_ascii_case("text/event-stream")
+        {
+            return Err(ModelError::Protocol(
+                "visual response content type invalid; body omitted".into(),
+            ));
+        }
+        Ok(())
     }
     fn visual_body(
         request: &ModelRequest<'_>,
@@ -351,17 +406,13 @@ impl OpenAiProvider {
     async fn generate_input(
         &self,
         request: &ModelRequest<'_>,
-        visual: Option<(
-            &crate::computer::VisionInput,
-            &crate::computer::DisclosureGrant,
-            &crate::cancellation::Cancellation,
-        )>,
+        mut visual: Option<VisualRequest<'_>>,
         text: &mut dyn TextSink,
     ) -> Result<ModelResponse, ModelError> {
         let enabled = text.telemetry_enabled();
         let started = enabled.then(Instant::now);
-        let (body, snapshot) = if let Some((image, _, _)) = visual {
-            Self::visual_body(request, image)?
+        let (body, snapshot) = if let Some(v) = visual.as_ref() {
+            Self::visual_body(request, v.image)?
         } else {
             let body = Self::body(request)?;
             let snapshot = Self::snapshot(&body, request);
@@ -400,19 +451,54 @@ impl OpenAiProvider {
             first: false,
         };
         let result = async {
-            if let Some((image, grant, cancel)) = visual {
-                grant
-                    .consume(image, request.model, cancel)
+            let response = if let Some(v) = visual.as_mut() {
+                let bytes = serde_json::to_vec(&body)
+                    .map_err(|_| ModelError::Protocol("visual body serialization failed".into()))?;
+                drop(body); // No JSON/base64 Value is captured across SSE response reading.
+                let length = bytes.len();
+                let upload = crate::visual_upload::Upload::new(bytes, v.image.deadline());
+                v.grant
+                    .consume(v.image, request.model, v.cancel)
                     .map_err(ModelError::Provider)?;
-            }
-            let response = self
-                .client
-                .post(&self.endpoint)
-                .bearer_auth(token.as_str())
-                .header(reqwest::header::ACCEPT, "text/event-stream")
-                .json(&body)
-                .send()
-                .await?;
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+                let response = self
+                    .client
+                    .post(&self.endpoint)
+                    .bearer_auth(token.as_str())
+                    .header(reqwest::header::ACCEPT, "text/event-stream")
+                    .header(reqwest::header::CONTENT_TYPE, "application/json")
+                    .header(reqwest::header::CONTENT_LENGTH, length)
+                    .body(upload.body(v.cancel))
+                    .send()
+                    .await?;
+                Self::visual_headers(&response)?;
+                upload
+                    .admit_response(v.cancel)
+                    .map_err(|e| ModelError::Provider(e.into()))?;
+                v.image.release();
+                upload.close();
+                drop(upload);
+                v.uploaded
+                    .take()
+                    .ok_or_else(|| {
+                        ModelError::Protocol("duplicate visual upload admission".into())
+                    })?
+                    .send(deadline)
+                    .map_err(|_| {
+                        ModelError::Provider(
+                            "visual response wait closed; remote outcome unknown".into(),
+                        )
+                    })?;
+                response
+            } else {
+                self.client
+                    .post(&self.endpoint)
+                    .bearer_auth(token.as_str())
+                    .header(reqwest::header::ACCEPT, "text/event-stream")
+                    .json(&body)
+                    .send()
+                    .await?
+            };
             if !response.status().is_success() {
                 let status = response.status().as_u16();
                 if visual.is_some() {

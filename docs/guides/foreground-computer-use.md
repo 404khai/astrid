@@ -70,6 +70,22 @@ Existing context-byte limits can reject even a legally sized PNG; this mode neit
 shrinks it nor raises budgets. Image tokens use a documented estimate plus margin,
 not bytes/4; actual image-only provider tokens/cost are unavailable.
 
+## Visual response completion
+
+[Accepted ADR 0025](../adr/0025-image-upload-response-deadlines.md) separates image
+lifetime from response streaming. Approval/authentication/upload and valid SSE
+headers still need to fit within ten seconds of capture admission. Application
+image/JSON/request-source buffers are released before waiting for the response.
+Transport/provider copies already sent cannot be erased or recalled.
+
+After upload admission, the model response may continue until a fixed sixty-second
+deadline measured from POST admission, including upload/header time. Streaming does
+not reset it. A description is completed only when the provider's valid terminal
+event arrives; timeout/cancellation keeps partial output interrupted with no retry.
+`visual upload deadline` still means the original image window was missed;
+`visual response deadline (60 seconds from POST admission)` is the separate wait.
+The five-second action freshness and thirty-second operation windows do not grow.
+
 ## Capture failures
 
 The foreground summary now retains fixed safe categories instead of hiding every

@@ -58,3 +58,15 @@ end-to-end success. [Proposed ADR 0025](../adr/0025-image-upload-response-deadli
 prepares ten-second image/upload cleanup plus a separate 60-second overall visual
 attempt response limit, explicit buffer release and unchanged stale-action gates.
 No dependent implementation or live call is authorized by the proposal itself.
+
+## Accepted deadline amendment — 2026-10-23
+
+The maintainer explicitly accepted ADR 0025 option 1 and requested return to this
+session branch. Contract `fb332b86` precedes the bounded upload-source/response
+implementation. Ten-second image/approval/upload/header admission and early buffer
+release now precede a fixed sixty-second total visual attempt from POST admission.
+Other grants, five-second action freshness, budgets, history and live gates remain.
+[Review](../reviews/visual-response-deadlines-2026-10-23.md) and
+[evidence](../evaluations/visual-response-deadlines-2026-10-23.json): 362 full Rust
+passed, 1 ignored; final focused 12 passed, strict Clippy/fmt/whitespace passed.
+No live call or successor work; PR #26 stays unmerged.

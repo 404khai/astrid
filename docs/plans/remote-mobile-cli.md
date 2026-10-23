@@ -103,6 +103,14 @@ separate and cannot create machines or transfer secrets.
 
 ## Computer-use investigation and bounded design
 
+Accepted deadline implementation update, 2026-10-23: maintainer accepted ADR 0025
+option 1; contract `fb332b86`, then tracked application upload ownership/header
+admission and a fixed sixty-second total visual response attempt. Ten-second image
+cleanup and five-second action freshness remain. [Review](../reviews/visual-response-deadlines-2026-10-23.md)
+records 362 full Rust passed/1 ignored, final focused 12 passed and strict Clippy.
+The earlier Proposed note below is decision history. No live/successor authority
+or merge is implied; return to the existing CU branch preserved desktop work.
+
 Visual response follow-up: user-supplied observation-only output includes a model
 screen description followed by the ten-second visual-image deadline. No complete
 visual exchange is established. [ADR 0025](../adr/0025-image-upload-response-deadlines.md)

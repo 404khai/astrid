@@ -29,3 +29,5 @@ pub mod computer_wire;
 pub mod desktop;
 pub mod instabox;
 pub mod remote;
+
+mod visual_upload;

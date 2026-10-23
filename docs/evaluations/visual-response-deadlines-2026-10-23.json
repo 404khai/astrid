@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-23",
+  "branch": "feat/foreground-computer-use",
+  "decision": "Maintainer explicitly accepted ADR 0025 option 1",
+  "contract_commit": "fb332b86",
+  "validation": {
+    "full_rust": {
+      "command": "cargo test --locked --offline -- --test-threads=1",
+      "passed": 362,
+      "failed": 0,
+      "ignored": 1
+    },
+    "final_focused": {
+      "command": "cargo test --locked --offline --lib visual -- --test-threads=1",
+      "passed": 12,
+      "failed": 0,
+      "note": "Includes header-latency regression added after full suite; production code unchanged after full run"
+    },
+    "clippy": "Strict all-target passed",
+    "format": "Passed",
+    "whitespace": "Passed",
+    "python": "Not rerun; no Python changes"
+  },
+  "bounds": {
+    "image_approval_upload_headers_seconds_from_capture": 10,
+    "total_visual_attempt_seconds_from_post": 60,
+    "action_frame_freshness_seconds": 5,
+    "existing_other_grants_and_budgets": "Unchanged"
+  },
+  "transport_contract": "Source consumed means application payload handed to HTTP transport, not proof of provider receipt/erasure; early headers alone cannot extend wait",
+  "live_calls": 0,
+  "screenshots_or_inputs": 0,
+  "provider_inference": 0,
+  "publication": {
+    "pr": 26,
+    "base": "main",
+    "merge_authorized": false
+  },
+  "source_sha256": {
+    "src/openai.rs": "5d0b2e1bdef25bd2d0f71dd8152e2984a41311d5ad56f223fe771674b5683407",
+    "src/computer.rs": "980cbdc417bc40096ce902a6b1cc6b1fa811c09c4475f39453980ae502d3a803",
+    "src/visual_upload.rs": "aef82b60a58192caaad10dfd3a6bb445b94f80a42fb2af8c603491bd1633102b",
+    "src/visual_response_tests.rs": "4b80a62c2e08ea5ecd523480b1d5bd3b2d8480928edfc2edb1993961f360128c"
+  },
+  "preservation": {
+    "dirty_gitignore_unchanged": true,
+    "original_CURRENT_suffix_unchanged": true,
+    "original_untracked_files_not_removed": true,
+    "desktop_build_files_left_untouched": true
+  }
+}
