@@ -341,7 +341,9 @@ fn project(event: &ExecutionEvent, elapsed_us: u64) -> Record {
         ToolCallRequested { call } => {
             let name = match call.name.as_str() {
                 "read_file" | "write_file" | "edit_file" | "list_directory" | "glob" | "grep"
-                | "shell" | "instabox_exec" => Some(call.name.as_str()),
+                | "shell" | "instabox_exec" | "instabox_observe" | "instabox_action" => {
+                    Some(call.name.as_str())
+                }
                 _ => None,
             };
             metadata = serde_json::json!({"tool":name});
@@ -380,6 +382,7 @@ fn project(event: &ExecutionEvent, elapsed_us: u64) -> Record {
         ModelCallCancelled => "model_call_cancelled",
         RemotePermissionRequired { .. } => "remote_permission_required",
         PermissionRequested { .. } => "permission_requested",
+        ImageInputAdmitted { .. } => "image_input_admitted",
         PermissionGranted => "permission_granted",
         PermissionDenied => "permission_denied",
         PermissionCancelled => "permission_cancelled",
@@ -1100,6 +1103,130 @@ impl Stats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn desktop_approval_content_stays_out_of_metadata_trace_projection() {
+        use crate::desktop::{
+            Action, ActionController, ApprovalRequest, Arguments, ObservationMetadata, Owner,
+            POLICY,
+        };
+        use crate::events::{EventKind, SessionId, ToolCallId};
+        let owner = Owner {
+            principal: "DESKTOP-PRINCIPAL-SENTINEL".into(),
+            run_id: RunId::default(),
+            machine_id: format!("m_{}", "z".repeat(26)),
+        };
+        let mut controller = ActionController::new(owner.clone()).unwrap();
+        let frame = controller
+            .record_observation(
+                ObservationMetadata {
+                    owner: owner.clone(),
+                    width: 1280,
+                    height: 800,
+                    admitted_at: tokio::time::Instant::now(),
+                },
+                &crate::cancellation::Cancellation::default(),
+            )
+            .unwrap();
+        let request = ApprovalRequest {
+            owner: owner.clone(),
+            tool_call_id: ToolCallId::default(),
+            provider_call_id: "DESKTOP-PROVIDER-CALL-SENTINEL".into(),
+            width: 1280,
+            height: 800,
+            policy: POLICY,
+            args: Arguments {
+                frame_id: frame,
+                action: Action::Type {
+                    text: "DESKTOP-TYPED-TEXT-SENTINEL".into(),
+                },
+            },
+        };
+        // No desktop event is registered. Exercise the existing metadata allowlist
+        // if a content-bearing client later carries approval/args on existing events.
+        let kinds = [
+            EventKind::PermissionRequested {
+                command: request.description(),
+                workspace: owner.machine_id.clone(),
+            },
+            EventKind::ToolCallRequested {
+                call: crate::model::ToolCall {
+                    call_id: request.provider_call_id.clone(),
+                    name: "gui.act".into(),
+                    arguments: serde_json::to_string(&request.args).unwrap(),
+                },
+            },
+            EventKind::ToolCallRequested {
+                call: crate::model::ToolCall {
+                    call_id: request.provider_call_id.clone(),
+                    name: "gui.act".into(),
+                    arguments: serde_json::to_string(&Arguments {
+                        frame_id: frame,
+                        action: Action::Click {
+                            x: 1279,
+                            y: 799,
+                            button: crate::desktop::Button::Right,
+                        },
+                    })
+                    .unwrap(),
+                },
+            },
+            EventKind::ToolCallRequested {
+                call: crate::model::ToolCall {
+                    call_id: request.provider_call_id.clone(),
+                    name: "gui.act".into(),
+                    arguments: serde_json::to_string(&Arguments {
+                        frame_id: frame,
+                        action: Action::Key {
+                            key: "PageDown".into(),
+                            modifiers: vec![crate::desktop::Modifier::Ctrl],
+                        },
+                    })
+                    .unwrap(),
+                },
+            },
+            EventKind::ToolCallFailed {
+                outcome: crate::model::ToolOutcome::Error {
+                    code: "DESKTOP-ERROR-SENTINEL".into(),
+                    message: "DESKTOP-ERROR-SENTINEL".into(),
+                },
+            },
+        ];
+        let records: Vec<_> = kinds
+            .into_iter()
+            .enumerate()
+            .map(|(i, kind)| {
+                project(
+                    &ExecutionEvent {
+                        session_id: SessionId::default(),
+                        run_id: owner.run_id,
+                        sequence: i as u64 + 1,
+                        turn_id: None,
+                        model_call_id: None,
+                        tool_call_id: Some(request.tool_call_id),
+                        kind,
+                    },
+                    0,
+                )
+            })
+            .collect();
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("synthetic-metadata.jsonl");
+        write_records(&path, &records);
+        let persisted = fs::read_to_string(path).unwrap();
+        for sentinel in [
+            "DESKTOP-PRINCIPAL-SENTINEL",
+            "DESKTOP-TYPED-TEXT-SENTINEL",
+            "DESKTOP-PROVIDER-CALL-SENTINEL",
+            "DESKTOP-ERROR-SENTINEL",
+            "\"x\":1279",
+            "\"y\":799",
+            "PageDown",
+            owner.machine_id.as_str(),
+            &serde_json::to_string(&frame).unwrap(),
+        ] {
+            assert!(!persisted.contains(sentinel));
+        }
+    }
     fn event(
         sequence: u64,
         elapsed_us: u64,

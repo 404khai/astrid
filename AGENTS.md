@@ -1,3 +1,62 @@
+# Visual upload/response deadline amendment — 2026-10-23
+
+Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
+Use the existing `feat/foreground-computer-use` checkout, no new branch/worktree.
+[ADR 0025](docs/adr/0025-image-upload-response-deadlines.md) is explicitly Accepted:
+retain ten-second image/approval/upload/header admission and release application
+image/request buffers before a separately bounded sixty-second total visual
+provider attempt from POST admission. Implement and validate with deterministic
+mocks. Preserve five-second action freshness, all other grants/limits, private v2,
+original complete exchanges, cancellation, metadata-only/off traces and no replay.
+No authenticated/live screenshot, inference/input, lifecycle or successor work.
+Preserve the desktop experiment branch/source, dirty checkout and all build/user
+files. Conventional commits and update PR #26; no PR merge.
+
+# Foreground computer-use integration authorization — 2026-10-21
+
+Maintainer requested “Tell me what’s left to get the actual CU working, and
+implement it”, then explicitly accepted [ADR 0024](docs/adr/0024-foreground-computer-use-integration.md)
+option 1 after its concrete privacy/runtime decision. Implement one-shot foreground
+CU with real adapter code, separate observe/action/per-frame model disclosure,
+native-image request-local inputs, unchanged finite limits and no image persistence
+or replay. This supersedes prior CU-01/02 implementation-only/stop restrictions
+only for this accepted integration contract. Branch `feat/foreground-computer-use`
+is stacked on open PR #25 (`4d10f91f`), same checkout, no worktree. No PR merge.
+
+Validate with synthetic PNGs, local HTTP/inference mocks and bounded helper-process
+fixtures only. No live/authenticated metadata, screenshot/input, provider inference
+or cloud/VM operation until separate exact existing target/action trial approval;
+no target supplied. Never read .env/private sessions or infer a target from keys.
+Preserve all remaining ADR 0022/0023 limits, private v2/provenance/continuation,
+original results/history, complete exchanges/admission, cancellation and ADRs
+0008/0009/0021. No lifecycle, ports, secrets transfer, remote workers, Host/mobile
+networking, Phase 9, daemon, PTY or desktop client. Preserve unrelated checkout data.
+Conventional commits and reviewable PR; stop after this integration slice, no MO-01.
+
+# CU-02 bounded desktop actions authorization — 2026-10-21
+
+Maintainer requested “Work on this next, open pr when done CU-02 — Bounded desktop
+actions. Add separately authorized clicks, typing, scrolling and keys, with
+stale-frame checks and execution limits.” Use `feat/bounded-desktop-actions` from
+fetched main `2daf811c`, same preserved checkout, no worktree. #24 was found already
+merged upstream. This supersedes the CU-01 stop/action exclusion only for CU-02;
+no PR merge or successor work is authorized. Conventional commits and PR against main.
+
+[ADR 0023](docs/adr/0023-bounded-desktop-actions.md) prepares the consequential
+per-action authority/native-coordinate/freshness contract. The maintainer explicitly
+accepted Option 1 with freshness UX, provenance, atomic admission/unknown-outcome
+and scope clarifications on 2026-10-21. Implement only the mocked headless Rust
+controller and deterministic tests under those accepted clarifications. CU-01's accepted ADR 0022 live transport, production decoder,
+runtime integration and image persistence/provider disclosure gates remain binding.
+No live/authenticated machine metadata, screenshot, action, model inference or
+cloud operation without separate exact target/action trial authorization. No target
+has been supplied. Never read .env/private sessions or discover targets from keys.
+Preserve private v2/provenance/continuation, original results/history, complete
+exchanges/context admission, cancellation and ADRs 0008/0009/0021. No remote workers,
+Host/mobile networking, Phase 9, daemon, PTY, provisioning/lifecycle/ports/secrets
+transfer or desktop client. Preserve unrelated checkout data. Stop after CU-02's
+slice and unmerged PR; no MO-01 implementation.
+
 # CU-01 screenshot observation authorization — 2026-10-21
 
 Maintainer requested CU-01 on parent-created `feat/screenshot-observation` from

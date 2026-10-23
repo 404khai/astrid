@@ -69,6 +69,9 @@ pub trait ToolExecutor: Send + Sync {
     fn instabox(&self) -> Option<&crate::remote::InstaboxTool> {
         None
     }
+    fn computer(&self) -> Option<&crate::computer::Computer> {
+        None
+    }
     fn permission(&self, call: &ToolCall) -> Result<Option<PermissionRequest>, ToolError>;
     async fn execute(&self, call: &ToolCall, cancellation: &Cancellation) -> ToolExecution;
     async fn execute_stream(
@@ -85,6 +88,7 @@ pub struct Tools {
     workspace: Workspace,
     shell_timeout: Duration,
     instabox: Option<crate::remote::InstaboxTool>,
+    computer: Option<crate::computer::Computer>,
 }
 
 #[derive(Deserialize)]
@@ -123,12 +127,17 @@ impl Tools {
             workspace,
             shell_timeout,
             instabox: None,
+            computer: None,
         })
     }
 
     /// Install a host-owned foreground capability; never restored from a session.
     pub fn with_instabox(mut self, tool: crate::remote::InstaboxTool) -> Self {
         self.instabox = Some(tool);
+        self
+    }
+    pub fn with_computer(mut self, computer: crate::computer::Computer) -> Self {
+        self.computer = Some(computer);
         self
     }
 
@@ -343,6 +352,9 @@ impl Tools {
 
 #[async_trait]
 impl ToolExecutor for Tools {
+    fn computer(&self) -> Option<&crate::computer::Computer> {
+        self.computer.as_ref()
+    }
     fn instabox(&self) -> Option<&crate::remote::InstaboxTool> {
         self.instabox.as_ref()
     }

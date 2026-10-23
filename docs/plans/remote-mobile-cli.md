@@ -43,8 +43,9 @@ trust need their concrete ADR before dependent implementation.
 | RC-03 | RC-01/02 | Bound one multi-tool exchange before further costly work; test many individually legal large outputs, Unicode and latest-exchange overflow | Done; [RC-03 guard/review](../reviews/aggregate-tool-admission-2026-10-21.md) |
 | RE-01 | RC-01/02/03; target-authority ADR | One foreground `instabox_exec` tool on an explicitly selected existing machine, mocked HTTP; deny remote access in every local preset absent separate grant | Done (mocked); [ADR 0021](../adr/0021-remote-target-authority.md) Accepted with maintainer clarifications; [review](../reviews/instabox-tool-adapter-2026-10-21.md); 302 Rust passed, 0 failed, 1 ignored; no live grant |
 | RE-02 | RE-01 | Explicit foreground CLI target selection and separate per-call approvals; isolated exact-target harmless trial, denial/timeout/cancel and attribution inspected separately | CLI validated (308 Rust passed, 0 failed, 1 ignored; 2 Python passed); [trial plan](../reviews/instabox-cli-approvals-2026-10-21.md); live pending exact target/scope authorization |
-| CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Contract accepted with explicit gates; synthetic fixture specification; [milestone](../milestones/screenshot-observation.md), [ADR 0022](../adr/0022-screenshot-observation.md); runtime/live exit pending |
-| CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | Draft; isolated harmless desktop trial after explicit live scope |
+| CU-01 | RC-03, RE-01; observation/data-retention decision | Bounded screenshot/status observation only, separate observe grant; fixture image retention, privacy and context accounting | Contract accepted with explicit gates; synthetic fixture specification; [milestone](../milestones/screenshot-observation.md), [ADR 0022](../adr/0022-screenshot-observation.md); foreground integration under accepted ADR 0024; live trial pending |
+| CU-02 | CU-01; action grant, image input and coordinate contracts | One click/type/scroll/key action at a time with step/time/byte bounds, stale-frame rejection and no uncertain retry | [ADR 0023](../adr/0023-bounded-desktop-actions.md) Accepted with clarifications; mocked Rust controller validated (327 Rust passed, 1 ignored; 18 existing Python passed); [milestone](../milestones/bounded-desktop-actions.md); foreground integration under accepted ADR 0024; live trial pending |
+| CU integration | CU-01/02; accepted [ADR 0024](../adr/0024-foreground-computer-use-integration.md) | One-shot exact-target capture/native receipt, separate observe/action/disclosure, single-request vision with no image history, deterministic real-adapter mocks | Implemented; [milestone](../milestones/foreground-computer-use.md), [testing/use](../guides/foreground-computer-use.md); exact live trial remains separate |
 | MO-01 | Existing mobile concept/reference | Shared RN Meister conversation shell, `.ios` SwiftUI adapters and Android components, mock streams/tool/approval states; both exports/typecheck | Draft; no credentials or live Host needed |
 | HO-01 | RC-01/02; authenticated Host ADR | Foreground single-user Host with bounded sessions, runs, event stream, cancellation and one authoritative store owner; synthetic clients | Draft; no daemon or public listener by implication |
 | MO-02 | MO-01, HO-01 | Real one-to-one Meister conversation, model/effort settings, streaming, tool cards, permissions, activity, session navigation | Draft; IOS/Android device acceptance separate |
@@ -102,6 +103,31 @@ separate and cannot create machines or transfer secrets.
 
 ## Computer-use investigation and bounded design
 
+Accepted deadline implementation update, 2026-10-23: maintainer accepted ADR 0025
+option 1; contract `fb332b86`, then tracked application upload ownership/header
+admission and a fixed sixty-second total visual response attempt. Ten-second image
+cleanup and five-second action freshness remain. [Review](../reviews/visual-response-deadlines-2026-10-23.md)
+records 362 full Rust passed/1 ignored, final focused 12 passed and strict Clippy.
+The earlier Proposed note below is decision history. No live/successor authority
+or merge is implied; return to the existing CU branch preserved desktop work.
+
+Visual response follow-up: user-supplied observation-only output includes a model
+screen description followed by the ten-second visual-image deadline. No complete
+visual exchange is established. [ADR 0025](../adr/0025-image-upload-response-deadlines.md)
+is Proposed: separate bounded upload/image cleanup from a fixed 60-second provider
+response allowance. This conflicts with ADR 0024's whole-wait expiry clause and
+requires an explicit decision before code. No deadlines are changed by the design.
+
+Integration update, 2026-10-21: the maintainer explicitly accepted ADR 0024 option 1
+and requested actual CU integration. Real adapters, safe PNG helper/native receipts,
+foreground CLI tools and per-frame OpenAI disclosure are implemented with unchanged
+limits and request-local images. [Review](../reviews/foreground-computer-use-2026-10-21.md)
+records deterministic evidence. Existing CU-01/02 scope statements below describe
+the initial slices; the specific integration gates are now amended only by ADR
+0024. Live provider/machine evidence remains absent and requires exact target/trial
+authorization. Five-second freshness is experimental, not solved production UX.
+Stop after this integration PR; MO-01/Host/successor implementation is not authorized.
+
 CU-01 update, 2026-10-21: [ADR 0022](../adr/0022-screenshot-observation.md) is
 explicitly accepted with its gates. Its separate observe grant, one ephemeral
 frame, fixed byte/pixel/time/count limits and zero image model context supersede
@@ -110,7 +136,13 @@ retrieved OpenAPI and SDK 0.5.3 without credentials: status is POST, screenshot
 is an exec/file workflow, and no direct screenshot route exists in that schema.
 Only synthetic fixture specification is implemented. Live transport, production
 decoder, runtime integration, persistence/schema and model disclosure stay gated;
-CU-02 actions are not started. The older research below is historical, not
+CU-02 now implements bounded headless Rust action controls against mock transport
+under [ADR 0023](../adr/0023-bounded-desktop-actions.md), explicitly Accepted with
+maintainer clarifications before dependent code. Limits are two actions/receipts,
+30 s per run, 3 s transport wait and experimental 5 s native-frame freshness; no
+silent refresh/approval reuse. This adds no real screenshot receipt/transport or
+runtime/model registration and preserves CU-01 image/privacy gates.
+The older research below is historical, not
 implementation authority. RE-02 live validation remains separately pending.
 
 Official [desktop guide](https://instabox.sh/docs/desktop) and

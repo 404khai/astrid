@@ -92,6 +92,14 @@ pub enum EventKind {
     ContextPrepared {
         snapshot: crate::context::ContextSnapshot,
     },
+    /// Authorized request-local image supplement to an unchanged text selection.
+    /// Numeric admission metadata only; no image, frame ID, target or hash.
+    ImageInputAdmitted {
+        snapshot: crate::context::ContextSnapshot,
+        width: u32,
+        height: u32,
+        estimated_input_tokens: usize,
+    },
     ModelFirstTextDelta,
     ModelTextDelta {
         text: String,
@@ -195,6 +203,8 @@ pub struct ModelState {
     pub turn_id: TurnId,
     pub first_text: bool,
     pub context: Option<crate::context::ContextSnapshot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_admission: Option<crate::context::ContextSnapshot>,
     #[serde(default)]
     pub usage: Option<crate::observability::Usage>,
     #[serde(default)]
@@ -398,6 +408,7 @@ impl ExecutionState {
             EventKind::ModelCallStarted { .. }
             | EventKind::ModelRouteSelected { .. }
             | EventKind::ContextPrepared { .. }
+            | EventKind::ImageInputAdmitted { .. }
             | EventKind::ModelFirstTextDelta
             | EventKind::ModelTextDelta { .. }
             | EventKind::ModelCallCompleted { .. }
@@ -407,6 +418,15 @@ impl ExecutionState {
                 e.turn_id.is_some() && e.model_call_id.is_some() && e.tool_call_id.is_none(),
             )?,
             EventKind::CancellationRequested => {}
+            EventKind::PermissionRequested { .. }
+            | EventKind::PermissionGranted
+            | EventKind::PermissionDenied
+            | EventKind::PermissionCancelled
+            | EventKind::PermissionFailed { .. }
+                if e.tool_call_id.is_none() =>
+            {
+                require(e.turn_id.is_some() && e.model_call_id.is_some())?;
+            }
             _ => require(
                 e.turn_id.is_some() && e.model_call_id.is_some() && e.tool_call_id.is_some(),
             )?,
@@ -639,6 +659,7 @@ impl ExecutionState {
                         turn_id: turn()?,
                         first_text: false,
                         context: None,
+                        image_admission: None,
                         usage: None,
                         route: None,
                     },
@@ -659,13 +680,72 @@ impl ExecutionState {
                 )?;
                 m.route = Some(decision.clone());
             }
+            EventKind::ImageInputAdmitted {
+                snapshot,
+                width,
+                height,
+                estimated_input_tokens,
+            } => {
+                let selection = self.context_selection.as_ref().ok_or_else(|| {
+                    TransitionError("image requires bounded text selection".into())
+                })?;
+                let base = &selection.snapshot;
+                let image = snapshot
+                    .measurements
+                    .last()
+                    .ok_or_else(|| TransitionError("missing image measurement".into()))?;
+                let expected_estimate =
+                    ((*width as usize).div_ceil(32) * (*height as usize).div_ceil(32) * 6)
+                        .div_ceil(5)
+                        + 1;
+                require(
+                    *width > 0
+                        && *height > 0
+                        && *width <= 2560
+                        && *height <= 2560
+                        && u64::from(*width) * u64::from(*height) <= 4_096_000,
+                )?;
+                require(*estimated_input_tokens == expected_estimate)?;
+                require(
+                    snapshot.measurements.len() == base.measurements.len() + 1
+                        && snapshot.measurements[..base.measurements.len()] == base.measurements
+                        && image.source == crate::context::ContextSource::ImageInput
+                        && image.entries == 1
+                        && image.contains_opaque_data
+                        && image.serialized_bytes <= 1_500_000
+                        && snapshot.serialized_request_bytes
+                            == base
+                                .serialized_request_bytes
+                                .saturating_add(image.serialized_bytes)
+                        && snapshot
+                            .non_opaque_json_size_token_heuristic
+                            .checked_sub(base.non_opaque_json_size_token_heuristic)
+                            .is_some_and(|n| n <= 256)
+                        && selection.budget.admits(snapshot)
+                        && snapshot
+                            .non_opaque_json_size_token_heuristic
+                            .saturating_add(*estimated_input_tokens)
+                            <= selection.budget.estimated_context_tokens
+                                - selection.budget.response_reserve_tokens,
+                )?;
+                let m = self.models.get_mut(&model()?).expect("known model");
+                require(
+                    m.status == Status::Granted
+                        && m.context.is_none()
+                        && m.image_admission.is_none()
+                        && !m.first_text
+                        && !self.cancellation_acknowledged,
+                )?;
+                m.image_admission = Some(snapshot.clone());
+                m.status = Status::Running;
+            }
             EventKind::ContextPrepared { snapshot } => {
                 if self.turns[&turn()?].context_selected {
-                    require(
-                        self.context_selection
-                            .as_ref()
-                            .is_some_and(|selection| &selection.snapshot == snapshot),
-                    )?;
+                    let expected = self.models[&model()?]
+                        .image_admission
+                        .as_ref()
+                        .or_else(|| self.context_selection.as_ref().map(|s| &s.snapshot));
+                    require(expected == Some(snapshot))?;
                 }
                 let m = self.models.get_mut(&model()?).expect("known model");
                 require(
@@ -734,6 +814,38 @@ impl ExecutionState {
                     },
                 );
             }
+            EventKind::PermissionRequested { .. }
+            | EventKind::PermissionGranted
+            | EventKind::PermissionDenied
+            | EventKind::PermissionCancelled
+            | EventKind::PermissionFailed { .. }
+                if e.tool_call_id.is_none() =>
+            {
+                // Request-local provider disclosure: model-scoped approval, no
+                // fictitious tool call/result and no added persisted event fields.
+                let m = self
+                    .models
+                    .get_mut(&model()?)
+                    .ok_or_else(|| TransitionError("unknown model disclosure parent".into()))?;
+                if matches!(e.kind, EventKind::PermissionRequested { .. }) {
+                    require(
+                        m.status == Status::Running
+                            && m.context.is_none()
+                            && m.image_admission.is_none()
+                            && !m.first_text
+                            && !self.cancellation_acknowledged,
+                    )?;
+                    m.status = Status::WaitingPermission;
+                } else {
+                    require(m.status == Status::WaitingPermission)?;
+                    m.status = if matches!(e.kind, EventKind::PermissionGranted) {
+                        require(!self.cancellation_acknowledged)?;
+                        Status::Granted
+                    } else {
+                        Status::Running
+                    };
+                }
+            }
             EventKind::PermissionPolicyEvaluated { .. }
             | EventKind::RemotePermissionRequired { .. }
             | EventKind::ToolOutput { .. }
@@ -770,7 +882,10 @@ impl ExecutionState {
                         require(
                             t.status == Status::Pending
                                 && t.permission.is_none()
-                                && t.call.name == "instabox_exec"
+                                && matches!(
+                                    t.call.name.as_str(),
+                                    "instabox_exec" | "instabox_observe" | "instabox_action"
+                                )
                                 && !self.cancellation_acknowledged,
                         )?;
                         let action = if *available {
