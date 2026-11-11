@@ -1,0 +1,56 @@
+# Astrid presence (macOS)
+
+V2-01's presence host: Astrid's own cursor (the "Arrow click" from
+`web/src/components/cursors.tsx`) with the Astrid mark trailing it, hand-drawn
+ink and subtitles, drawn over every app on every display from a scripted event
+stream. No model, no screen capture, no input injection, no network listener.
+The mark's eyes follow your real pointer through `NSEvent.mouseLocation`, which
+needs no permissions. Contract: [ADR 0026](../../docs/adr/0026-presence-host-and-protocol.md).
+
+Requires macOS 14+ and Swift 5.9+ (Xcode or Command Line Tools).
+
+```sh
+cd apps/presence-mac
+swift build                                   # build
+swift test                                    # 29 deterministic tests (protocol, geometry, motion, ink)
+.build/debug/astrid-presence                  # play the demo tour (same as --demo)
+.build/debug/astrid-presence --print-demo > /tmp/tour.jsonl   # demo as editable JSON lines
+.build/debug/astrid-presence --script /tmp/tour.jsonl         # play a script file
+.build/debug/astrid-presence --stdin < scripts/example.jsonl  # stream events on stdin
+.build/debug/astrid-presence --reduce-motion                  # force Reduce Motion behaviour
+```
+
+Quit with **Ctrl-C** in the terminal, the **Astrid icon in the menu bar → Quit
+Astrid Presence**, or a `{"v":1,"type":"quit"}` event. `--exit-at-end` quits
+once the input ends and the queue drains.
+
+`--snapshot DIR` writes PNGs of Astrid's own layers (never the screen beneath)
+once a second; it is how the host is checked without Screen Recording access.
+
+## Protocol v1 in one screen
+
+One JSON object per line, `#` lines are comments in scripts. Coordinates are
+global points from the primary display's top-left corner (y down), or relative
+to a display with `"display": n` (0 = primary). The `ready` line on stdout lists
+the displays.
+
+```jsonl
+{"v":1,"type":"show","x":700,"y":400}
+{"v":1,"type":"point_at","x":300,"y":250}
+{"v":1,"type":"sketch","shapes":[{"kind":"circle","x":300,"y":250,"r":60}]}
+{"v":1,"type":"say","text":"This is the button you want."}
+{"v":1,"type":"wait","ms":2500}
+{"v":1,"type":"sketch","shapes":[{"kind":"arrow","from":[500,500],"to":[330,280]}]}
+{"v":1,"type":"say","text":"Streaming partial","final":false}
+{"v":1,"type":"clear_ink"}
+{"v":1,"type":"hide"}
+{"v":1,"type":"quit"}
+```
+
+## Layout
+
+- `Sources/PresenceCore`: protocol parsing/encoding, script player, display
+  geometry, motion (glide, trailing, gaze, bob, blink), ink geometry, the mark
+  and cursor art, demo generator. No AppKit; fully unit tested.
+- `Sources/AstridPresence`: the AppKit host (overlay panels, Core Animation
+  layers, frame loop, stdin reader, menu-bar item).

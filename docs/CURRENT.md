@@ -1,3 +1,34 @@
+# V2-01 presence on the Mac — 2026-11-11
+
+Maintainer: "let's start with V2-01 ... the overlay of astrid's logo, plus cursor
+from the components. open a PR when done and let me verify". Branch
+`feat/presence-overlay` from main `b2879784` (PR #28 merge), same checkout, no
+worktree; unrelated dirty/untracked files preserved and unstaged. v2 gameplan D1
+option (a) accepted for the presence host only in
+[ADR 0026](adr/0026-presence-host-and-protocol.md); D2–D5 remain open.
+
+`apps/presence-mac/` is a Swift package (macOS 14+, no Xcode project):
+`PresenceCore` (protocol v1 parse/encode with limits, script player, display
+geometry, glide/trail/gaze/bob/blink motion, ink geometry, mark and cursor art,
+demo generator) and the `astrid-presence` AppKit host (one click-through,
+non-activating `.screenSaver` panel per display, all Spaces, full-screen
+auxiliary; Core Animation; menu-bar quit; Reduce Motion followed live). Input is
+the bundled demo, a validated script file or stdin; no model, screen capture,
+input injection, network listener or Rust changes. Stdin is the future runtime
+sidecar seam.
+
+**`swift test`: 29 passed, 0 failed.** Headless runs: demo, script, stdin, error
+lines (stderr JSON with line numbers), invalid script refused with exit 2,
+disconnected display rejected, `--reduce-motion`. `screencapture` is denied in
+this session (no Screen Recording grant), so verification used `--snapshot`,
+which renders only Astrid's own layers: cursor, trailing mark, ink and subtitles
+were upright and placed as scripted. Only one built-in display was connected.
+**Pending maintainer eyes:** real-window composition, click-through,
+multiple displays, Spaces, full-screen apps, system Reduce Motion toggle, eye
+tracking. Cargo was not rerun (no Rust changes). PR against main, not merged.
+
+---
+
 # Visual upload/response deadlines implemented — 2026-10-23
 
 Maintainer requested return to `feat/foreground-computer-use` and explicitly

@@ -11,6 +11,15 @@ resident timer host)
 need explicit answers before dependent implementation. ADRs 0021–0025 and all
 grant/limit/privacy contracts remain binding. Frozen areas are kept, not deleted.
 
+**V2-01 started 2026-11-11.** Maintainer: "let's start with V2-01 ... the overlay
+of astrid's logo, plus cursor from the components. open a PR when done and let me
+verify". This accepts D1 option (a) for the presence host only
+([ADR 0026](docs/adr/0026-presence-host-and-protocol.md)): a native Swift/AppKit
+host in `apps/presence-mac/` driven by presence protocol v1 JSON lines (demo,
+script file or stdin). Branch `feat/presence-overlay` from main `b2879784`, same
+checkout, no worktree. No model, screen capture, input injection, network
+listener, Rust sidecar IPC, daemon or resident timers. D2–D5 stay open. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

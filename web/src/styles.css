@@ -3970,5 +3970,5 @@ kbd {
 }
 .astrid-cursor .cursor-tip > g > path:first-child {
   stroke-width: 1.7;
-  fill: color-mix(in srgb, currentColor 22%, transparent);
+  fill: currentColor;
 }
