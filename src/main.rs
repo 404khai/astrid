@@ -38,6 +38,21 @@ struct Cli {
     /// One-shot visual computer use; separate observe, action and per-frame image approvals.
     #[arg(long, global = true, requires = "instabox_machine")]
     computer_use: bool,
+    /// One-shot local look (ADR 0027): Astrid may see one display of this Mac,
+    /// one approval per frame (capture plus disclosure), then point and sketch.
+    #[arg(long, global = true, conflicts_with = "instabox_machine")]
+    look: bool,
+    /// Display index for --look (0 = the display with the menu bar).
+    #[arg(long, global = true, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=15), requires = "look")]
+    look_display: u32,
+    /// Presence host: `Astrid Presence.app` (recommended; it owns Screen Recording)
+    /// or the `astrid-presence` executable. Defaults to $ASTRID_PRESENCE_HOST.
+    #[arg(long, global = true, env = "ASTRID_PRESENCE_HOST", requires = "look")]
+    presence_host: Option<std::path::PathBuf>,
+    /// Development: the host draws a synthetic desktop instead of reading the
+    /// screen. That synthetic frame is still sent to the model on approval.
+    #[arg(long, global = true, requires = "look")]
+    presence_synthetic: bool,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -729,6 +744,16 @@ async fn conversation_loop(
 }
 
 fn validate_computer_scope(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+    if cli.look {
+        match &cli.command {
+            Some(Commands::Run{notes:false,model,routing:None,mode,read_policy,write_policy,shell_policy,..})
+                if astrid::computer::supported_model(model) && run_policy(false,*mode,*read_policy,*write_policy,*shell_policy) != PermissionPolicy::read_only()=>{},
+            _=>return Err("--look requires a fresh one-shot run, no notes/routing, and an explicitly supported image model".into()),
+        }
+        if cli.presence_host.is_none() {
+            return Err("--look needs --presence-host (Astrid Presence.app from apps/presence-mac/scripts/bundle.sh) or ASTRID_PRESENCE_HOST".into());
+        }
+    }
     if cli.computer_use {
         match &cli.command {
             Some(Commands::Run{notes:false,model,routing:None,mode,read_policy,write_policy,shell_policy,..})
@@ -757,6 +782,11 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         })
         .transpose()?;
+    let look = cli.look.then(|| LookSetup {
+        display: cli.look_display,
+        host: cli.presence_host.clone().expect("validated presence host"),
+        synthetic: cli.presence_synthetic,
+    });
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
         Some(command) => command,
@@ -1027,11 +1057,49 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 notes,
                 show_context,
                 remote.as_ref(),
+                look.as_ref(),
             )
             .await?;
         }
     }
     Ok(())
+}
+
+/// Invocation-only local look configuration. Nothing is persisted.
+struct LookSetup {
+    display: u32,
+    host: std::path::PathBuf,
+    synthetic: bool,
+}
+impl LookSetup {
+    async fn start(
+        &self,
+    ) -> Result<Arc<astrid::presence::PresenceHost>, Box<dyn std::error::Error>> {
+        let launch = astrid::presence::Launch::from_path(&self.host);
+        let mut extra = vec![];
+        if self.synthetic {
+            extra.extend(["--capture-source".to_string(), "synthetic".to_string()]);
+        }
+        let host = astrid::presence::PresenceHost::start(&launch, &extra).await?;
+        let displays = host.displays().len();
+        if self.display as usize >= displays {
+            host.quit().await;
+            return Err(format!(
+                "--look-display {} is not connected ({displays} display(s))",
+                self.display
+            )
+            .into());
+        }
+        // Astrid appears at the centre of the chosen display before looking.
+        let _ = astrid::presence::LookHost::present(
+            &host,
+            serde_json::json!({"v":1,"type":"show","display":self.display,
+                "x":host.displays()[self.display as usize]["width"].as_f64().unwrap_or(800.0) / 2.0,
+                "y":host.displays()[self.display as usize]["height"].as_f64().unwrap_or(500.0) / 2.0}),
+        )
+        .await;
+        Ok(Arc::new(host))
+    }
 }
 
 /// Shared one-shot client path, with provider injection only in deterministic tests.
@@ -1042,6 +1110,7 @@ async fn run_task(
     notes: bool,
     show_context: bool,
     remote: Option<&remote_cli::ForegroundRemote>,
+    look: Option<&LookSetup>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut console = Console::new(
         startup_identity(&config.model, tools.workspace(), config.permissions),
@@ -1057,6 +1126,22 @@ async fn run_task(
     if let Some(remote) = remote {
         tools = remote.install(tools, permission_sender)?;
     }
+    let presence = match look {
+        Some(look) => {
+            let host = look.start().await?;
+            let computer = astrid::computer::Computer::local(
+                format!("local-euid:{}", unsafe { libc::geteuid() }),
+                look.display,
+                host.clone(),
+                Arc::new(astrid::computer_png::DecodeWorker::new(
+                    std::env::current_exe()?,
+                )),
+            )?;
+            tools = tools.with_computer(computer);
+            Some(host)
+        }
+        None => None,
+    };
     let execution = runtime::run(
         provider,
         &tools,
@@ -1072,7 +1157,17 @@ async fn run_task(
         permission_receiver,
         &mut console,
     )
-    .await?;
+    .await;
+    if let Some(host) = &presence {
+        match &result {
+            Ok(result) if matches!(result.outcome, RunOutcome::Completed) => {
+                // Leave Astrid's pointing on screen briefly after the answer.
+                host.finish(Duration::from_secs(10)).await
+            }
+            _ => host.quit().await,
+        }
+    }
+    let result = result?;
     recording_notice(&result);
     if notes {
         eprintln!("Tool coverage (observations, not a factual-quality verdict):");
@@ -1319,6 +1414,98 @@ mod tests {
     }
 
     #[test]
+    fn local_look_scope_is_checked_before_any_host_or_authentication() {
+        let parse = |args: &[&str]| Cli::try_parse_from(args).unwrap();
+        let ok = parse(&[
+            "astrid",
+            "--look",
+            "--presence-host",
+            "/x/Astrid Presence.app",
+            "run",
+            "task",
+            "--model",
+            "gpt-5.6-sol",
+        ]);
+        assert!(validate_computer_scope(&ok).is_ok());
+        assert_eq!(ok.look_display, 0);
+        for args in [
+            vec![
+                "astrid",
+                "--look",
+                "--presence-host",
+                "/x/h",
+                "run",
+                "task",
+                "--model",
+                "unknown",
+            ],
+            vec![
+                "astrid",
+                "--look",
+                "--presence-host",
+                "/x/h",
+                "run",
+                "task",
+                "--model",
+                "gpt-5.6-sol",
+                "--notes",
+            ],
+            vec!["astrid", "--look", "--presence-host", "/x/h", "models"],
+            vec!["astrid", "--look", "--presence-host", "/x/h"],
+        ] {
+            assert!(validate_computer_scope(&parse(&args)).is_err(), "{args:?}");
+        }
+        // Without a host (and no $ASTRID_PRESENCE_HOST) the scope is rejected.
+        if std::env::var_os("ASTRID_PRESENCE_HOST").is_none() {
+            let missing = parse(&["astrid", "--look", "run", "task", "--model", "gpt-5.6-sol"]);
+            assert!(validate_computer_scope(&missing).is_err());
+        }
+        for args in [
+            // Local look and an InstaBox target are mutually exclusive.
+            vec![
+                "astrid",
+                "--look",
+                "--instabox-machine",
+                "m_0123456789abcdefghijklmnop",
+                "run",
+                "t",
+                "--model",
+                "gpt-5.6-sol",
+            ],
+            // Look options require --look.
+            vec![
+                "astrid",
+                "--look-display",
+                "1",
+                "run",
+                "t",
+                "--model",
+                "gpt-5.6-sol",
+            ],
+            vec![
+                "astrid",
+                "--presence-synthetic",
+                "run",
+                "t",
+                "--model",
+                "gpt-5.6-sol",
+            ],
+            vec![
+                "astrid",
+                "--look",
+                "--look-display",
+                "16",
+                "run",
+                "t",
+                "--model",
+                "gpt-5.6-sol",
+            ],
+        ] {
+            assert!(Cli::try_parse_from(&args).is_err(), "{args:?}");
+        }
+    }
+
+    #[test]
     fn bare_cli_enters_prompt_but_explicit_run_requires_a_model() {
         assert!(Cli::try_parse_from(["astrid"]).unwrap().command.is_none());
         assert!(Cli::try_parse_from(["astrid", "run"]).is_err());
@@ -1523,9 +1710,17 @@ mod tests {
             max_model_calls: 4,
             permissions: policy,
         };
-        run_task(&server.provider, tools, config.clone(), true, false, None)
-            .await
-            .unwrap();
+        run_task(
+            &server.provider,
+            tools,
+            config.clone(),
+            true,
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert!(!root.path().join("created").exists());
         assert!(!root.path().join("shell-created").exists());
         let requests = server.finish().await;
@@ -1534,7 +1729,7 @@ mod tests {
         let failed = Server::http(503, vec![vec![]]).await;
         let tools =
             Tools::new(Workspace::new(root.path()).unwrap(), Duration::from_secs(2)).unwrap();
-        let error = run_task(&failed.provider, tools, config, true, false, None)
+        let error = run_task(&failed.provider, tools, config, true, false, None, None)
             .await
             .unwrap_err();
         assert!(error.to_string().contains("503"));

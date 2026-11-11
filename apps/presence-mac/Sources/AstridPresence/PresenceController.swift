@@ -17,6 +17,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     private let forceReduceMotion: Bool
     private let exitAtEnd: Bool
     private let snapshotDirectory: URL?
+    private let captureSource: CaptureSource
+    private var capturesInFlight = 0
     private var nextSnapshot = 0.0
     private var snapshotCount = 0
 
@@ -35,7 +37,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var signalSources: [DispatchSourceSignal] = []
 
-    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?) {
+    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?, captureSource: CaptureSource = .screen) {
+        self.captureSource = captureSource
         self.source = source
         self.snapshotDirectory = snapshotDirectory
         self.forceReduceMotion = forceReduceMotion
@@ -122,7 +125,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
             writeSnapshots()
         }
 
-        if exitAtEnd, inputEnded, player.isIdle, !motion.isMoving {
+        if exitAtEnd, inputEnded, player.isIdle, !motion.isMoving, capturesInFlight == 0 {
             NSApp.terminate(nil)
         }
     }
@@ -157,6 +160,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
                 break
             case .quit:
                 NSApp.terminate(nil)
+            case let .capture(requestId, display):
+                capture(requestId: requestId, display: display)
             }
         } catch let error as PresenceProtocolError {
             Output.error(error.message, line: nil)
@@ -176,6 +181,38 @@ final class PresenceController: NSObject, NSApplicationDelegate {
             let url = directory.appendingPathComponent(String(format: "display%d-%03d.png", scene.display.index, snapshotCount))
             let rep = NSBitmapImageRep(cgImage: image)
             try? rep.representation(using: .png, properties: [:])?.write(to: url)
+        }
+    }
+
+    // MARK: Capture (ADR 0027)
+
+    /// One frame for the runtime, answered on stdout. The overlay keeps
+    /// drawing; ScreenCaptureKit excludes this process's windows.
+    private func capture(requestId: String, display index: Int) {
+        let screens = NSScreen.screens
+        guard layout.displays.indices.contains(index), screens.indices.contains(index) else {
+            Output.emit(["type": "capture_failed", "request_id": requestId, "reason": "display_unavailable"])
+            return
+        }
+        let display = layout.displays[index], screen = screens[index], source = captureSource
+        capturesInFlight += 1
+        Task { @MainActor in
+            let result = await FrameCapture.capture(display: display, screen: screen, source: source)
+            let reply: [String: Any]
+            switch result {
+            case let .success(frame):
+                reply = ["type": "frame", "request_id": requestId, "display": index,
+                         "width": frame.width, "height": frame.height,
+                         "png_base64": frame.png.base64EncodedString()]
+            case let .failure(failure):
+                reply = ["type": "capture_failed", "request_id": requestId, "reason": failure.reason]
+            }
+            // A frame line can be over a megabyte; never block drawing on the
+            // reader draining the pipe.
+            Output.queue.async {
+                Output.emit(reply)
+                DispatchQueue.main.async { self.capturesInFlight -= 1 }
+            }
         }
     }
 
@@ -271,6 +308,9 @@ enum StatusIcon {
 
 /// JSON lines out: status on stdout, errors on stderr.
 enum Output {
+    /// Serial queue for large writes; keeps stdout lines whole and ordered.
+    static let queue = DispatchQueue(label: "astrid-presence-output")
+
     static func emit(_ fields: [String: Any]) {
         write(fields, to: FileHandle.standardOutput)
     }

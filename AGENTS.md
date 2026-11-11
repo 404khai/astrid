@@ -20,6 +20,8 @@ script file or stdin). Branch `feat/presence-overlay` from main `b2879784`, same
 checkout, no worktree. No model, screen capture, input injection, network
 listener, Rust sidecar IPC, daemon or resident timers. D2–D5 stay open. PR, no merge.
 
+**V2-02 started 2026-11-11.** PR #29 merged at the maintainer's "merge work on v2-02"; ADR 0027 option 1 accepted ("go for it, open the PR"). Branch `feat/ask-look-point`. Local look with one combined approval, host capture at 1x excluding the overlay, presentation tools. Live screen/model trials still need exact trial approval.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

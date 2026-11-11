@@ -120,6 +120,12 @@ impl Action {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FrameId(uuid::Uuid);
+impl FrameId {
+    /// A new frame identity for targets without an action controller (ADR 0027).
+    pub(crate) fn fresh() -> Self {
+        Self(uuid::Uuid::new_v4())
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -316,7 +322,7 @@ pub struct ActionController {
     first_observation: Option<Instant>,
     accounting: Accounting,
 }
-fn valid_geometry(width: u32, height: u32) -> bool {
+pub(crate) fn valid_geometry(width: u32, height: u32) -> bool {
     width > 0
         && height > 0
         && width <= 2560

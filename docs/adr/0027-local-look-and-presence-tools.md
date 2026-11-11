@@ -1,7 +1,8 @@
 # ADR 0027 — Local Mac look, ephemeral disclosure and presentation tools
 
 Date: 2026-11-11
-Status: **Proposed**. Needs the maintainer's explicit answer before dependent code.
+Status: **Accepted 2026-11-11 (option 1)**. The maintainer answered "go for it, open the PR, when done" to the decision below.
+Implementation notes: presentation calls validate against the run's latest look frame; two metadata-only events (`PresentationAllowed`, `ImageDisclosureCoveredByLook`) make the no-prompt paths explicit in the event state machine; the app bundle is launched through LaunchServices with private FIFOs.
 Related: ADRs 0022–0025 (remote observation, actions, disclosure, deadlines),
 0026 (presence host and protocol v1); [v2 gameplan](../plans/v2-gameplan.md) D2, V2-02;
 [V2-02 plan](../plans/v2-02-ask-look-point.md).

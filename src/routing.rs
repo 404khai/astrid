@@ -53,6 +53,8 @@ pub struct RequestOptions {
     /// Tool advertisement only; authority is rechecked by the foreground runtime.
     pub instabox_exec: bool,
     pub computer_use: bool,
+    /// ADR 0027 local look and presentation tools.
+    pub look: bool,
     pub effort: Option<ReasoningEffort>,
     pub replay: ReplayMode,
 }

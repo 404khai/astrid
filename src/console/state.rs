@@ -176,7 +176,7 @@ impl Presentation {
                     );
                 }
             }
-            EventKind::ImageInputAdmitted { .. } => {}
+            EventKind::ImageInputAdmitted { .. } | EventKind::ImageDisclosureCoveredByLook => {}
             EventKind::ContextPrepared { snapshot } => {
                 self.context_meter.prepared(snapshot);
                 self.line(&self.context_meter.line(), Ink::Dim);

@@ -17,6 +17,9 @@ OPTIONS
   --print-demo     Print the demo for the current displays as JSON lines and exit.
   --reduce-motion  Behave as if Reduce Motion were on (it is also followed live).
   --exit-at-end    Quit after the input ends and the queue drains.
+  --capture-source screen|synthetic
+                   Where `capture` events read frames (default screen, which needs
+                   Screen Recording permission). synthetic draws a fake desktop.
   --snapshot DIR   Debug: once a second, write PNGs of Astrid's own overlay layers
                    (never the screen beneath) to DIR.
   -h, --help       Show this help.
@@ -39,6 +42,7 @@ var source: PresenceController.Source = .demo
 var reduceMotion = false
 var exitAtEnd = false
 var snapshotDirectory: URL?
+var captureSource = CaptureSource.screen
 var arguments = CommandLine.arguments.dropFirst()
 var sourceCount = 0
 
@@ -79,6 +83,11 @@ while let argument = arguments.popFirst() {
         reduceMotion = true
     case "--exit-at-end":
         exitAtEnd = true
+    case "--capture-source":
+        guard let value = arguments.popFirst(), let parsed = CaptureSource(rawValue: value) else {
+            fail("--capture-source needs screen or synthetic")
+        }
+        captureSource = parsed
     case "--snapshot":
         guard let path = arguments.popFirst() else { fail("--snapshot needs a directory") }
         let url = URL(fileURLWithPath: path, isDirectory: true)
@@ -92,6 +101,6 @@ if sourceCount > 1 { fail("choose one of --demo, --script or --stdin") }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory)
+let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, captureSource: captureSource)
 app.delegate = controller
 app.run()

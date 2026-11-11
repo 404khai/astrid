@@ -56,6 +56,9 @@ public enum PresenceEvent: Equatable, Sendable {
     /// Script pacing: hold later events for a number of milliseconds.
     case wait(ms: Int)
     case quit
+    /// Capture one display at 1x point resolution, excluding Astrid's own
+    /// overlay (ADR 0027). Answered on stdout with `frame` or `capture_failed`.
+    case capture(requestId: String, display: Int)
 }
 
 public struct PresenceProtocolError: Error, Equatable, CustomStringConvertible {
@@ -130,6 +133,12 @@ extension PresenceProtocol {
             return .wait(ms: ms)
         case "quit":
             return .quit
+        case "capture":
+            guard let id = try reader.string("request_id"), isRequestId(id) else {
+                throw PresenceProtocolError("\"request_id\" must be 1...64 characters of [A-Za-z0-9-]")
+            }
+            guard let display = try reader.display() else { throw PresenceProtocolError("missing \"display\"") }
+            return .capture(requestId: id, display: display)
         default:
             throw PresenceProtocolError("unknown type \"\(type)\"")
         }
@@ -149,6 +158,10 @@ extension PresenceProtocol {
         case let kind:
             throw PresenceProtocolError("shape \(index): unknown kind \"\(kind)\"")
         }
+    }
+
+    static func isRequestId(_ id: String) -> Bool {
+        (1...64).contains(id.count) && id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
     }
 
     private static func checkMilliseconds(_ value: Int, _ name: String) throws {
@@ -301,6 +314,10 @@ extension PresenceProtocol {
             fields["ms"] = ms
         case .quit:
             fields["type"] = "quit"
+        case let .capture(requestId, display):
+            fields["type"] = "capture"
+            fields["request_id"] = requestId
+            fields["display"] = display
         }
         let data = try! JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys, .withoutEscapingSlashes])
         return String(decoding: data, as: UTF8.self)
