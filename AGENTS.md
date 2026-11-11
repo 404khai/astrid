@@ -1,3 +1,16 @@
+# v2 direction: over-the-shoulder personal agent — 2026-11-11
+
+Maintainer created branch `v2` (from `feat/foreground-computer-use`, same
+checkout, no worktree) to redefine Astrid as a very personal, polished agent
+that sees the user's laptop (later phone) on request and points, sketches,
+builds Anatomy isometric figures and walks the user through tasks, in the
+spirit of heyclicky. The website redesign is authorized and done first. The
+[v2 gameplan](docs/plans/v2-gameplan.md) is **Proposed**: decisions D1–D5
+(presence host, look-grant semantics, figure execution, roadmap precedence,
+resident timer host)
+need explicit answers before dependent implementation. ADRs 0021–0025 and all
+grant/limit/privacy contracts remain binding. Frozen areas are kept, not deleted.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
