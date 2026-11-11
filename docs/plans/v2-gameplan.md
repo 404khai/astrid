@@ -1,7 +1,9 @@
 # Astrid v2 gameplan: the over-the-shoulder agent
 
-Status: **Proposed** (maintainer direction, 2026-11-11, branch `v2`). Decisions
-D1–D5 below need explicit answers before dependent implementation.
+Status: **Proposed** (maintainer direction, 2026-11-11, branch `v2`). D1 is
+**accepted for the presence host** (option a, [ADR 0026](../adr/0026-presence-host-and-protocol.md),
+2026-11-11, when the maintainer started V2-01). D2–D5 still need explicit answers
+before dependent implementation.
 
 ## 1. What Astrid is now
 
@@ -151,7 +153,7 @@ approval, as with ADRs 0021–0025.
 | ID | Milestone | Exit criteria |
 |---|---|---|
 | V2-00 | **Direction and website** (this branch) | New positioning, site redesign, this gameplan. |
-| V2-01 | **Presence on the Mac** | Overlay host draws Astrid's cursor, ink and subtitles from a scripted event stream; multi-display, Spaces, full-screen apps, reduced motion, click-through verified. No model. |
+| V2-01 | **Presence on the Mac** (`apps/presence-mac`, in review) | Overlay host draws Astrid's cursor, ink and subtitles from a scripted event stream; multi-display, Spaces, full-screen apps, reduced motion, click-through verified. No model. |
 | V2-02 | **Ask, look, point** | Typed ask → one granted frame → vision model → `point_at` / `sketch` on the right target; grounding suite baseline recorded. |
 | V2-03a | **Everyday tools** | Timers and alarms that survive the chat; reminders and calendar events through EventKit with confirm cards; read-only local mail search. Each tool is mocked, then trialled live on exact scope. |
 | V2-03 | **Voice** | Push-to-talk, streaming STT/TTS, subtitles, barge-in cancellation; latency spans in traces. |
@@ -176,6 +178,10 @@ approval, as with ADRs 0021–0025.
 - Cost of changing later: **High.**
 - Decision: *Adopt a native macOS presence host with the Rust runtime as
   sidecar, superseding GPUI as the first desktop surface?*
+- **Answer (2026-11-11):** accepted for the presence host. The maintainer's
+  "let's start with V2-01 ... the overlay of astrid's logo, plus cursor" is the
+  go-ahead; [ADR 0026](../adr/0026-presence-host-and-protocol.md) records the
+  host and presence protocol v1. Rust sidecar IPC is a later slice (stdin pipe seam).
 
 **D2: Look-grant semantics for conversations and walkthroughs**
 
