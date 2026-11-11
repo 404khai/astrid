@@ -52,6 +52,7 @@ pub enum ReplayReason {
 pub struct RequestOptions {
     /// Tool advertisement only; authority is rechecked by the foreground runtime.
     pub instabox_exec: bool,
+    pub computer_use: bool,
     pub effort: Option<ReasoningEffort>,
     pub replay: ReplayMode,
 }
@@ -183,6 +184,40 @@ pub(crate) struct RequestProvider<'a> {
 }
 #[async_trait]
 impl ModelProvider for RequestProvider<'_> {
+    fn measure_visual_request(
+        &self,
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+    ) -> Result<Option<crate::context::ContextSnapshot>, ModelError> {
+        self.inner.measure_visual_request(
+            &ModelRequest {
+                options: self.options,
+                ..*request
+            },
+            image,
+        )
+    }
+    async fn generate_visual(
+        &self,
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+        grant: &crate::computer::DisclosureGrant,
+        cancel: &crate::cancellation::Cancellation,
+        text: &mut dyn TextSink,
+    ) -> Result<ModelResponse, ModelError> {
+        self.inner
+            .generate_visual(
+                &ModelRequest {
+                    options: self.options,
+                    ..*request
+                },
+                image,
+                grant,
+                cancel,
+                text,
+            )
+            .await
+    }
     fn provider_name(&self) -> Option<&'static str> {
         self.inner.provider_name()
     }

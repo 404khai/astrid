@@ -1,5 +1,7 @@
 # Astrid homepage
 
+v2 (2026-11-11): redesigned around Astrid as an over-the-shoulder personal agent. See [the v2 gameplan](../docs/plans/v2-gameplan.md) for the section-by-section design. The hero engine is generated with `node scripts/build-figure.mjs` (Anatomy kit, vendored in `vendor/anatomy`). Dashboard icons use Hugeicons (`@hugeicons/react`, free set); `VerseText` was supplied by the maintainer.
+
 Responsive React/TypeScript homepage based on Paper’s **Astrid / Homepage / Desktop** in the [Astrid design file](https://app.paper.design/file/01M44J87RWEKW0TNRSDQAYZXM5/p-1-0). Layout and typography values came from Paper’s JSX export. Product copy reflects the personal runtime direction and verified Phase 4 foundations in AGENTS.md; the terminal run is explicitly illustrative.
 
 ```sh

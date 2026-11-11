@@ -294,10 +294,11 @@ fn pty_child() {
     };
     if scenario == "absent_tty" {
         assert!(
-            !tokio::runtime::Runtime::new()
+            tokio::runtime::Runtime::new()
                 .unwrap()
                 .block_on(crate::terminal_answer())
-                .unwrap()
+                .is_err(),
+            "missing controlling terminal must be unavailable, never approval or a human denial"
         );
         return;
     }
@@ -815,7 +816,7 @@ fn pty_piped_output_preserves_canonical_approval_and_broken_pipe_exit() {
 }
 
 #[test]
-fn detached_client_without_tty_denies_approval() {
+fn detached_client_without_tty_reports_unavailable_approval() {
     let mut command = Command::new(std::env::current_exe().unwrap());
     command
         .args(["--exact", "console::pty_tests::pty_child", "--nocapture"])

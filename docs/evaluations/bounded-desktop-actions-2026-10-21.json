@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-21",
+  "branch": "feat/bounded-desktop-actions",
+  "baseline": "2daf811c1f6e5236c378ece320f52cb89e4b3e48",
+  "accepted_contract_commit": "b452ef23",
+  "scope": "Headless Rust controller with deterministic mocked transport only",
+  "decision": "ADR 0023 Accepted with all four maintainer clarifications",
+  "validation": [
+    {
+      "command": "cargo test --locked --offline -- --test-threads=1",
+      "passed": 327,
+      "failed": 0,
+      "ignored": 1,
+      "new_rust_tests": 19
+    },
+    {
+      "command": "cargo test --locked --offline --lib desktop -- --test-threads=1",
+      "passed": 19,
+      "scope": "Focused run before final full-suite pinned-source verification"
+    },
+    {
+      "cwd": "scripts",
+      "command": "python3 -m unittest -v test_screenshot_observation.py test_compare_routing.py",
+      "passed": 18,
+      "scope": "Existing CU-01/comparison regressions"
+    },
+    {
+      "command": "cargo fmt --check",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check; scoped Markdown link check",
+      "result": "passed"
+    }
+  ],
+  "sha256": {
+    "Cargo.toml": "9430001596680151ae2d5d6f7afcb36881f03c32c125202460f3a084609bf09e",
+    "Cargo.lock": "4cc5a93f8c19ae736586ec2478be98bca9fa2db274bf501b3d6dfbfe8cbded35",
+    "src/desktop.rs": "781a2d01effa0cff1a447888ed5d8a5b72d1edaa068230c3024ed726a05a45e4",
+    "src/desktop_tests.rs": "92810bc5e5b1efc4a7d230279451bc71e19489f4a08a22ab7ee97c9a0ff6a084",
+    "src/lib.rs": "d19597163f14124695cafb2126beb8327084ccbcacdf1e20ef68db13be09db25",
+    "src/observability.rs": "25941f8126eee1f33bde117e9dcf73e2462839712be5f695c5d7cc29f361846d"
+  },
+  "development_checks": {
+    "resolved": [
+      "Test temporary-borrow compile error",
+      "Test mutex held across await",
+      "Dropped-caller unknown flag initially placed in close rather than admission; regression caught and corrected"
+    ]
+  },
+  "remaining_limits": [
+    "Trusted host metadata is not verified screenshot provenance; one controller per run is host-owned, not globally enforced",
+    "Experimental 5-second human approval/freshness UX needs separate review",
+    "Async transport must cooperate with drop; local cancellation does not prove remote termination",
+    "Input acknowledgement does not verify UI effect",
+    "No production/live action transport, observation/runtime registration, image disclosure/persistence, background execution or live trial"
+  ],
+  "live_evidence": false,
+  "public_api_audit": {
+    "openapi_info_version": "1.0.0",
+    "openapi_sha256": "d317b385641e504f4af1137691c8d902ea7eb44af2a82c3632ff417e7e5982a3",
+    "sdk_version": "0.5.3",
+    "sdk_npm_shasum": "b91fae29342de5e8973f223df6dd442d8572d779"
+  },
+  "publication": {
+    "url": "https://github.com/404khai/astrid/pull/25",
+    "base": "main",
+    "merged": false
+  }
+}

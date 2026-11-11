@@ -126,6 +126,9 @@ pub enum ContextSource {
     ToolDefinitions,
     RequestFraming,
     Summary,
+    /// Request-local image wire bytes, excluded from the JSON bytes/4 heuristic.
+    /// Added only after text selection; never a persisted conversation Message.
+    ImageInput,
 }
 
 /// Aggregate metadata only; never contains prompt or continuation contents.

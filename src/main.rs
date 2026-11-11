@@ -35,6 +35,9 @@ struct Cli {
     /// Opt in for this foreground invocation only; each remote call still requires exact approval.
     #[arg(long, global = true, value_parser = remote_cli::machine_id)]
     instabox_machine: Option<String>,
+    /// One-shot visual computer use; separate observe, action and per-frame image approvals.
+    #[arg(long, global = true, requires = "instabox_machine")]
+    computer_use: bool,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -286,14 +289,11 @@ impl PermissionHandler for TerminalPermission {
 }
 
 async fn terminal_answer() -> io::Result<bool> {
-    let Ok(tty) = OpenOptions::new()
+    let tty = OpenOptions::new()
         .read(true)
         .write(true)
         .custom_flags(libc::O_NONBLOCK)
-        .open("/dev/tty")
-    else {
-        return Ok(false);
-    };
+        .open("/dev/tty")?;
     read_permission_answer(tty).await
 }
 
@@ -313,7 +313,10 @@ async fn read_permission_answer(tty: std::fs::File) -> io::Result<bool> {
             return Err(err);
         }
         if count == 0 {
-            return Ok(false);
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "permission input closed",
+            ));
         }
         answer.extend_from_slice(&bytes[..count as usize]);
         if answer.contains(&b'\n') {
@@ -326,6 +329,13 @@ async fn read_permission_answer(tty: std::fs::File) -> io::Result<bool> {
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    if std::env::args().nth(1).as_deref() == Some("__astrid_decode_png") {
+        return if astrid::computer_png::worker_stdio().is_ok() {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        };
+    }
     match execute(Cli::parse()).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -718,7 +728,19 @@ async fn conversation_loop(
     }
 }
 
+fn validate_computer_scope(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+    if cli.computer_use {
+        match &cli.command {
+            Some(Commands::Run{notes:false,model,routing:None,mode,read_policy,write_policy,shell_policy,..})
+                if astrid::computer::supported_model(model) && run_policy(false,*mode,*read_policy,*write_policy,*shell_policy) != PermissionPolicy::read_only()=>{},
+            _=>return Err("--computer-use requires a fresh one-shot run, no notes/routing, and an explicitly supported image model".into()),
+        }
+    }
+    Ok(())
+}
+
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
+    validate_computer_scope(&cli)?;
     // Reject unsupported scopes before loading any remote credentials or provider setup.
     if cli.instabox_machine.is_some()
         && !matches!(cli.command, None | Some(Commands::Run { notes: false, .. }))
@@ -727,7 +749,13 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     }
     let remote = cli
         .instabox_machine
-        .map(remote_cli::ForegroundRemote::load)
+        .map(|machine| {
+            if cli.computer_use {
+                remote_cli::ForegroundRemote::load_computer(machine)
+            } else {
+                remote_cli::ForegroundRemote::load(machine)
+            }
+        })
         .transpose()?;
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
@@ -1247,6 +1275,50 @@ mod tests {
     }
 
     #[test]
+    fn computer_use_scope_is_checked_before_authentication() {
+        let parse = |extra: &[&str]| {
+            let mut args = vec![
+                "astrid",
+                "--computer-use",
+                "--instabox-machine",
+                "m_0123456789abcdefghijklmnop",
+            ];
+            args.extend_from_slice(extra);
+            Cli::try_parse_from(args).unwrap()
+        };
+        assert!(
+            validate_computer_scope(&parse(&["run", "task", "--model", "gpt-5.6-sol"])).is_ok()
+        );
+        for args in [
+            vec![],
+            vec!["models"],
+            vec!["run", "task", "--model", "unknown"],
+            vec!["run", "task", "--model", "gpt-5.6-sol", "--notes"],
+            vec![
+                "run",
+                "task",
+                "--model",
+                "gpt-5.6-sol",
+                "--routing",
+                "not-read.json",
+            ],
+        ] {
+            assert!(validate_computer_scope(&parse(&args)).is_err());
+        }
+        assert!(
+            Cli::try_parse_from([
+                "astrid",
+                "--computer-use",
+                "run",
+                "task",
+                "--model",
+                "gpt-5.6-sol"
+            ])
+            .is_err()
+        );
+    }
+
+    #[test]
     fn bare_cli_enters_prompt_but_explicit_run_requires_a_model() {
         assert!(Cli::try_parse_from(["astrid"]).unwrap().command.is_none());
         assert!(Cli::try_parse_from(["astrid", "run"]).is_err());
@@ -1476,7 +1548,7 @@ mod tests {
     }
     #[tokio::test]
     async fn nonblocking_permission_input_handles_fragmentation_denial_and_eof() {
-        for (answer, expected) in [("yes\n", true), ("no\n", false), ("", false)] {
+        for (answer, expected) in [("yes\n", true), ("no\n", false)] {
             let (reader, mut writer) = input();
             let supply = async {
                 for byte in answer.as_bytes() {
@@ -1487,6 +1559,18 @@ mod tests {
             };
             let (decision, ()) = tokio::join!(read_permission_answer(reader), supply);
             assert_eq!(decision.unwrap(), expected);
+        }
+    }
+    #[tokio::test]
+    async fn permission_input_eof_is_unavailable_instead_of_a_user_denial() {
+        for pending in ["", "yes"] {
+            let (reader, mut writer) = input();
+            writer.write_all(pending.as_bytes()).unwrap();
+            drop(writer);
+            assert_eq!(
+                read_permission_answer(reader).await.unwrap_err().kind(),
+                io::ErrorKind::UnexpectedEof
+            );
         }
     }
     #[tokio::test]

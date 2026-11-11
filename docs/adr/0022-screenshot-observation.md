@@ -2,10 +2,19 @@
 
 Date: 2026-10-21
 Status: Accepted — 2026-10-21, with the explicit gates below
-Implementation: Synthetic fixture specification only; no runtime capability installed.
+Implementation: Initial fixture slice implemented; accepted ADR 0024 now adds
+foreground runtime/transport/production decode and per-frame image disclosure.
 Related: ADRs 0004, 0006–0009, 0012, 0016, 0018, 0020, 0021;
 [CU-01 milestone](../milestones/screenshot-observation.md),
 [public API audit](../reviews/screenshot-observation-2026-10-21.md).
+
+## Integration amendment — 2026-10-21
+
+[Accepted ADR 0024](0024-foreground-computer-use-integration.md) supersedes only
+the production-code/runtime/private-result/native-image/provider-disclosure gates
+within its one-shot foreground scope. Retention, finite limits and separate grants
+remain binding; image persistence and actual live trials remain gated. The initial
+CU-01 scope below is retained as decision history.
 
 ## Context
 

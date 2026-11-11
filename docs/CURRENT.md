@@ -1,3 +1,185 @@
+# Visual upload/response deadlines implemented — 2026-10-23
+
+Maintainer requested return to `feat/foreground-computer-use` and explicitly
+accepted [ADR 0025](adr/0025-image-upload-response-deadlines.md) option 1. Switched
+from the preserved `experiment/gpui-spatial-workspace` branch in the same checkout;
+no new branch/worktree or desktop implementation. Dirty tracked bytes and all
+original untracked files were preserved. Branch-specific desktop build files now
+visible as untracked remain untouched and unstaged.
+
+Acceptance commit `fb332b86` precedes provider implementation. Preparation,
+authentication, exact single-use grant, bounded upload source and valid SSE headers
+must fit original ten-second image expiry. JSON/base64 application copies are
+dropped before send; tracked pending bytes and the frame are released before the
+longer response wait. Cancellation/drop clears pending source/frame ownership;
+expired/cancelled source polling cannot yield image bytes. Transport copies already
+handed off cannot be erased/recalled and are not proof of remote processing.
+
+A fixed sixty-second total visual attempt from POST admission now bounds response
+completion, including upload/header time. It never resets with streamed output.
+Only valid provider completion establishes a result; partial text stays interrupted
+on timeout/cancel, with no retry or synthetic completion/usage. Five-second action
+freshness, thirty-second operation windows, all other grants/budgets, private v2,
+original complete exchanges, context admission and metadata-only/off traces remain.
+No image persistence/replay, live calls, workers, Host/mobile or successor work.
+
+**362 full Rust passed, 0 failed, 1 existing overhead test ignored.** Final focused
+visual suite: **12 passed**, including one header-latency regression added after the
+full suite; production code unchanged after that full run. Strict all-target Clippy,
+fmt, whitespace and scoped documentation checks passed. Python was not rerun for
+Rust-only changes. [Review](reviews/visual-response-deadlines-2026-10-23.md),
+[evidence](evaluations/visual-response-deadlines-2026-10-23.json),
+[testing/use](guides/foreground-computer-use.md). Update PR #26 against main, no merge.
+Actual live completion remains separately scoped and unverified by mock evidence.
+
+---
+
+# Foreground computer-use integration — 2026-10-21
+
+The maintainer requested actual CU and explicitly accepted [ADR 0024](adr/0024-foreground-computer-use-integration.md)
+option 1. Contract commit `390bddec` precedes implementation on
+`feat/foreground-computer-use`, stacked on open CU-02 PR #25 (`4d10f91f`), same
+preserved checkout, no worktree. No merge or actual live operation is authorized.
+
+The fresh one-shot CLI now installs separately approved observation/action tools
+on an exact invocation-only target. Fixed InstaBox exec/status adapters capture
+PNG24 through bounded stdout pipes, validate/canonically decode in a killable
+helper, and install native receipts only after successful image admission. Typed
+click/type/scroll/key plans retain exact single-use grants, original finite limits,
+experimental five-second freshness and unknown-outcome stop/no retry semantics.
+
+A distinct per-frame approval sends one native image only to the next named
+supported OpenAI model request. Real byte and documented patch-estimate admission
+use unchanged budgets. One frame expires within ten seconds; no image persistence,
+Message variant, replay, saved image grant or private image continuation. Private
+v2 original results/provenance and visible-history semantics remain; traces retain
+metadata only, observability-off unchanged. No image-only actual usage is invented.
+
+**351 Rust passed, 0 failed, 1 existing overhead test ignored.** The earlier
+18 Python regressions passed; Python was not rerun for this Rust-only repair.
+Fmt, strict all-target Clippy and whitespace passed. The final focused 17-test
+computer suite revalidated the fixed cache-limited capture plan; three helper
+process tests include actual decode plus cancellation/deadline kill and reap.
+[Review](reviews/foreground-computer-use-2026-10-21.md),
+[evidence](evaluations/foreground-computer-use-2026-10-21.json),
+[milestone](milestones/foreground-computer-use.md),
+[testing/use](guides/foreground-computer-use.md).
+
+The application path is implemented and validated with synthetic images/local
+HTTP and model mocks. Live CU and RE-02 evidence remain pending separate exact
+existing-machine/action/disclosure trial authorization; no target was supplied.
+Real guest tools, model account availability, geometry, latency and UI effects
+remain unverified. Five-second freshness may reject normal use; practical approval
+UX requires separate review. No mobile/Host/workers/background loop, image
+persistence, provisioning, ports, secret transfer or successor work. Stop after
+the integration PR, left unmerged.
+
+Diagnostic follow-up: a reported observation failure exposed a CLI bug: generic
+remote summaries hid the host's categorical `failure` reason and successful CU
+results displayed null exec fields. The console now shows allowlisted failure
+stages while preserving unknown-outcome/no-retry semantics, and renders capture,
+status and input acknowledgements accurately. No raw server/screen contents are
+added. 71 binary tests passed (including two new diagnostic tests); strict
+all-target Clippy and formatting passed. The reported live root cause remains
+unidentified from the pasted output; no authenticated retry was performed.
+
+Capture transport follow-up: the next pasted result localized failure to capture,
+but transport parsing still collapsed HTTP rejection, command exit/timeout,
+provider truncation and invalid encoding into one message. These now have fixed
+safe categories; raw response bodies/guest stderr are still discarded. Limits,
+grants, private history and unknown-outcome/no-retry behavior are unchanged.
+The previously audited exec contract caps stdout at 1 MiB, so base64 can truncate
+an otherwise <=1 MiB PNG; no chunking, resize or larger allowance is inferred.
+
+The maintainer supplied an exact target and separately approved only one running-
+state GET plus `command -v import base64 head tr; test -S /tmp/.X11-unix/X1`, cwd
+`/data/home`, timeout 2 s, one attempt/no retry, with possible auto-wake and unknown
+post-admission cancellation. This is not screenshot/input/model/lifecycle approval.
+It was NOT dispatched: no INSTABOX_API_KEY in the tool process environment.
+No .env/private session or authenticated API was read/called; the cause on that
+machine remains unverified. The approved command can be run in the maintainer's
+own configured terminal; no key should be pasted into chat.
+
+Validation: 15 focused computer tests and all 71 binary tests passed; strict
+all-target Clippy, formatting and whitespace passed. Eleven mocked capture cases
+verify safe classification, no raw stderr/content, no retry and no frame admission.
+
+Disclosure approval repair: the maintainer reported typing yes before the CLI
+printed denial. The deadline had been mapped to false, and input errors also
+looked like refusal. Explicit no, expiry and unavailable input now have distinct
+codes/events; terminal open/EOF errors remain errors. A yes at the deadline still
+fails closed. The prompt shows remaining milliseconds at construction and states
+that the original ten-second capture lifetime is already running. No retention,
+freshness, disclosure or other authority is expanded; no live retry was performed.
+Clock-controlled runtime tests reproduce late yes with no image HTTP and checked
+event replay. 17 focused computer tests and all 72 CLI tests passed; strict
+all-target Clippy, formatting and whitespace passed. Full-suite results are in the
+integration evidence. User-supplied installation/capture output is partial live
+evidence only; provider image delivery and desktop actions remain unverified.
+
+Visual completion decision pending: user-supplied output shows a screen
+interpretation followed by `visual image deadline` before provider completion.
+Code inspection confirms the ten-second frame timer wraps the entire model stream.
+[ADR 0025](adr/0025-image-upload-response-deadlines.md) is Proposed: keep ten-second
+image/approval/upload cleanup, explicitly release application image/request buffers,
+and permit a fixed 60-second total visual provider-attempt response deadline.
+All other grants, budgets, action freshness, history/privacy and live gates remain.
+This changes ADR 0024's accepted whole-wait clause, so no dependent code is written
+until an explicit decision. No image/raw description is retained; no live call or
+runtime test was run for this documentation-only design. Prior 351-test evidence
+remains the last implementation result.
+
+Publication: [PR #26](https://github.com/404khai/astrid/pull/26) targets main,
+stacked on open #25. Contract `390bddec`, implementation `17d5f70c`; both PRs
+remain unmerged. No live operation or successor implementation was performed.
+
+---
+
+# Bounded headless desktop actions — 2026-10-21
+
+CU-02 is implemented on `feat/bounded-desktop-actions` from fetched main
+`2daf811c`, same preserved checkout, no worktree. PR #24 was already merged
+upstream; no PR merge is authorized or performed here. The maintainer explicitly
+accepted [ADR 0023](adr/0023-bounded-desktop-actions.md), including all four
+freshness/provenance/outcome/scope clarifications, committed as `b452ef23` before
+dependent Rust implementation. [PR #25](https://github.com/404khai/astrid/pull/25)
+is updated with the mocked controller for review against main and left unmerged.
+
+`src/desktop.rs` adds a headless action controller, separate exact-call broker/
+atomic single-use grant, typed click/type/scroll/key arguments and one-method
+mock transport seam. One native frame under experimental 5 s freshness per action;
+at most two receipt installations/actions, 30 s original run window, 3 s transport
+wait, 1024 bytes per typing action and 2048 per run. No silent recapture, approval
+reuse, budget growth or retry. Unknown post-admission outcomes and dropped callers
+close the controller; acknowledged input is not proof of UI effect or task success.
+
+Frame metadata is a trusted in-process assertion, not verified screenshot evidence.
+The host owns one controller per run/target; there is no global run registry.
+Replacement cannot reset receipt/action/window accounting. Future receipts must
+originate only from successfully admitted real observations with validated native
+geometry and full CU-01 accounting. Human approval may exceed the experimental
+5 s window; a practical live strategy needs separate review.
+
+**327 Rust passed, 0 failed, 1 ignored; 18 existing Python regression tests passed;
+fmt, strict all-target Clippy and whitespace passed.** Nineteen new Rust tests
+cover action binding/freshness/geometry/limits/atomic consumption/cancellation/
+unknown outcomes and persisted metadata privacy. [Review and next live contracts](reviews/bounded-desktop-actions-2026-10-21.md),
+[evidence](evaluations/bounded-desktop-actions-2026-10-21.json),
+[milestone](milestones/bounded-desktop-actions.md), [active plan](plans/remote-mobile-cli.md).
+
+The mocked CU-02 controller slice is complete; runtime/live CU-01/CU-02 acceptance
+remains gated on observation transport/production decode, real receipt admission,
+practical freshness approval, exact action transport and private runtime result/
+event contracts, then separately approved exact-machine trial. No target supplied.
+No live screenshot/input/metadata, model image disclosure, persistence, runtime/model
+tool registration, automatic loop, workers/background work, expanded permissions,
+Host/mobile, Phase 9, daemon, PTY, desktop client or next milestone. Private v2,
+original results/history/continuation/provenance, complete exchanges/context
+admission and ADRs 0008/0009/0021/0022 remain unchanged. Unrelated `.gitignore`,
+historical CURRENT content and user/recovery data remain outside task commits.
+
+---
+
 # Screenshot observation contract and fixtures — 2026-10-21
 
 CU-01 uses parent-created `feat/screenshot-observation` from main `7d7f45d5`,
