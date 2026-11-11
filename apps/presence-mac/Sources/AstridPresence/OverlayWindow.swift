@@ -178,13 +178,13 @@ final class CursorLayer: CALayer {
         arrow.lineWidth = AstridArt.arrowStrokeWidth * unit
         arrow.lineJoin = .round
         arrow.lineCap = .round
-        let sparks = CAShapeLayer()
-        sparks.path = (try? SVGPath.parse(AstridArt.cursorSparks))?.copy(using: &transform)
-        sparks.fillColor = nil
-        sparks.strokeColor = color.cgColor
-        sparks.lineWidth = AstridArt.sparkStrokeWidth * unit
-        sparks.lineCap = .round
-        for layer in [arrow, sparks] {
+        let lines = CAShapeLayer()
+        lines.path = (try? SVGPath.parse(AstridArt.cursorClickLines))?.copy(using: &transform)
+        lines.fillColor = nil
+        lines.strokeColor = color.cgColor
+        lines.lineWidth = AstridArt.clickLineWidth * unit
+        lines.lineCap = .round
+        for layer in [arrow, lines] {
             layer.frame = bounds
             layer.contentsScale = scale
             addSublayer(layer)

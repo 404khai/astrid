@@ -309,10 +309,13 @@ final class ArtTests: XCTestCase {
     func testCursorArrowHandlesImplicitAndRelativeCommands() throws {
         let arrow = try SVGPath.parse(AstridArt.cursorArrow).boundingBoxOfPath
         XCTAssertEqual(arrow, CGRect(x: 7, y: 6, width: 21, height: 23))
-        XCTAssertEqual(AstridArt.cursorSparks, "M5 2.5v-2M2.5 3.5l-1.5-1.5M7.5 3.5l1.5-1.5M1.5 6h-2")
-        let sparks = try SVGPath.parse(AstridArt.cursorSparks).boundingBoxOfPath
-        XCTAssertEqual(sparks.minX, -0.5, accuracy: 1e-9)
-        XCTAssertEqual(sparks.minY, 0.5, accuracy: 1e-9)
+        // Same path the web's clickFan(7, 6) emits.
+        XCTAssertEqual(AstridArt.cursorClickLines, "M4 6L1.5 6M4.88 3.88L3.11 2.11M7 3L7 0.5M9.12 3.88L10.89 2.11")
+        let lines = try SVGPath.parse(AstridArt.cursorClickLines).boundingBoxOfPath
+        XCTAssertEqual(lines.minX, 1.5, accuracy: 1e-9)
+        XCTAssertEqual(lines.minY, 0.5, accuracy: 1e-9)
+        // Every line stays above or level with the tip, clear of the arrow body.
+        XCTAssertLessThanOrEqual(lines.maxY, AstridArt.cursorHotspot.y)
     }
 
     func testRejectsUnsupportedPathData() {

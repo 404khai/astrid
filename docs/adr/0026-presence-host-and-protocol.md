@@ -70,8 +70,8 @@ for runs, grants and limits, so the host must be a thin client.
    stdout. Pipes keep the channel private to the two processes with no port or
    socket. Host → runtime inputs from the gameplan (`Ask`, `PushToTalk`,
    `Cancel`, `ApproveLook`) are not defined yet and need their own review.
-5. **Motion.** Mirrors `web/`: "Arrow click" cursor (hotspot 7,6, #6575FF, 22%
-   fill), the mark trailing at (+22, +18) with slower easing, 2.4 s bob,
+5. **Motion.** Mirrors `web/`: "Arrow click" cursor (hotspot 7,6, #6575FF, filled,
+   click lines fanned around the tip), the mark trailing at (+22, +18) with slower easing, 2.4 s bob,
    9 s blink and look-around loop (look-around only after the pointer rests 4 s),
    ink draw-on 0.75 s. Reduce Motion (system setting, followed live, or
    `--reduce-motion`) removes glides, trailing, fades, bob, blink and

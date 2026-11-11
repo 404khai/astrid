@@ -164,18 +164,25 @@ public enum AstridArt {
     public static let cursorSize: CGFloat = 30
     public static let cursorHotspot = CGPoint(x: 7, y: 6)
     public static let cursorArrow = "M7 6 28 16l-10.5 2.5L13 29Z"
-    /// `sparkle(5, 5, 2.5)`: four short click-spark strokes.
-    public static let cursorSparks = sparkle(x: 5, y: 5, r: 2.5)
+    /// `clickFan(7, 6)`: four click lines fanned around the tip (left,
+    /// up-left, up, up-right), matching the web cursor.
+    public static let cursorClickLines = clickFan(x: 7, y: 6)
     public static let cursorColor: UInt32 = 0x6575FF
-    public static let cursorFillAlpha: CGFloat = 0.22
+    public static let cursorFillAlpha: CGFloat = 1
     public static let arrowStrokeWidth: CGFloat = 1.7
-    public static let sparkStrokeWidth: CGFloat = 1.5
+    public static let clickLineWidth: CGFloat = 1.5
 
-    public static func sparkle(x: Double, y: Double, r: Double) -> String {
+    /// Rays from `inner` to `outer` around a tip at 180°, 225°, 270° and 315°
+    /// (y down), rounded to hundredths as on the web.
+    public static func clickFan(x: Double, y: Double, inner: Double = 3, outer: Double = 5.5) -> String {
         func n(_ v: Double) -> String {
-            v == v.rounded() ? String(Int(v)) : String(v)
+            let r = (v * 100).rounded() / 100
+            return r == r.rounded() ? String(Int(r)) : String(r)
         }
-        return "M\(n(x)) \(n(y - r))v-2M\(n(x - r)) \(n(y - r + 1))l-1.5-1.5M\(n(x + r)) \(n(y - r + 1))l1.5-1.5M\(n(x - r - 1)) \(n(y + 1))h-2"
+        return [180.0, 225, 270, 315].map { degrees in
+            let a = degrees * .pi / 180
+            return "M\(n(x + cos(a) * inner)) \(n(y + sin(a) * inner))L\(n(x + cos(a) * outer)) \(n(y + sin(a) * outer))"
+        }.joined()
     }
 
     // MARK: Ink and subtitles (web `.ink-layer`, `.subtitle`)
