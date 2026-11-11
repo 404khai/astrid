@@ -38,6 +38,10 @@ struct Cli {
     /// One-shot visual computer use; separate observe, action and per-frame image approvals.
     #[arg(long, global = true, requires = "instabox_machine")]
     computer_use: bool,
+    /// Read-only mail for this run (ADR 0028): apple, gmail or all. Each
+    /// mail_search/mail_read call still asks for approval.
+    #[arg(long, global = true, value_parser = ["apple", "gmail", "all"])]
+    mail: Option<String>,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -52,6 +56,86 @@ enum SettingsCommand {
         value: Switch,
     },
 }
+#[derive(Subcommand)]
+enum MailCommand {
+    /// Sign in to Gmail in the browser with read-only access; the token goes to the Keychain.
+    GmailLogin {
+        /// Print the sign-in URL without opening the browser.
+        #[arg(long)]
+        no_browser: bool,
+    },
+    /// Revoke Gmail access and delete the Keychain token.
+    GmailLogout,
+    /// Show which mail sources are ready, without reading any mail.
+    Status,
+}
+
+async fn mail_command(command: MailCommand) -> Result<(), Box<dyn std::error::Error>> {
+    use astrid::mail::{ClientConfig, Endpoints, keychain, login};
+    match command {
+        MailCommand::GmailLogin { no_browser } => {
+            let client = ClientConfig::load()?;
+            let token = login::run(&client, &Endpoints::default(), !no_browser).await?;
+            keychain::store(&token)?;
+            eprintln!(
+                "Gmail connected with read-only access (gmail.readonly). Token stored in your login Keychain as \"Astrid Gmail (read-only)\"."
+            );
+        }
+        MailCommand::GmailLogout => {
+            let revoked = match keychain::read()? {
+                Some(token) => login::revoke(&token, &Endpoints::default()).await,
+                None => false,
+            };
+            let deleted = keychain::delete();
+            eprintln!(
+                "Gmail token {}; Keychain item {}.",
+                if revoked {
+                    "revoked at Google"
+                } else {
+                    "not revoked (none stored or Google unreachable)"
+                },
+                if deleted { "deleted" } else { "not present" }
+            );
+        }
+        MailCommand::Status => {
+            let apple = astrid::mail::AppleMail::default_root().is_some_and(|p| p.is_dir());
+            let client = ClientConfig::path().is_some_and(|p| p.is_file());
+            let signed_in = keychain::read().ok().flatten().is_some();
+            println!(
+                "apple\t{}",
+                if apple {
+                    "Mail store present (Spotlight search; may need Full Disk Access)"
+                } else {
+                    "no ~/Library/Mail store found"
+                }
+            );
+            println!(
+                "gmail\t{}",
+                match (client, signed_in) {
+                    (true, true) => "signed in (read-only)",
+                    (true, false) => "client configured; run `astrid mail gmail-login`",
+                    (false, _) =>
+                        "save your Google OAuth desktop client as ~/.config/astrid/gmail-client.json",
+                }
+            );
+        }
+    }
+    Ok(())
+}
+
+fn mail_tools(choice: &str) -> Result<astrid::mail::Mail, Box<dyn std::error::Error>> {
+    use astrid::mail::{AppleMail, Gmail, MailSource, Spotlight};
+    let mut sources: Vec<Arc<dyn MailSource>> = vec![];
+    if matches!(choice, "apple" | "all") {
+        let root = AppleMail::default_root().ok_or("HOME is not set")?;
+        sources.push(Arc::new(AppleMail::new(root, Arc::new(Spotlight))));
+    }
+    if matches!(choice, "gmail" | "all") {
+        sources.push(Arc::new(Gmail::load()?));
+    }
+    Ok(astrid::mail::Mail::new(sources)?)
+}
+
 #[derive(Subcommand)]
 enum BatchCommand {
     /// Execute a bounded caller-authored DAG with fresh read-only workers.
@@ -75,6 +159,11 @@ enum BatchCommand {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Gmail sign-in for read-only mail search (ADR 0028).
+    Mail {
+        #[command(subcommand)]
+        command: MailCommand,
+    },
     /// Explicit metadata discovery or exact-command execution on an existing InstaBox machine.
     Instabox {
         #[command(subcommand)]
@@ -741,6 +830,10 @@ fn validate_computer_scope(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> 
 
 async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     validate_computer_scope(&cli)?;
+    if cli.mail.is_some() && !matches!(cli.command, Some(Commands::Run { notes: false, .. })) {
+        return Err("--mail requires a one-shot run without --notes".into());
+    }
+    let mail = cli.mail.clone();
     // Reject unsupported scopes before loading any remote credentials or provider setup.
     if cli.instabox_machine.is_some()
         && !matches!(cli.command, None | Some(Commands::Run { notes: false, .. }))
@@ -759,12 +852,14 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         .transpose()?;
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
+        Some(Commands::Mail { command }) => return mail_command(command).await,
         Some(command) => command,
         None => return interactive_loop(remote).await,
     };
     let directory = auth::default_directory()?;
     match command {
         Commands::Instabox { command } => return instabox::run(command).await,
+        Commands::Mail { command } => return mail_command(command).await,
         Commands::Batch {
             command:
                 BatchCommand::Run {
@@ -1001,7 +1096,10 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             remember_model(&model)?;
-            let tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
+            let mut tools = Tools::new(workspace, Duration::from_secs(shell_timeout as u64))?;
+            if let Some(choice) = mail.as_deref() {
+                tools = tools.with_mail(mail_tools(choice)?);
+            }
             let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
             let policy = run_policy(notes, mode, read_policy, write_policy, shell_policy);
             let task = if notes {

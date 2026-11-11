@@ -20,6 +20,15 @@ script file or stdin). Branch `feat/presence-overlay` from main `b2879784`, same
 checkout, no worktree. No model, screen capture, input injection, network
 listener, Rust sidecar IPC, daemon or resident timers. D2–D5 stay open. PR, no merge.
 
+**V2-03a started 2026-11-11.** Maintainer: "let's start v2-03a ... apple mail ... also
+gmail" then "make all the decisions, yes for both". Accepted
+[ADR 0028](docs/adr/0028-read-only-mail.md) (read-only Apple Mail via Spotlight, and
+Gmail API `gmail.readonly` via OAuth PKCE with the token in Keychain) and
+[ADR 0029](docs/adr/0029-resident-presence-timers.md) (D5 a: resident menu-bar host owns
+timers/alarms). Branch `feat/everyday-mail-timers` from main. No sending/modifying
+mail; reminders/calendar EventKit is the next slice. Live mail access needs the
+maintainer's own sign-in; development used fixtures and mocks only. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

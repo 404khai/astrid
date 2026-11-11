@@ -53,6 +53,9 @@ pub struct RequestOptions {
     /// Tool advertisement only; authority is rechecked by the foreground runtime.
     pub instabox_exec: bool,
     pub computer_use: bool,
+    /// ADR 0028 mail tools for these enabled sources.
+    pub mail_apple: bool,
+    pub mail_gmail: bool,
     pub effort: Option<ReasoningEffort>,
     pub replay: ReplayMode,
 }

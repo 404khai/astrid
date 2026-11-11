@@ -72,6 +72,10 @@ pub trait ToolExecutor: Send + Sync {
     fn computer(&self) -> Option<&crate::computer::Computer> {
         None
     }
+    /// ADR 0028 read-only mail, installed per invocation by `--mail`.
+    fn mail(&self) -> Option<&crate::mail::Mail> {
+        None
+    }
     fn permission(&self, call: &ToolCall) -> Result<Option<PermissionRequest>, ToolError>;
     async fn execute(&self, call: &ToolCall, cancellation: &Cancellation) -> ToolExecution;
     async fn execute_stream(
@@ -89,6 +93,7 @@ pub struct Tools {
     shell_timeout: Duration,
     instabox: Option<crate::remote::InstaboxTool>,
     computer: Option<crate::computer::Computer>,
+    mail: Option<crate::mail::Mail>,
 }
 
 #[derive(Deserialize)]
@@ -128,6 +133,7 @@ impl Tools {
             shell_timeout,
             instabox: None,
             computer: None,
+            mail: None,
         })
     }
 
@@ -138,6 +144,10 @@ impl Tools {
     }
     pub fn with_computer(mut self, computer: crate::computer::Computer) -> Self {
         self.computer = Some(computer);
+        self
+    }
+    pub fn with_mail(mut self, mail: crate::mail::Mail) -> Self {
+        self.mail = Some(mail);
         self
     }
 
@@ -354,6 +364,9 @@ impl Tools {
 impl ToolExecutor for Tools {
     fn computer(&self) -> Option<&crate::computer::Computer> {
         self.computer.as_ref()
+    }
+    fn mail(&self) -> Option<&crate::mail::Mail> {
+        self.mail.as_ref()
     }
     fn instabox(&self) -> Option<&crate::remote::InstaboxTool> {
         self.instabox.as_ref()

@@ -28,6 +28,7 @@ pub mod computer_png;
 pub mod computer_wire;
 pub mod desktop;
 pub mod instabox;
+pub mod mail;
 pub mod remote;
 
 mod visual_upload;

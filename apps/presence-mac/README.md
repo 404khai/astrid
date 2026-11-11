@@ -54,3 +54,18 @@ the displays.
   and cursor art, demo generator. No AppKit; fully unit tested.
 - `Sources/AstridPresence`: the AppKit host (overlay panels, Core Animation
   layers, frame loop, stdin reader, menu-bar item).
+
+## Timers and alarms (ADR 0029)
+
+```sh
+.build/debug/astrid-presence --stdin --resident   # stays in the menu bar
+{"v":1,"type":"timer_start","id":"tea","seconds":180,"label":"Tea"}
+{"v":1,"type":"alarm_set","id":"wake","at":"2026-11-12T07:30:00Z","label":"Wake up"}
+{"v":1,"type":"timers_list"}
+{"v":1,"type":"timer_cancel","id":"tea"}
+```
+
+Timers persist in `~/Library/Application Support/Astrid/timers.json` (owner-only)
+and fire once on the next launch if they came due while the host was not running.
+The menu bar lists them; click one to cancel. Notifications appear only when
+running as `Astrid Presence.app` (`scripts/bundle.sh`).

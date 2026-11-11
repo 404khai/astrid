@@ -17,6 +17,9 @@ OPTIONS
   --print-demo     Print the demo for the current displays as JSON lines and exit.
   --reduce-motion  Behave as if Reduce Motion were on (it is also followed live).
   --exit-at-end    Quit after the input ends and the queue drains.
+  --resident       Stay in the menu bar and own timers/alarms (ADR 0029), saved in
+                   ~/Library/Application Support/Astrid/timers.json.
+  --timers-file PATH  Use another timers file (testing).
   --snapshot DIR   Debug: once a second, write PNGs of Astrid's own overlay layers
                    (never the screen beneath) to DIR.
   -h, --help       Show this help.
@@ -38,6 +41,8 @@ func currentLayout() -> DisplayLayout {
 var source: PresenceController.Source = .demo
 var reduceMotion = false
 var exitAtEnd = false
+var resident = false
+var timersURL = TimerStore.defaultURL
 var snapshotDirectory: URL?
 var arguments = CommandLine.arguments.dropFirst()
 var sourceCount = 0
@@ -79,6 +84,11 @@ while let argument = arguments.popFirst() {
         reduceMotion = true
     case "--exit-at-end":
         exitAtEnd = true
+    case "--resident":
+        resident = true
+    case "--timers-file":
+        guard let path = arguments.popFirst() else { fail("--timers-file needs a path") }
+        timersURL = URL(fileURLWithPath: path)
     case "--snapshot":
         guard let path = arguments.popFirst() else { fail("--snapshot needs a directory") }
         let url = URL(fileURLWithPath: path, isDirectory: true)
@@ -92,6 +102,6 @@ if sourceCount > 1 { fail("choose one of --demo, --script or --stdin") }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory)
+let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, resident: resident, timersURL: timersURL)
 app.delegate = controller
 app.run()

@@ -141,6 +141,16 @@ impl OpenAiProvider {
         if request.options.computer_use {
             definitions.extend(crate::computer::definitions());
         }
+        let mail: Vec<&str> = [
+            (request.options.mail_apple, "apple"),
+            (request.options.mail_gmail, "gmail"),
+        ]
+        .into_iter()
+        .filter_map(|(on, name)| on.then_some(name))
+        .collect();
+        if !mail.is_empty() {
+            definitions.extend(crate::mail::definitions(&mail));
+        }
         let mut body = json!({"model":request.model,"instructions":request.instructions,"input":input,
             "store":false,"stream":true,"include":["reasoning.encrypted_content"],
             "tools":[{"type":"namespace","name":"astrid","description":"Astrid workspace tools", "tools":definitions}]});
