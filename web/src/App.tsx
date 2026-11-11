@@ -1,10 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { RuneIcon } from "runeicons-react";
 import { AstridLogo } from "./components/AstridLogo";
+import { AstridHome } from "./components/AstridHome";
+import { Bento } from "./components/Bento";
+import { DnaExplainer } from "./components/DnaExplainer";
+import { Everyday } from "./components/Everyday";
+import { HeroScreen } from "./components/HeroScreen";
 import { LaptopMockupCard } from "./components/LaptopMockup";
+import { SpatialStack } from "./components/SpatialStack";
+import { VerseText } from "./components/VerseText";
+
+/** Section headings print in VerseText; "\n" keeps the designed line breaks. */
+function SectionTitle({ id, text }: { id?: string; text: string }) {
+  return (
+    <div className="h2" role="heading" aria-level={2} id={id}>
+      <VerseText text={text} tone="dark" idle={false} seed={text.length * 31} />
+    </div>
+  );
+}
 
 const repo = "https://github.com/404khai/astrid";
 const doc = (path: string) => `${repo}/blob/main/${path}`;
+const gameplan = `${repo}/blob/v2/docs/plans/v2-gameplan.md`;
 function Icon({ name = "arrow-right" }: { name?: string }) {
   return (
     <span className="icon" aria-hidden="true">
@@ -81,10 +98,11 @@ function Navigation() {
             aria-label="Mobile navigation"
           >
             {[
-              ["The loop", "#loop"],
-              ["Philosophy", "#philosophy"],
-              ["Roadmap", "#roadmap"],
-              ["Docs", doc("docs/architecture.md")],
+              ["See it work", "#demo"],
+              ["How it helps", "#help"],
+              ["Spatial", "#spatial"],
+              ["Gameplan", "#gameplan"],
+              ["Docs", "/docs.html"],
               ["Build notes", doc("docs/development.md")],
               ["Contributing", doc("AGENTS.md")],
               ["Issues", `${repo}/issues`],
@@ -98,9 +116,9 @@ function Navigation() {
         )}
       </div>
       <nav className="nav-box nav-left" aria-label="Sections">
-        <a href="#loop">The loop</a>
-        <a href="#philosophy">Philosophy</a>
-        <a href="#roadmap">Roadmap</a>
+        <a href="#help">How it helps</a>
+        <a href="#spatial">Spatial</a>
+        <a href="#gameplan">Gameplan</a>
       </nav>
       <a className="brand" href="#" aria-label="Astrid home">
         <AstridLogo animated tracking />
@@ -110,7 +128,7 @@ function Navigation() {
         <Icon name="arrow-up-right" />
       </a>
       <nav className="nav-box nav-right" aria-label="Project">
-        <a href={doc("docs/architecture.md")}>Docs</a>
+        <a href="/docs.html">Docs</a>
         <a href={repo}>GitHub</a>
         <div className="more" ref={menu}>
           <button
@@ -146,80 +164,43 @@ function Navigation() {
     </header>
   );
 }
-function LoopVisual() {
+function DemoVisual() {
   return (
-    <div className="loop-visual" id="loop">
+    <div className="loop-visual demo-visual" id="demo">
       <svg
         className="circuit"
-        viewBox="0 0 1280 440"
+        viewBox="0 0 1280 640"
         fill="none"
         aria-hidden="true"
       >
         <path
-          d="M32 302H190L260 372H1008L1078 302H1248 M32 132H190L260 62H1008L1078 132H1248"
+          d="M32 452H170L240 522H1040L1110 452H1248 M32 182H170L240 112H1040L1110 182H1248"
           stroke="#1A32EC"
           strokeWidth="2"
         />
         <path
-          d="M42 322H180L250 392H1018L1088 322H1238 M42 112H180L250 42H1018L1088 112H1238"
+          d="M42 472H160L230 542H1050L1120 472H1238 M42 162H160L230 92H1050L1120 162H1238"
           stroke="#151B55"
         />
-        <rect x="22" y="292" width="20" height="20" fill="#4459F9" />
-        <rect x="1238" y="122" width="20" height="20" fill="#4459F9" />
+        <rect x="22" y="442" width="20" height="20" fill="#4459F9" />
+        <rect x="1238" y="172" width="20" height="20" fill="#4459F9" />
       </svg>
-      <aside className="tool-note inspect">
-        <span className="eyebrow">01 / INSPECT</span>
-        <span>read_file</span>
-        <small>src/parser.rs</small>
-        <div className="code-bars" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-        </div>
-      </aside>
+      <p className="demo-note demo-note-left">
+        <span className="eyebrow">01 / LOOK</span>
+        <strong>You ask. It looks once.</strong>
+        <small>One frame of Preview, seen only because you asked.</small>
+      </p>
       <LaptopMockupCard variant="titanium">
-        <div className="terminal">
-          <div className="terminal-heading">
-            <span>astrid — ~/hello-world</span>
-            <span>ILLUSTRATIVE RUN</span>
-          </div>
-          <div className="terminal-body">
-            <p className="prompt">
-              <span>❯</span> find and fix the failing parser test
-            </p>
-            <p className="response">
-              I’ll inspect the parser, make a targeted edit,
-              <br />
-              then run the tests.
-            </p>
-            <div className="tool-rows">
-              {[
-                ["01", "read_file", "src/parser.rs", "complete"],
-                ["02", "edit_file", "handle empty input", "complete"],
-                ["03", "shell", "cargo test", "passed"],
-              ].map((row) => (
-                <div className="tool-row" key={row[0]}>
-                  <span>{row[0]}</span>
-                  <span>{row[1]}</span>
-                  <span>{row[2]}</span>
-                  <span>{row[3]}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <HeroScreen />
       </LaptopMockupCard>
-      <aside className="tool-note execute">
-        <span className="eyebrow">02 / EXECUTE</span>
-        <span>cargo test</span>
-        <small>test result: ok</small>
-        <span className="back-to-model">
-          <i /> back to model <Icon />
-        </span>
-      </aside>
+      <p className="demo-note demo-note-right">
+        <span className="eyebrow">02 / EXPLAIN</span>
+        <strong>Then it shows you.</strong>
+        <small>An engine built from page 4, walked through part by part.</small>
+      </p>
       <p className="loop-caption">
-        REQUEST <span>→</span> MODEL <span>→</span> TOOL <span>→</span> RESULT{" "}
-        <span>→</span> REPEAT
+        LOOK <span>→</span> POINT <span>→</span> SKETCH <span>→</span> EXPLAIN{" "}
+        <span>→</span> CHECK
       </p>
     </div>
   );
@@ -231,25 +212,102 @@ export function App() {
       <main id="main">
         <section className="hero" aria-labelledby="hero-title">
           <p className="eyebrow hero-label">
-            <i /> ASTRID / INFERENCE-AWARE PERSONAL AGENT RUNTIME
+            <i /> ASTRID / A PERSONAL AGENT THAT SEES WHAT YOU SEE
           </p>
           <h1 id="hero-title">
-            Inside the loop.
+            Don’t just get answers.
             <br />
-            Beyond the black box.
+            Get <span className="sweep">shown.</span>
           </h1>
           <p className="hero-description">
-            A personal agent runtime for exploring how agents reason,
-            <br className="desktop-break" /> use tools, and work with context.
-            Built to be understood.
+            Astrid looks at your screen when you ask, then points, sketches and
+            <br className="desktop-break" /> builds working diagrams right
+            where you’re stuck. Laptop now, phone next.
           </p>
           <div className="hero-actions">
             <Action href={repo}>Explore Astrid</Action>
-            <Action secondary href={doc("docs/architecture.md")}>
-              Read the architecture
+            <Action secondary href={gameplan}>
+              Read the gameplan
             </Action>
           </div>
-          <LoopVisual />
+          <DemoVisual />
+        </section>
+        <section
+          className="section help"
+          id="help"
+          aria-labelledby="help-title"
+        >
+          <div className="philosophy-heading">
+            <p className="eyebrow">01 / HOW IT HELPS</p>
+            <div>
+              <SectionTitle id="help-title" text={"Less chat window.\nMore over-the-shoulder."} />
+              <p className="section-description">
+                The best help is someone beside you who can see the screen,
+                <br className="desktop-break" /> point at the thing and draw
+                you a picture. Astrid is built to be that.
+              </p>
+            </div>
+          </div>
+          <Bento />
+        </section>
+        <section
+          className="section everyday-section"
+          id="everyday"
+          aria-labelledby="everyday-title"
+        >
+          <div className="philosophy-heading">
+            <p className="eyebrow">02 / EVERYDAY</p>
+            <div>
+              <SectionTitle id="everyday-title" text={"The small stuff,\nhandled out loud."} />
+              <p className="section-description">
+                Timers, alarms, your calendar, that one email from last March.
+                <br className="desktop-break" /> The basics a personal agent
+                should just do, planned for v2.
+              </p>
+            </div>
+          </div>
+          <div className="band-stage">
+            <Everyday />
+          </div>
+        </section>
+        <section className="explainer-section" id="explain" aria-label="Explanations with a pointer">
+          <DnaExplainer />
+        </section>
+        <section
+          className="section spatial-section"
+          id="spatial"
+          aria-labelledby="spatial-title"
+        >
+          <div className="roadmap-heading">
+            <div>
+              <p className="eyebrow">03 / SPATIAL BY DESIGN</p>
+              <SectionTitle id="spatial-title" text={"A layer over\neverything you use."} />
+            </div>
+            <p>
+              Astrid doesn’t replace your apps or pull you into its own.
+              <br className="desktop-break" /> It floats above them in three
+              thin, honest layers.
+            </p>
+          </div>
+          <SpatialStack />
+        </section>
+        <section
+          className="section home-section"
+          id="home"
+          aria-labelledby="home-title"
+        >
+          <div className="philosophy-heading">
+            <p className="eyebrow">04 / HOME BASE</p>
+            <div>
+              <SectionTitle id="home-title" text={"One quiet place\nfor everything it did."} />
+              <p className="section-description">
+                Every ask, sketch and walkthrough lands back here, with the
+                <br className="desktop-break" /> devices it can see and what it
+                is allowed to do in plain view.
+              </p>
+            </div>
+          </div>
+          <AstridHome />
         </section>
         <section
           className="section philosophy"
@@ -257,19 +315,14 @@ export function App() {
           aria-labelledby="philosophy-title"
         >
           <div className="philosophy-heading">
-            <p className="eyebrow">01 / THE PHILOSOPHY</p>
+            <p className="eyebrow">05 / UNDERNEATH</p>
             <div>
-              <h2 id="philosophy-title">
-                Capable agents deserve
-                <br />
-                understandable systems.
-              </h2>
+              <SectionTitle id="philosophy-title" text={"Personal means\nanswerable to you."} />
               <p className="section-description">
-                Astrid explores the machinery underneath agent behavior.
-                <br className="desktop-break" /> A small, deliberate system for
-                learning what makes an agent
-                <br className="desktop-break" /> reliable—and what happens when
-                it isn’t.
+                Under the polish is Astrid’s own Rust runtime: explicit
+                grants,
+                <br className="desktop-break" /> finite limits and traces you
+                can read. It earns every look.
               </p>
             </div>
           </div>
@@ -277,18 +330,18 @@ export function App() {
             {[
               [
                 "01",
-                "Make state explicit.",
-                "Runs, turns, tools, and context should have clear boundaries. If it matters, it should be visible.",
+                "Asks before it looks.",
+                "Each screenshot is its own single-use grant. No ambient watching, no silent recording, no stored frames.",
               ],
               [
                 "02",
-                "Measure before optimizing.",
-                "Understand where time, tokens, and cost go. Make better decisions with evidence, not guesswork.",
+                "Shows its work.",
+                "What it saw, why it pointed there and which model answered are all on the record, in metadata-only traces.",
               ],
               [
                 "03",
-                "Earn the autonomy.",
-                "Start with a reliable loop. Delegate within explicit permissions. Add capabilities when the foundations can support them.",
+                "Earns the autonomy.",
+                "Explaining comes first. Clicking for you comes later, one approved action at a time, on a fresh frame.",
               ],
             ].map(([number, title, description]) => (
               <article key={number}>
@@ -301,50 +354,43 @@ export function App() {
         </section>
         <section
           className="section roadmap"
-          id="roadmap"
+          id="gameplan"
           aria-labelledby="roadmap-title"
         >
           <div className="roadmap-heading">
             <div>
-              <p className="eyebrow">02 / BUILT IN PHASES</p>
-              <h2 id="roadmap-title">
-                Start small.
-                <br />
-                Understand deeply.
-              </h2>
+              <p className="eyebrow">06 / THE GAMEPLAN</p>
+              <SectionTitle id="roadmap-title" text={"Explain first.\nThen do."} />
             </div>
             <p>
-              Each phase asks a better question.
-              <br />
-              The goal is learning how capable agents work,
-              <br className="desktop-break" /> one observable primitive at a
-              time.
+              Each milestone ships something you can feel on your own screen,
+              <br className="desktop-break" /> on top of the runtime that is
+              already built.
             </p>
           </div>
           <div className="phase-panel">
             <article className="featured-phase">
               <div className="phase-meta">
-                <span>PHASE 04</span>
-                <span>FOUNDATION VERIFIED</span>
+                <span>V2 · 01</span>
+                <span>IN PROGRESS</span>
               </div>
-              <h3>See the loop.</h3>
+              <h3>Astrid on your Mac.</h3>
               <p>
-                Persistent traces. Context accounting. Inference telemetry.
-                <br className="desktop-break" /> Understand where time, tokens,
-                and tools go.
-                <br className="desktop-break" /> The foundations for bounded
-                personal delegation.
+                A floating presence over every app: its own cursor,
+                <br className="desktop-break" /> push-to-talk voice and a
+                sketch layer.
+                <br className="desktop-break" /> Sees one frame when you ask.
               </p>
               <span className="phase-sequence">
-                RUN → TRACE → INSPECT → UNDERSTAND
+                ASK → LOOK → POINT → SKETCH → EXPLAIN
               </span>
             </article>
             <div className="phase-list">
               {[
-                ["01", "Runtime model", "BUILT"],
-                ["02", "Execution environment", "VERIFIED"],
-                ["03", "Context engine", "VERIFIED"],
-                ["NEXT", "Mac desktop client", "PLANNED"],
+                ["02", "Anatomy figures, live", "NEXT"],
+                ["03", "Guided walkthroughs", "PLANNED"],
+                ["04", "Phone companion", "PLANNED"],
+                ["05", "Memory you control", "LATER"],
               ].map(([number, title, status]) => (
                 <div key={number}>
                   <span>{number}</span>
@@ -355,9 +401,9 @@ export function App() {
             </div>
           </div>
           <div className="roadmap-bottom">
-            <span>LEARNING → CORRECTNESS → OBSERVABILITY → CLARITY</span>
-            <a href={doc("docs/plans/personal-agent-roadmap.md")}>
-              Explore the full roadmap
+            <span>SEE → EXPLAIN → GUIDE → ACT</span>
+            <a href={gameplan}>
+              Read the full gameplan
               <Icon />
             </a>
           </div>
@@ -367,8 +413,8 @@ export function App() {
         <div className="footer-content">
           <div className="footer-callout">
             <div>
-              <p className="eyebrow">A WORK IN PROGRESS. BY DESIGN.</p>
-              <h2>Build it. Understand it.</h2>
+              <p className="eyebrow">A PERSONAL AGENT. BUILT IN THE OPEN.</p>
+              <SectionTitle text={"See it. Understand it."} />
             </div>
             <Action href={repo}>Explore Astrid</Action>
           </div>
@@ -376,26 +422,26 @@ export function App() {
             <div className="footer-brand">
               <AstridLogo />
               <p>
-                A personal agent runtime.
+                A personal agent that sees what you see.
                 <br />
-                Built to learn. Built to be understood.
+                Points, sketches and explains.
               </p>
             </div>
             {[
               {
                 title: "EXPLORE",
                 links: [
-                  ["The loop", "#loop"],
-                  ["Philosophy", "#philosophy"],
-                  ["Roadmap", "#roadmap"],
+                  ["See it work", "#demo"],
+                  ["How it helps", "#help"],
+                  ["Spatial", "#spatial"],
                 ],
               },
               {
                 title: "PROJECT",
                 links: [
                   ["GitHub", repo],
-                  ["Docs", doc("docs/architecture.md")],
-                  ["AGENTS.md", doc("AGENTS.md")],
+                  ["Gameplan", gameplan],
+                  ["Docs", "/docs.html"],
                 ],
               },
               {
@@ -419,12 +465,12 @@ export function App() {
           </div>
           <div className="footer-meta">
             <span>© 2026 ASTRID</span>
-            <span>AN EXPERIMENT IN UNDERSTANDING AGENTS.</span>
+            <span>HELP THAT LIVES ON YOUR SCREEN.</span>
             <span>DESIGNED & BUILT BY 404KHAI</span>
           </div>
         </div>
         <div className="wordmark" aria-hidden="true">
-          ASTRID
+          <VerseText text="ASTRID" tone="dark" seed={2026} />
         </div>
       </footer>
     </>

@@ -132,8 +132,8 @@ test("mobile Menu dismisses with Escape and closes after navigation", async ({
   await menu.click();
   await page
     .locator("#mobile-links")
-    .getByRole("link", { name: "Philosophy" })
+    .getByRole("link", { name: "Spatial" })
     .click();
   await expect(menu).toHaveAttribute("aria-expanded", "false");
-  await expect(page).toHaveURL(/#philosophy$/);
+  await expect(page).toHaveURL(/#spatial$/);
 });
