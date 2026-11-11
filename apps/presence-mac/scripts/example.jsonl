@@ -1,0 +1,19 @@
+# Astrid presence protocol v1 example. Coordinates are relative to the primary
+# display (display 0), top-left origin, in points. Edit freely.
+{"v":1,"type":"show","x":700,"y":420,"display":0}
+{"v":1,"type":"say","text":"Hi! This script came in on stdin."}
+{"v":1,"type":"wait","ms":2200}
+{"v":1,"type":"point_at","x":260,"y":200,"display":0}
+{"v":1,"type":"wait","ms":1100}
+{"v":1,"type":"sketch","display":0,"shapes":[{"kind":"circle","x":260,"y":200,"r":64}]}
+{"v":1,"type":"say","text":"I circle what matters"}
+{"v":1,"type":"wait","ms":2200}
+{"v":1,"type":"point_at","x":900,"y":520,"display":0}
+{"v":1,"type":"wait","ms":1100}
+{"v":1,"type":"sketch","display":0,"shapes":[{"kind":"arrow","from":[640,640],"to":[880,535]},{"kind":"line","from":[860,560],"to":[1010,556]}]}
+{"v":1,"type":"say","text":"and point the way","final":false}
+{"v":1,"type":"wait","ms":600}
+{"v":1,"type":"say","text":"and point the way to the next step."}
+{"v":1,"type":"wait","ms":3000}
+{"v":1,"type":"clear_ink"}
+{"v":1,"type":"say","text":"Done. I stay here until you quit (Ctrl-C or the menu bar)."}
