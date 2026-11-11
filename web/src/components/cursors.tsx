@@ -7,6 +7,17 @@ export type Cursor = { name: string; hot: [number, number]; art: ReactNode };
 const B = "currentColor";
 const line = { fill: "none", stroke: B, strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 const outlineArrow = "M5 4 26 14 15.5 16.5 11 27Z";
+const pointerHand =
+  "M10 7.5a2 2 0 0 1 4 0V15h.5v-2a2 2 0 0 1 4 0v2h.5v-1a2 2 0 0 1 4 0v1.5h.3a2 2 0 0 1 3.7 1V22c0 4-2.5 7-6.5 7H15c-2.5 0-4-1-5.5-3L4.6 20c-1-1.6.8-3.4 2.4-2.3L10 20Z";
+/** Click lines fanned around a tip: left, up-left, up and up-right. */
+const clickFan = (x: number, y: number, inner = 3, outer = 5.5) =>
+  [180, 225, 270, 315]
+    .map((deg) => {
+      const [c, s] = [Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180)];
+      const r = (v: number) => Math.round(v * 100) / 100;
+      return `M${r(x + c * inner)} ${r(y + s * inner)}L${r(x + c * outer)} ${r(y + s * outer)}`;
+    })
+    .join("");
 const sparkle = (x: number, y: number, r = 3) => (
   <g {...line} strokeWidth={1.1}>
     <path d={`M${x} ${y - r}v-2M${x - r} ${y - r + 1}l-1.5-1.5M${x + r} ${y - r + 1}l1.5-1.5M${x - r - 1} ${y + 1}h-2`} />
@@ -179,23 +190,15 @@ export const cursors: Cursor[] = [
     hot: [7, 6],
     art: (
       <g>
-        <path d="M7 6 28 16l-10.5 2.5L13 29Z" {...line} />
-        {sparkle(5, 5, 2.5)}
+        <path d="M7 6 28 16l-10.5 2.5L13 29Z" fill={B} stroke={B} strokeWidth={1.4} strokeLinejoin="round" />
+        <path d={clickFan(7, 6)} {...line} strokeWidth={1.1} />
       </g>
     ),
   },
   {
-    name: "Pointer tap",
-    hot: [12, 5],
-    art: (
-      <g>
-        <path {...line} strokeWidth={1.1} d="M12 2.4V.6M8.6 3.8 7 2.3M15.4 3.8 17 2.3M7.6 6.6H5.4" />
-        <path
-          fill={B}
-          d="M10 7.5a2 2 0 0 1 4 0V15h.5v-2a2 2 0 0 1 4 0v2h.5v-1a2 2 0 0 1 4 0v1.5h.3a2 2 0 0 1 3.7 1V22c0 4-2.5 7-6.5 7H15c-2.5 0-4-1-5.5-3L4.6 20c-1-1.6.8-3.4 2.4-2.3L10 20Z"
-        />
-      </g>
-    ),
+    name: "Pointer",
+    hot: [12, 6],
+    art: <path fill={B} d={pointerHand} />,
   },
   {
     name: "Press button",
@@ -209,16 +212,16 @@ export const cursors: Cursor[] = [
   },
   {
     name: "Tap",
-    hot: [12, 9],
+    hot: [12, 5],
     art: (
       <g>
-        <rect x="4" y="2" width="16" height="10" rx="5" {...line} />
-        <path {...line} d="M10 7.5a2 2 0 0 1 4 0V16h.5v-2a2 2 0 0 1 4 0v2h.5v-1a2 2 0 0 1 4 0v1.5a2 2 0 0 1 3.5 1.2V23c0 4-2.5 6.5-6.5 6.5H15c-2.4 0-3.8-1-5.3-3l-4.4-6.4c-1-1.6.8-3.3 2.4-2.2L10 20Z" />
+        <path {...line} strokeWidth={1.1} d="M12 2.4V.6M8.6 3.8 7 2.3M15.4 3.8 17 2.3M7.6 6.6H5.4" />
+        <path fill={B} d={pointerHand} />
       </g>
     ),
   },
 ];
 
 
-/** Astrid's own cursor across the site: the outline arrow with click sparks. */
+/** Astrid's own cursor across the site: the filled arrow with click lines fanned around its tip. */
 export const astridCursor = cursors.find((cursor) => cursor.name === "Arrow click")!;

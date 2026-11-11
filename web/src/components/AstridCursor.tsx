@@ -5,7 +5,7 @@ import { astridCursor } from "./cursors";
 const TIP = 30;
 const [hx, hy] = astridCursor.hot;
 
-/** Astrid's own pointer: the Arrow click cursor (outline arrow with click sparks), with the
+/** Astrid's own pointer: the Arrow click cursor (filled arrow with click lines around its tip), with the
  * Astrid mark (eyes tracking) trailing it; distinct from the system cursor so it is always clear who
  * is pointing. `stick` adds a whiteboard pointer whose tip is the hotspot. */
 export function AstridCursor({
