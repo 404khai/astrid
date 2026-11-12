@@ -57,6 +57,65 @@ enum SettingsCommand {
     },
 }
 #[derive(Subcommand)]
+enum OpencodeCommand {
+    /// Paste an OpenCode Go API key; it is stored in your login Keychain.
+    Login,
+    /// Delete the stored key from the Keychain.
+    Logout,
+    /// Show whether a key is available, without printing it.
+    Status,
+    /// List OpenCode Go models usable by Astrid (public catalog, no key needed).
+    Models,
+}
+
+async fn opencode_command(command: OpencodeCommand) -> Result<(), Box<dyn std::error::Error>> {
+    use astrid::opencode::{ApiKey, SERVICE};
+    match command {
+        OpencodeCommand::Login => {
+            eprintln!(
+                "Paste your OpenCode Go API key (opencode.ai → Go → API key) and press Return."
+            );
+            ApiKey::new(rpassword_line()?)?.store()?;
+            eprintln!(
+                "Stored in your login Keychain. List models with `astrid opencode models`, then run with --model opencode/<id>."
+            );
+        }
+        OpencodeCommand::Logout => eprintln!(
+            "Keychain key {}.",
+            if astrid::keychain::delete(SERVICE) {
+                "deleted"
+            } else {
+                "not present"
+            }
+        ),
+        OpencodeCommand::Status => println!(
+            "opencode\t{}",
+            if std::env::var("OPENCODE_API_KEY").is_ok_and(|k| !k.trim().is_empty()) {
+                "API key from OPENCODE_API_KEY"
+            } else if astrid::keychain::read(SERVICE).ok().flatten().is_some() {
+                "API key in Keychain"
+            } else {
+                "no key; run `astrid opencode login`"
+            }
+        ),
+        OpencodeCommand::Models => {
+            for model in astrid::opencode::catalog().await? {
+                println!(
+                    "opencode/{}\treasoning effort: {}",
+                    model.id,
+                    if model.efforts.is_empty() {
+                        "-".into()
+                    } else {
+                        model.efforts.join("/")
+                    }
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[derive(Subcommand)]
 enum ClaudeCommand {
     /// Paste a Claude Console API key; it is stored in your login Keychain.
     Login,
@@ -225,6 +284,11 @@ enum BatchCommand {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// OpenCode Go key and models for opencode/* models (ADR 0031).
+    Opencode {
+        #[command(subcommand)]
+        command: OpencodeCommand,
+    },
     /// Claude API key for claude-* models (ADR 0030).
     Claude {
         #[command(subcommand)]
@@ -925,6 +989,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
         Some(Commands::Mail { command }) => return mail_command(command).await,
         Some(Commands::Claude { command }) => return claude_command(command),
+        Some(Commands::Opencode { command }) => return opencode_command(command).await,
         Some(command) => command,
         None => return interactive_loop(remote).await,
     };
@@ -933,6 +998,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Instabox { command } => return instabox::run(command).await,
         Commands::Mail { command } => return mail_command(command).await,
         Commands::Claude { command } => return claude_command(command),
+        Commands::Opencode { command } => return opencode_command(command).await,
         Commands::Batch {
             command:
                 BatchCommand::Run {
@@ -1174,7 +1240,16 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 tools = tools.with_mail(mail_tools(choice)?);
             }
             // ADR 0030: exact claude-* model IDs use the Anthropic adapter.
-            let provider: Box<dyn astrid::model::ModelProvider> = if model.starts_with("claude-") {
+            let provider: Box<dyn astrid::model::ModelProvider> = if let Some(id) =
+                model.strip_prefix(astrid::opencode::PREFIX)
+            {
+                // ADR 0031: OpenCode Go, checked against the live public catalog.
+                let info = astrid::opencode::lookup(id).await?;
+                Box::new(astrid::opencode::OpenCodeProvider::new(
+                    astrid::opencode::ApiKey::load()?,
+                    info,
+                )?)
+            } else if model.starts_with("claude-") {
                 if !astrid::anthropic::supported_model(&model) {
                     return Err(format!("unsupported Claude model {model:?}; use claude-opus-5-5, claude-sonnet-5-5, claude-fable-5-1, claude-opus-5 or claude-haiku-4-5").into());
                 }

@@ -35,6 +35,12 @@ Anthropic Messages API adapter for exact `claude-*` model IDs with a Console API
 (env or Keychain). Consumer Claude subscriptions cannot back third-party apps.
 Branch `feat/claude-provider` stacked on `feat/everyday-mail-timers`. PR, no merge.
 
+**OpenCode Go provider 2026-11-12.** Maintainer: "you can merge the claude provider, add an
+opencode v2 provider and merge as well". PR #32 merged into the stack;
+[ADR 0031](docs/adr/0031-opencode-go-provider.md) adds `opencode/<id>` Chat Completions
+models with the required user agent and session header. Branch `feat/opencode-provider`
+stacked on `feat/everyday-mail-timers`, merged into that stack; main still needs #31.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

@@ -12,6 +12,7 @@ pub mod model;
 pub mod native;
 pub mod observability;
 pub mod openai;
+pub mod opencode;
 pub mod output;
 pub mod permissions;
 pub mod routing;
@@ -29,6 +30,7 @@ pub mod computer_png;
 pub mod computer_wire;
 pub mod desktop;
 pub mod instabox;
+pub mod keychain;
 pub mod mail;
 pub mod remote;
 
