@@ -29,6 +29,12 @@ timers/alarms). Branch `feat/everyday-mail-timers` from main. No sending/modifyi
 mail; reminders/calendar EventKit is the next slice. Live mail access needs the
 maintainer's own sign-in; development used fixtures and mocks only. PR, no merge.
 
+**Claude provider 2026-11-12.** Maintainer: "add a claude adapter to astrid, cuz that is
+the subscription I have right now". [ADR 0030](docs/adr/0030-claude-provider.md):
+Anthropic Messages API adapter for exact `claude-*` model IDs with a Console API key
+(env or Keychain). Consumer Claude subscriptions cannot back third-party apps.
+Branch `feat/claude-provider` stacked on `feat/everyday-mail-timers`. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
