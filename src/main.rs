@@ -57,6 +57,72 @@ enum SettingsCommand {
     },
 }
 #[derive(Subcommand)]
+enum ClaudeCommand {
+    /// Paste a Claude Console API key; it is stored in your login Keychain.
+    Login,
+    /// Delete the stored key from the Keychain.
+    Logout,
+    /// Show whether a key is available, without printing it.
+    Status,
+}
+
+fn claude_command(command: ClaudeCommand) -> Result<(), Box<dyn std::error::Error>> {
+    use astrid::anthropic::{ApiKey, keychain};
+    match command {
+        ClaudeCommand::Login => {
+            eprintln!(
+                "Paste an API key from https://platform.claude.com/settings/keys and press Return.\nClaude Pro/Max chat subscriptions cannot be used by third-party apps; API usage is billed to your Console account."
+            );
+            let key = rpassword_line()?;
+            keychain::store(&ApiKey::new(key)?)?;
+            eprintln!(
+                "Stored in your login Keychain as \"Astrid Claude API key\". Try: astrid run --model claude-opus-5-5 \"hello\""
+            );
+        }
+        ClaudeCommand::Logout => eprintln!(
+            "Keychain key {}.",
+            if keychain::delete() {
+                "deleted"
+            } else {
+                "not present"
+            }
+        ),
+        ClaudeCommand::Status => println!(
+            "claude\t{}",
+            if std::env::var("ANTHROPIC_API_KEY").is_ok_and(|k| !k.trim().is_empty()) {
+                "API key from ANTHROPIC_API_KEY"
+            } else if keychain::read().ok().flatten().is_some() {
+                "API key in Keychain"
+            } else {
+                "no key; run `astrid claude login`"
+            }
+        ),
+    }
+    Ok(())
+}
+
+/// Reads one line from the terminal with echo off, so the key is not shown.
+fn rpassword_line() -> Result<String, Box<dyn std::error::Error>> {
+    use std::io::BufRead;
+    let fd = libc::STDIN_FILENO;
+    let mut term: libc::termios = unsafe { std::mem::zeroed() };
+    let tty = unsafe { libc::tcgetattr(fd, &mut term) } == 0;
+    let original = term;
+    if tty {
+        term.c_lflag &= !libc::ECHO;
+        unsafe { libc::tcsetattr(fd, libc::TCSANOW, &term) };
+    }
+    let mut line = String::new();
+    let read = io::stdin().lock().read_line(&mut line);
+    if tty {
+        unsafe { libc::tcsetattr(fd, libc::TCSANOW, &original) };
+        eprintln!();
+    }
+    read?;
+    Ok(line.trim().to_owned())
+}
+
+#[derive(Subcommand)]
 enum MailCommand {
     /// Sign in to Gmail in the browser with read-only access; the token goes to the Keychain.
     GmailLogin {
@@ -159,6 +225,11 @@ enum BatchCommand {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Claude API key for claude-* models (ADR 0030).
+    Claude {
+        #[command(subcommand)]
+        command: ClaudeCommand,
+    },
     /// Gmail sign-in for read-only mail search (ADR 0028).
     Mail {
         #[command(subcommand)]
@@ -853,6 +924,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
         Some(Commands::Mail { command }) => return mail_command(command).await,
+        Some(Commands::Claude { command }) => return claude_command(command),
         Some(command) => command,
         None => return interactive_loop(remote).await,
     };
@@ -860,6 +932,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         Commands::Instabox { command } => return instabox::run(command).await,
         Commands::Mail { command } => return mail_command(command).await,
+        Commands::Claude { command } => return claude_command(command),
         Commands::Batch {
             command:
                 BatchCommand::Run {
@@ -1100,7 +1173,17 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             if let Some(choice) = mail.as_deref() {
                 tools = tools.with_mail(mail_tools(choice)?);
             }
-            let provider = OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?;
+            // ADR 0030: exact claude-* model IDs use the Anthropic adapter.
+            let provider: Box<dyn astrid::model::ModelProvider> = if model.starts_with("claude-") {
+                if !astrid::anthropic::supported_model(&model) {
+                    return Err(format!("unsupported Claude model {model:?}; use claude-opus-5-5, claude-sonnet-5-5, claude-fable-5-1, claude-opus-5 or claude-haiku-4-5").into());
+                }
+                Box::new(astrid::anthropic::ClaudeProvider::new(
+                    astrid::anthropic::ApiKey::load()?,
+                )?)
+            } else {
+                Box::new(OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?)
+            };
             let policy = run_policy(notes, mode, read_policy, write_policy, shell_policy);
             let task = if notes {
                 eprintln!("{}", notes_notice(&model, tools.workspace(), policy));
@@ -1111,7 +1194,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 task
             };
             run_task(
-                &provider,
+                provider.as_ref(),
                 tools,
                 RunConfig {
                     routing,

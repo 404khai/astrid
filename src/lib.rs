@@ -1,6 +1,7 @@
 //! Sequential, observable execution with headless conversational sessions and optional local idle snapshots.
 
 pub mod agent;
+pub mod anthropic;
 pub mod auth;
 pub mod cancellation;
 pub mod changes;
