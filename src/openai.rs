@@ -152,7 +152,7 @@ impl OpenAiProvider {
                                 .continuation
                                 .0
                                 .iter()
-                                .filter(|item| item["type"] != "anthropic_content")
+                                .filter(|item| !matches!(item["type"].as_str(), Some("anthropic_content" | "opencode_chat")))
                                 .cloned(),
                         );
                     }
@@ -678,7 +678,7 @@ pub fn completed_response(response: Value) -> Result<ModelResponse, ModelError> 
                 }
             }
             // Preserve opaque reasoning and other providers' replay items without interpreting them.
-            "reasoning" | "anthropic_content" => {}
+            "reasoning" | "anthropic_content" | "opencode_chat" => {}
             kind => {
                 return Err(ModelError::Protocol(format!(
                     "unsupported output item {kind}"
