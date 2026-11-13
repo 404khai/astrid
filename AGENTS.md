@@ -59,6 +59,16 @@ agent state components ... dia lvl polish of briefs". [ADR 0033](docs/adr/0033-p
 `astrid-presence --ask` + `astrid presence-ask`; web UI in `web/src/presence`. Branch
 `feat/presence-overlay` fast-forwarded to main first. PR, no merge.
 
+**V2-03 voice started 2026-11-13.** Maintainer: "let's work on V2-03, new branch ... voice ring
+listening component, it should react to sound ... open a PR". [ADR 0034](docs/adr/0034-push-to-talk-voice.md):
+push-to-talk on the ask surface, host-owned mic and on-device-only STT, VoiceRing driven by the host
+level. Branch `feat/voice-listening` from main. No TTS, barge-in or cloud STT yet. PR, no merge.
+
+**V2-03 spoken replies 2026-11-13.** Maintainer: "alright lets go for it. open pr when done" to
+local Kokoro TTS. [ADR 0035](docs/adr/0035-local-spoken-replies.md): `apps/astrid-voice` (Kokoro-82M via
+mlx-audio, JSON lines), host playback through the voice ring, macOS voice fallback, barge-in,
+metadata-only speech timings. Branch `feat/voice-speaking` stacked on `feat/voice-listening`. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

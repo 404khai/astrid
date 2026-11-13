@@ -156,7 +156,7 @@ approval, as with ADRs 0021–0025.
 | V2-01 | **Presence on the Mac** (`apps/presence-mac`, merged PR #29) | Overlay host draws Astrid's cursor, ink and subtitles from a scripted event stream; multi-display, Spaces, full-screen apps, reduced motion, click-through verified. No model. |
 | V2-02 | **Ask, look, point** ([plan](v2-02-ask-look-point.md); ADR 0027 accepted; PR #30) | Typed ask → one granted frame → vision model → `point_at` / `sketch` on the right target; grounding suite baseline recorded. |
 | V2-03a | **Everyday tools** (mail + timers in review; ADRs 0028/0029; EventKit next) | Timers and alarms that survive the chat; reminders and calendar events through EventKit with confirm cards; read-only local mail search. Each tool is mocked, then trialled live on exact scope. |
-| V2-03 | **Voice** | Push-to-talk, streaming STT/TTS, subtitles, barge-in cancellation; latency spans in traces. |
+| V2-03 | **Voice** (push-to-talk + on-device STT + voice ring in review; ADR 0034; TTS/barge-in next) | Push-to-talk, streaming STT/TTS, subtitles, barge-in cancellation; latency spans in traces. |
 | V2-04 | **Anatomy figures, live** | `show_figure` renders a sandboxed, interactive figure card next to the subject; figure checks pass. |
 | V2-05 | **Guided walkthroughs** | Multi-step tasks with wait/re-look/verify; never advances on an unverified step. |
 | V2-06 | **Phone companion** | Phone asks routed to the Mac runtime; Android overlay prototype. |

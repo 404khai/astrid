@@ -15,6 +15,9 @@ struct AskConfig {
     var astrid: URL
     var model: String
     var mail: String?
+    /// The `astrid-voice` executable (ADR 0035); nil uses macOS's built-in voice.
+    var voiceCommand: URL?
+    var voiceName = "af_heart"
 }
 
 final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
@@ -34,6 +37,10 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private static let margin: CGFloat = 20
     private var pointerTimer: Timer?
     private var lastPointer = NSPoint(x: -1, y: -1)
+    private let voice = VoiceInput()
+    private var hotkey: Hotkey?
+    private var dragTimer: Timer?
+    private let speaker: Speaker
 
     init(config: AskConfig) {
         self.config = config
@@ -43,6 +50,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         // scripts load with a real origin (file:// gives them a null origin).
         configuration.setURLSchemeHandler(UIFiles(root: config.ui.deletingLastPathComponent()), forURLScheme: "astrid-ui")
         web = WKWebView(frame: .zero, configuration: configuration)
+        speaker = Speaker(command: config.voiceCommand, voice: config.voiceName)
         super.init()
         configuration.userContentController.add(self, name: "astrid")
         panel.isOpaque = false
@@ -64,6 +72,17 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.trackPointer() }
         RunLoop.main.add(timer, forMode: .common)
         pointerTimer = timer
+        voice.onFrame = { [weak self] frame in self?.deliver(frame.message) }
+        speaker.onFrame = { [weak self] frame in
+            var message = frame.message
+            message["source"] = "speaker"
+            self?.deliver(message)
+        }
+        speaker.onSpeaking = { [weak self] on in self?.deliver(["type": "speaking", "on": on]) }
+        voice.onTranscript = { [weak self] text, final in self?.deliver(["type": "transcript", "text": text, "final": final]) }
+        voice.onError = { [weak self] message in self?.deliver(["type": "voice-error", "message": message]) }
+        // Hold ⌥Space anywhere to talk; the page opens itself and drives the mic.
+        hotkey = Hotkey { [weak self] down in self?.deliver(["type": "hotkey", "down": down]) }
     }
 
     private func trackPointer() {
@@ -96,6 +115,8 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 contentSize = NSSize(width: w, height: h)
                 place()
             }
+        case "drag-start":
+            startDrag()
         case "drag":
             // Web y grows downward; screen y grows upward.
             if let dx = body["dx"] as? Double, let dy = body["dy"] as? Double, dx.isFinite, dy.isFinite {
@@ -107,11 +128,26 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             }
         case "expanded":
             if body["expanded"] as? Bool == true {
+                speaker.prepare()
                 NSApp.activate(ignoringOtherApps: true)
                 panel.makeKey()
             } else {
                 panel.resignKey()
             }
+        case "listen":
+            // Talking over Astrid interrupts her (barge-in).
+            if body["on"] as? Bool == true {
+                speaker.stop()
+                speaker.prepare()
+                voice.start()
+            } else {
+                voice.stop()
+        speaker.shutdown()
+            }
+        case "speak":
+            if let text = body["text"] as? String { speaker.say(String(text.prefix(4000))) }
+        case "speak-stop":
+            speaker.stop()
         case "ask", "approve", "cancel":
             forward(body)
         case "open":
@@ -122,6 +158,31 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         default:
             break
         }
+    }
+
+    /// Moves the panel natively with the mouse until the button is released:
+    /// no per-move round trip through the page, so the drag stays smooth.
+    private func startDrag() {
+        dragTimer?.invalidate()
+        let offset = NSPoint(x: anchor.x - NSEvent.mouseLocation.x, y: anchor.y - NSEvent.mouseLocation.y)
+        let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { [weak self] timer in
+            guard let self else { return timer.invalidate() }
+            let mouse = NSEvent.mouseLocation
+            let next = NSPoint(x: mouse.x + offset.x, y: mouse.y + offset.y)
+            if next != self.anchor {
+                self.anchor = next
+                self.panel.setFrameOrigin(NSPoint(x: next.x - self.panel.frame.width / 2, y: next.y))
+            }
+            if NSEvent.pressedMouseButtons & 1 == 0 {
+                timer.invalidate()
+                self.dragTimer = nil
+                self.place()
+                let frame = self.panel.frame
+                self.anchor = NSPoint(x: frame.midX, y: frame.minY)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dragTimer = timer
     }
 
     // MARK: Runtime child
@@ -183,6 +244,11 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     /// Debug: with ASTRID_ASK_SNAPSHOT=/path.png, save the panel's own web
     /// content (never the screen) once the page has loaded.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Debug: ASTRID_SAY="text" speaks once the page is up, to check playback.
+        if let text = ProcessInfo.processInfo.environment["ASTRID_SAY"] {
+            speaker.prepare()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in self?.speaker.say(text) }
+        }
         guard let path = ProcessInfo.processInfo.environment["ASTRID_ASK_SNAPSHOT"] else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             webView.takeSnapshot(with: nil) { image, _ in
@@ -195,6 +261,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
 
     func stop() {
         pointerTimer?.invalidate()
+        voice.stop()
         child?.terminate()
     }
 }

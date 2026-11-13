@@ -27,6 +27,19 @@ once the input ends and the queue drains.
 `--snapshot DIR` writes PNGs of Astrid's own layers (never the screen beneath)
 once a second; it is how the host is checked without Screen Recording access.
 
+## Voice (ADR 0034)
+
+With `--ask`, hold **⌥Space** anywhere (or hold the mic in the input) to talk;
+let go to send. A quick tap on the mic keeps it open until the next tap; Esc
+cancels. Speech is recognised on-device only. Microphone access needs the app
+bundle's usage strings, so test it from the bundle:
+
+```sh
+(cd web && npx vite build -c vite.presence.config.ts) && cargo build \
+  && apps/presence-mac/scripts/bundle.sh \
+  && open "apps/presence-mac/.build/Astrid Presence.app" --args --ask
+```
+
 ## Protocol v1 in one screen
 
 One JSON object per line, `#` lines are comments in scripts. Coordinates are

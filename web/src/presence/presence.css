@@ -393,3 +393,107 @@ button {
     transition: none;
   }
 }
+
+/* Voice (V2-03): mic in the input, the voice ring while listening. */
+.pr-mic {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-right: -8px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  color: #8a8a8a;
+  transition: color 0.18s ease, background-color 0.18s ease;
+  touch-action: none;
+}
+.pr-mic:hover {
+  color: var(--ink);
+}
+.pr-mic-on {
+  color: #fff;
+  background: var(--button);
+}
+.pr-mic:focus-visible {
+  outline: 2px solid var(--eye);
+  outline-offset: 2px;
+}
+.pr-listen-ring {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin-bottom: 4px;
+  align-self: center;
+  pointer-events: none;
+}
+.pr-listen-mark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.pr-listen-mark .astrid-logo {
+  width: 40px;
+  height: 32px;
+}
+.pr-answer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pr-speak {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+.pr-speak:hover,
+.pr-speak-on {
+  color: var(--ink);
+  background: #262626;
+}
+.pr-speak:focus-visible {
+  outline: 2px solid var(--eye);
+  outline-offset: 2px;
+}
+
+/* Voice mode: the ring alone, no input; the mark in its centre leaves. */
+.pr-voice {
+  align-items: center;
+}
+.pr-voice-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: grab;
+}
+.pr-voice-stage .pr-listen-ring {
+  pointer-events: auto;
+}
+.pr-listen-exit {
+  inset: 50% auto auto 50%;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border-radius: 32px;
+  cursor: pointer;
+}
+.pr-listen-exit:focus-visible {
+  outline: 2px solid var(--eye);
+  outline-offset: 2px;
+}
+.pr-voice-caption {
+  margin: 0;
+  max-width: 360px;
+  min-height: 22px;
+  text-align: center;
+  color: var(--ink);
+  font: 400 15px/22px var(--sans);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
