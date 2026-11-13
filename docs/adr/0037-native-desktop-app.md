@@ -120,11 +120,14 @@ maintainer asked for a full desktop app on that same native stack, with macOS
 
      The main content is an inset rounded card. Collapsing the sidebar (⌃⌘S)
      lets the card fill the window. As in Arc, resting the pointer on the left
-     edge then **peeks** the sidebar over the content as a floating glass
-     panel, without moving the content. Its toggle docks the sidebar, and
+     edge then **peeks** the sidebar: flush with the window edge, full
+     height and tinted like the docked one, lying over the content, which
+     keeps its layout underneath. Its toggle docks the sidebar, and
      leaving the panel hides it. The docked sidebar is resizable from its
-     right edge (200–380 pt). The **window buttons** show only on a docked
-     sidebar at least 236 pt wide; ⌘W, ⌘M and the Window menu keep working
+     right edge (200–380 pt). The top row follows Radian: the toggle on the
+     left and new chat on the right, on the window buttons' centre line
+     (measured from AppKit). The **window buttons** show only on a docked
+     sidebar at least 236 pt wide, never while peeking; ⌘W, ⌘M and the Window menu keep working
      when they are hidden. This custom sidebar replaces the
      `NavigationSplitView` above; Liquid Glass stays on every control.
    - **Themes.** Each theme sets the sidebar tint and its strength, the

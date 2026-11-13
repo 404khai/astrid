@@ -14,12 +14,15 @@ struct RootView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var peeking = false
     @State private var hidePeek: DispatchWorkItem?
+    private let pinnedPeek = ProcessInfo.processInfo.environment["ASTRID_DESKTOP_PEEK"] != nil
+    /// Where AppKit put the window buttons, so the sidebar's top row lines up.
+    @State private var lights = TrafficLights()
 
     var body: some View {
         let palette = Palette(spec: settings.theme(dark: scheme == .dark))
         HStack(spacing: 0) {
             if settings.sidebarShown {
-                Sidebar(model: model, settings: settings)
+                Sidebar(model: model, settings: settings, lights: settings.trafficLightsVisible ? lights : TrafficLights(maxX: nil, centerY: lights.centerY))
                     .frame(width: settings.sidebarWidth)
                     .overlay(alignment: .trailing) { ResizeHandle(width: $settings.sidebarWidth).offset(x: 4) }
                     .transition(.move(edge: .leading).combined(with: .opacity))
@@ -33,7 +36,7 @@ struct RootView: View {
             if !settings.sidebarShown { peek(palette) }
         }
         .background { palette.sidebar.opacity(palette.spec.sidebarOpacity) }
-        .background(WindowChrome(trafficLights: settings.trafficLightsVisible))
+        .background(WindowChrome(trafficLights: settings.trafficLightsVisible, measured: $lights))
         .ignoresSafeArea()
         .environment(\.palette, palette)
         .animation(.smooth(duration: 0.3), value: settings.sidebarShown)
@@ -45,14 +48,20 @@ struct RootView: View {
                 .presentationBackground(palette.content)
         }
         .onChange(of: settings.sidebarShown) { _, shown in if shown { peeking = false } }
-        // Debug: ASTRID_DESKTOP_PEEK=1 starts with the sidebar peeking.
-        .onAppear { if ProcessInfo.processInfo.environment["ASTRID_DESKTOP_PEEK"] != nil, !settings.sidebarShown { peeking = true } }
+        // Debug: ASTRID_DESKTOP_PEEK=1 holds a closed sidebar peeking.
+        .onAppear {
+            if pinnedPeek {
+                settings.sidebarShown = false
+                peeking = true
+            }
+        }
         .onChange(of: settings.model) { _, _ in model.reconfigure(model: settings.model, mail: settings.mail) }
         .onChange(of: settings.mail) { _, _ in model.reconfigure(model: settings.model, mail: settings.mail) }
     }
 
-    /// A hover strip on the left edge and, while peeking, the sidebar as a
-    /// floating glass panel over the content (the content does not move).
+    /// A hover strip on the left edge and, while peeking, the sidebar itself:
+    /// flush with the window edge, full height, the same tint over a material,
+    /// lying over the content, which keeps its layout underneath.
     @ViewBuilder
     private func peek(_ palette: Palette) -> some View {
         ZStack(alignment: .leading) {
@@ -63,14 +72,21 @@ struct RootView: View {
                 .onHover { if $0 { setPeek(true) } }
                 .accessibilityHidden(true)
             if peeking {
-                Sidebar(model: model, settings: settings, peeking: true)
+                Sidebar(model: model, settings: settings, peeking: true, lights: TrafficLights(maxX: nil, centerY: lights.centerY))
                     .frame(width: settings.sidebarWidth)
-                    .padding(.vertical, 4)
-                    .glassEffect(.regular.tint(palette.sidebar.opacity(0.55)), in: .rect(cornerRadius: 16, style: .continuous))
-                    .shadow(color: .black.opacity(0.3), radius: 18, x: 4)
-                    .padding(8)
+                    .frame(maxHeight: .infinity)
+                    .background {
+                        ZStack {
+                            Rectangle().fill(.ultraThinMaterial)
+                            palette.sidebar.opacity(min(1, palette.spec.sidebarOpacity + 0.2))
+                        }
+                    }
+                    .overlay(alignment: .trailing) {
+                        Rectangle().fill(palette.sidebarText.opacity(0.1)).frame(width: 0.5)
+                    }
+                    .shadow(color: .black.opacity(palette.spec.dark ? 0.35 : 0.15), radius: 14, x: 3)
                     .onHover { setPeek($0) }
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(.move(edge: .leading))
             }
         }
         .animation(.smooth(duration: 0.25), value: peeking)
@@ -80,6 +96,7 @@ struct RootView: View {
     /// doesn't flicker it.
     private func setPeek(_ on: Bool) {
         hidePeek?.cancel()
+        if pinnedPeek { return }
         if on {
             peeking = true
         } else {
@@ -116,10 +133,18 @@ struct ResizeHandle: View {
     }
 }
 
-/// Shows or hides the window's close, minimise and zoom buttons. Hidden
-/// buttons leave ⌘W, ⌘M and the Window menu working.
+/// Where the window buttons sit, measured from the window's top-left corner.
+struct TrafficLights: Equatable {
+    /// The right edge of the zoom button, or nil when the buttons are hidden.
+    var maxX: CGFloat? = 70
+    var centerY: CGFloat = 16
+}
+
+/// Shows or hides the window's close, minimise and zoom buttons, and reports
+/// where they are. Hidden buttons leave ⌘W, ⌘M and the Window menu working.
 struct WindowChrome: NSViewRepresentable {
     var trafficLights: Bool
+    @Binding var measured: TrafficLights
 
     func makeNSView(context: Context) -> NSView { NSView() }
 
@@ -128,6 +153,11 @@ struct WindowChrome: NSViewRepresentable {
         DispatchQueue.main.async {
             guard let window = view.window else { return }
             let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].compactMap { window.standardWindowButton($0) }
+            if let zoom = buttons.last {
+                let frame = zoom.convert(zoom.bounds, to: nil)
+                let next = TrafficLights(maxX: frame.maxX, centerY: window.frame.height - frame.midY)
+                if next != measured { measured = next }
+            }
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.2
                 for button in buttons {
@@ -166,17 +196,26 @@ struct Sidebar: View {
     @ObservedObject var settings: AppSettings
     /// Shown as Arc-style peek over the content; its toggle docks it.
     var peeking = false
+    /// The window buttons, when they show on this sidebar.
+    var lights = TrafficLights()
     @Environment(\.palette) private var palette
+
+    /// Height of the top row; its centre sits on the window buttons' centre.
+    private let row: CGFloat = 34
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Leaves the traffic lights their corner, like Radian's top row.
+            // Radian's top row: the toggle on the left (after the window
+            // buttons when they show), new chat on the right, all on the
+            // window buttons' centre line.
             HStack(spacing: 8) {
-                Spacer()
+                if let maxX = lights.maxX { Color.clear.frame(width: max(0, maxX - 12 + 8)) }
                 GlassCircle(symbol: "sidebar.left", help: peeking ? "Keep Sidebar Open (⌃⌘S)" : "Hide Sidebar (⌃⌘S)") { settings.sidebarShown = peeking }
+                Spacer()
                 GlassCircle(symbol: "square.and.pencil", help: "New Chat (⌘N)") { model.newChat() }
             }
-            .frame(height: 32)
+            .frame(height: row)
+            .padding(.top, max(0, lights.centerY - row / 2))
 
             SearchPill(query: $model.query) { settings.showSettings = true }
 
