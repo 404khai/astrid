@@ -47,7 +47,14 @@ function useDrag() {
     const start = { ...last };
     const move = (ev: PointerEvent) => {
       if (!moved.current && Math.hypot(ev.screenX - start.x, ev.screenY - start.y) < 4) return;
+      if (!moved.current && native()) {
+        // The host follows the mouse itself until release: no per-move round trip.
+        moved.current = true;
+        send({ type: "drag-start" });
+        return;
+      }
       moved.current = true;
+      if (native()) return;
       send({ type: "drag", dx: ev.screenX - last.x, dy: ev.screenY - last.y });
       last = { x: ev.screenX, y: ev.screenY };
     };
@@ -79,7 +86,10 @@ function App() {
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const askRef = useRef<string | null>(null);
-  const voice = useVoice((heard) => submit(heard));
+  const voice = useVoice((heard, final) => {
+    setText(heard);
+    if (final) setTimeout(() => input.current?.focus(), 0);
+  });
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
 
@@ -191,10 +201,13 @@ function App() {
 
   return (
     <div className="pr-root" ref={root}>
+      {voice.listening && !busy && <ListeningRing voice={voice} reduced={reduced} />}
       <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
-        {(voice.listening || voice.heard !== null || voice.error) && !busy && (
+        {voice.error && !busy && (
           <Liquid.Item transition="smooth">
-            <ListeningCard voice={voice} reduced={reduced} />
+            <div className="pr-card">
+              <p className="pr-error">{voice.error}</p>
+            </div>
           </Liquid.Item>
         )}
         {(busy || answer || error) && !voice.listening && (
@@ -236,11 +249,11 @@ function App() {
                 ref={input}
                 value={text}
                 disabled={busy}
-                placeholder={busy ? "Astrid is on it…" : "Ask about your email…"}
+                placeholder={busy ? "Astrid is on it…" : voice.listening ? "Listening…" : "Ask about your email…"}
                 onChange={(e) => setText(e.target.value)}
                 aria-label="Ask Astrid"
               />
-              {!busy && !text.trim() && (
+              {!busy && (!text.trim() || voice.listening) && (
                 <button
                   type="button"
                   className={`pr-mic${voice.listening ? " pr-mic-on" : ""}`}
@@ -258,15 +271,15 @@ function App() {
               through the goo as soon as there is something to send. */}
           <Liquid.Item
             transition="bouncy"
-            x={text.trim() && !busy ? 0 : -(44 + 24)}
-            scale={text.trim() && !busy ? 1 : 0.3}
+            x={text.trim() && !busy && !voice.listening ? 0 : -(44 + 24)}
+            scale={text.trim() && !busy && !voice.listening ? 1 : 0.3}
           >
             <button
               type="button"
-              className={`pr-send${text.trim() && !busy ? "" : " pr-send-hidden"}`}
+              className={`pr-send${text.trim() && !busy && !voice.listening ? "" : " pr-send-hidden"}`}
               aria-label="Send"
               onClick={() => submit()}
-              tabIndex={text.trim() && !busy ? 0 : -1}
+              tabIndex={text.trim() && !busy && !voice.listening ? 0 : -1}
             >
               <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={2} />
             </button>
@@ -280,16 +293,17 @@ function App() {
 type Voice = ReturnType<typeof useVoice>;
 
 /**
- * Push-to-talk (V2-03, ADR 0034). Hold the mic to talk and let go to send; a
- * quick tap keeps listening until the next tap. The native host owns the mic
- * and on-device speech and streams back the level and transcript. In a plain
- * browser the ring follows the page's own microphone instead.
+ * Push-to-talk (V2-03, ADR 0034). Hold the mic (or ⌥Space) to talk; a quick
+ * tap keeps listening until the next tap. What you say is written into the
+ * input as you speak, ready to edit and send. The native host owns the mic and
+ * on-device speech and streams back analyser frames and the transcript. In a
+ * plain browser the ring follows the page's own microphone instead.
  */
-function useVoice(onHeard: (text: string) => void) {
+function useVoice(onHeard: (text: string, final: boolean) => void) {
   const [listening, setListening] = useState(false);
   const [heard, setHeard] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const level = useRef(0);
+  const analyser = useRef(new HostAnalyser());
   const on = useRef(false);
   const pressed = useRef(0);
   const cancelled = useRef(false);
@@ -301,7 +315,7 @@ function useVoice(onHeard: (text: string) => void) {
     if (on.current) return;
     on.current = true;
     cancelled.current = false;
-    level.current = 0;
+    analyser.current.clear();
     setHeard("");
     setError(null);
     setListening(true);
@@ -322,7 +336,7 @@ function useVoice(onHeard: (text: string) => void) {
   };
 
   const receive = (m: Incoming) => {
-    if (m.type === "voice") level.current = m.level;
+    if (m.type === "voice") analyser.current.write(m.sampleRate, m.time, m.freq);
     else if (m.type === "voice-error") {
       on.current = false;
       setListening(false);
@@ -331,11 +345,11 @@ function useVoice(onHeard: (text: string) => void) {
     } else if (m.type === "transcript") {
       if (cancelled.current) return;
       setHeard(m.text);
+      heardRef.current(m.text, m.final);
       if (m.final) {
         on.current = false;
         setListening(false);
         setHeard(null);
-        if (m.text.trim()) heardRef.current(m.text);
       }
     }
   };
@@ -360,33 +374,56 @@ function useVoice(onHeard: (text: string) => void) {
     },
   };
 
-  return { listening, heard, error, level, stream: native() ? null : mic.stream, start, stop, cancel, receive, handlers };
+  return { listening, heard, error, analyser, stream: native() ? null : mic.stream, start, stop, cancel, receive, handlers };
 }
 
-function ListeningCard({ voice, reduced }: { voice: Voice; reduced: boolean }) {
+/**
+ * Stands in for a Web Audio AnalyserNode, filled from the host's frames, so the
+ * voice ring reads the native microphone through its full-spectrum path
+ * (loudness, voice bands and spectrum) exactly as it reads a browser mic.
+ */
+class HostAnalyser {
+  fftSize = 1024;
+  frequencyBinCount = 512;
+  context = { sampleRate: 48000 };
+  private time = new Float32Array(1024);
+  private freq = new Uint8Array(512);
+
+  write(sampleRate: number, time: string, freq: string) {
+    this.context.sampleRate = sampleRate;
+    const t = Uint8Array.from(atob(time), (c) => c.charCodeAt(0));
+    const samples = new Float32Array(t.buffer, 0, Math.min(1024, t.byteLength >> 2));
+    this.time.set(samples);
+    const f = atob(freq);
+    for (let i = 0; i < 512 && i < f.length; i++) this.freq[i] = f.charCodeAt(i);
+  }
+  clear() {
+    this.time.fill(0);
+    this.freq.fill(0);
+  }
+  getFloatTimeDomainData(out: Float32Array) {
+    out.set(this.time.subarray(0, out.length));
+  }
+  getByteFrequencyData(out: Uint8Array) {
+    out.set(this.freq.subarray(0, out.length));
+  }
+}
+
+/** The voice ring floats above the input on the bare desktop, no card behind it. */
+function ListeningRing({ voice, reduced }: { voice: Voice; reduced: boolean }) {
   return (
-    <div className="pr-listen">
-      <div className="pr-listen-ring">
-        <VoiceRing
-          size={132}
-          theme="dark"
-          state={voice.listening ? "listening" : voice.error ? "idle" : "processing"}
-          stream={voice.stream}
-          level={voice.stream ? undefined : () => voice.level.current}
-          paused={reduced}
-        />
-        <span className="pr-listen-mark">
-          <AstridLogo expression="listening" />
-        </span>
-      </div>
-      {voice.error ? (
-        <p className="pr-error">{voice.error}</p>
-      ) : (
-        <p className={`pr-heard${voice.heard ? "" : " pr-heard-empty"}`} aria-live="polite">
-          {voice.heard || (voice.listening ? "Listening…" : "")}
-        </p>
-      )}
-      {!voice.error && <span className="pr-eyebrow">ON-DEVICE · NOTHING SAVED</span>}
+    <div className="pr-listen-ring" aria-hidden>
+      <VoiceRing
+        size={200}
+        theme="dark"
+        state="listening"
+        stream={voice.stream}
+        analyser={voice.stream ? undefined : (voice.analyser.current as unknown as AnalyserNode)}
+        paused={reduced}
+      />
+      <span className="pr-listen-mark">
+        <AstridLogo expression="listening" />
+      </span>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 import Speech
 
@@ -7,8 +8,10 @@ import Speech
 /// when the Mac cannot recognise on-device, listening fails rather than
 /// falling back to Apple's servers.
 final class VoiceInput {
-    /// Shaped loudness 0–1, at the audio tap's rate (~20–50 Hz).
-    var onLevel: (Double) -> Void = { _ in }
+    /// One analyser frame per audio buffer: the latest 1024 samples and their
+    /// byte spectrum, shaped like a Web Audio AnalyserNode so the page's voice
+    /// ring reads it exactly as it reads a browser microphone.
+    var onFrame: (AnalyserFrame) -> Void = { _ in }
     /// The best transcript so far; `final` once recognition has settled.
     var onTranscript: (String, Bool) -> Void = { _, _ in }
     var onError: (String) -> Void = { _ in }
@@ -36,7 +39,6 @@ final class VoiceInput {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         request?.endAudio()
-        onLevel(0)
     }
 
     private func authorize(_ done: @escaping (String?) -> Void) {
@@ -66,10 +68,11 @@ final class VoiceInput {
 
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
+        let analyser = Analyser(sampleRate: format.sampleRate)
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             request.append(buffer)
-            let level = VoiceInput.level(of: buffer)
-            DispatchQueue.main.async { self?.onLevel(level) }
+            guard let frame = analyser.read(buffer) else { return }
+            DispatchQueue.main.async { self?.onFrame(frame) }
         }
         task = recognizer.recognitionTask(with: request) { [weak self] result, error in
             DispatchQueue.main.async {
@@ -95,14 +98,58 @@ final class VoiceInput {
         task = nil
         request = nil
     }
+}
 
-    /// RMS of the first channel mapped from −50…0 dBFS onto 0…1.
-    static func level(of buffer: AVAudioPCMBuffer) -> Double {
-        guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return 0 }
-        var sum: Float = 0
-        for i in 0..<Int(buffer.frameLength) { sum += samples[i] * samples[i] }
-        let rms = sqrt(sum / Float(buffer.frameLength))
-        let db = 20 * log10(max(rms, 1e-7))
-        return Double(min(max((db + 50) / 50, 0), 1))
+struct AnalyserFrame {
+    var sampleRate: Double
+    var time: [Float]
+    var bytes: [UInt8]
+
+    var message: [String: Any] {
+        let time = self.time.withUnsafeBufferPointer { Data(buffer: $0).base64EncodedString() }
+        return ["type": "voice", "sampleRate": sampleRate, "time": time, "freq": Data(bytes).base64EncodedString()]
+    }
+}
+
+/// Web Audio's AnalyserNode in miniature (fftSize 1024, Blackman window,
+/// smoothing 0.5, −100…−30 dB to bytes), run on the audio tap's thread.
+final class Analyser {
+    static let size = 1024
+    private let sampleRate: Double
+    private var ring = [Float](repeating: 0, count: Analyser.size)
+    private var smoothed = [Float](repeating: 0, count: Analyser.size / 2)
+    private let window = vDSP.window(ofType: Float.self, usingSequence: .blackman, count: Analyser.size, isHalfWindow: false)
+    private let fft = vDSP.FFT(log2n: 10, radix: .radix2, ofType: DSPSplitComplex.self)
+
+    init(sampleRate: Double) { self.sampleRate = sampleRate }
+
+    func read(_ buffer: AVAudioPCMBuffer) -> AnalyserFrame? {
+        guard let samples = buffer.floatChannelData?[0], let fft else { return nil }
+        let n = Analyser.size, count = Int(buffer.frameLength)
+        let fresh = Array(UnsafeBufferPointer(start: samples, count: count).suffix(n))
+        ring = Array((ring + fresh).suffix(n))
+
+        let windowed = vDSP.multiply(ring, window)
+        var real = [Float](repeating: 0, count: n / 2), imag = [Float](repeating: 0, count: n / 2)
+        var magnitudes = [Float](repeating: 0, count: n / 2)
+        real.withUnsafeMutableBufferPointer { re in
+            imag.withUnsafeMutableBufferPointer { im in
+                var split = DSPSplitComplex(realp: re.baseAddress!, imagp: im.baseAddress!)
+                windowed.withUnsafeBytes { raw in
+                    vDSP_ctoz(raw.bindMemory(to: DSPComplex.self).baseAddress!, 2, &split, 1, vDSP_Length(n / 2))
+                }
+                fft.forward(input: split, output: &split)
+                vDSP.absolute(split, result: &magnitudes)
+            }
+        }
+        var bytes = [UInt8](repeating: 0, count: n / 2)
+        for i in 0..<n / 2 {
+            // zrip doubles the DFT; Web Audio divides by the size.
+            let magnitude = magnitudes[i] / 2 / Float(n)
+            smoothed[i] = 0.5 * smoothed[i] + 0.5 * magnitude
+            let db = 20 * log10(max(smoothed[i], 1e-12))
+            bytes[i] = UInt8(max(0, min(255, 255 * (db + 100) / 70)))
+        }
+        return AnalyserFrame(sampleRate: sampleRate, time: ring, bytes: bytes)
     }
 }

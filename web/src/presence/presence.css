@@ -418,36 +418,21 @@ button {
   outline: 2px solid var(--eye);
   outline-offset: 2px;
 }
-.pr-listen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding-bottom: 4px;
-  text-align: center;
-}
 .pr-listen-ring {
   position: relative;
-  width: 132px;
-  height: 132px;
+  width: 200px;
+  height: 200px;
+  margin-bottom: 4px;
+  align-self: center;
+  pointer-events: none;
 }
 .pr-listen-mark {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  pointer-events: none;
 }
 .pr-listen-mark .astrid-logo {
-  width: 34px;
-  height: 27px;
-}
-.pr-heard {
-  margin: 0;
-  max-width: 340px;
-  color: var(--ink);
-  font: 400 15px/22px var(--sans);
-}
-.pr-heard-empty {
-  color: #6b6b6b;
+  width: 40px;
+  height: 32px;
 }

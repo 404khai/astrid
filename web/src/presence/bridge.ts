@@ -15,7 +15,7 @@ export type Incoming =
   | { type: "answer"; text: string; brief: Brief | null }
   | { type: "error"; message: string }
   | { type: "done"; outcome: string }
-  | { type: "voice"; level: number }
+  | { type: "voice"; sampleRate: number; time: string; freq: string }
   | { type: "hotkey"; down: boolean }
   | { type: "transcript"; text: string; final: boolean }
   | { type: "voice-error"; message: string };
@@ -28,6 +28,7 @@ export type Outgoing =
   | { type: "open"; url: string }
   | { type: "size"; width: number; height: number }
   | { type: "drag"; dx: number; dy: number }
+  | { type: "drag-start" }
   | { type: "expanded"; expanded: boolean };
 
 declare global {
