@@ -7,7 +7,7 @@ import { Liquid } from "liquid-gooey";
 import { ThinkingOrb } from "thinking-orbs";
 import type { OrbState } from "thinking-orbs";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowUp02Icon, Mail01Icon, Mic01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUp02Icon, Mail01Icon, Mic01Icon, StopIcon, VolumeHighIcon } from "@hugeicons/core-free-icons";
 import { VoiceRing, useMicrophone } from "voice-ring";
 import { AstridLogo, type EyeExpression } from "../components/AstridLogo";
 import { listen, native, send, type Brief, type Incoming } from "./bridge";
@@ -25,6 +25,19 @@ const looks: Record<string, { orb: OrbState; eyes: EyeExpression }> = {
 
 type Approval = { id: number; title: string; detail: Record<string, unknown> };
 type Answer = { ask: string; text: string; brief: Brief | null };
+
+/** What Astrid says out loud: the gist, not every to-do and source (ADR 0035). */
+function spoken(answer: Answer) {
+  const plain = (t: string) => t.replace(/\*\*|__|`|#+\s|^\s*[-*]\s|^\s*\d+\.\s/gm, "").replace(/\s+/g, " ").trim();
+  const end = (t: string) => (/[.!?…]$/.test(t) ? t : `${t}.`);
+  if (answer.brief?.title || answer.brief?.summary) {
+    return [answer.brief.title, answer.brief.summary].filter(Boolean).map((t) => end(plain(t!))).join(" ");
+  }
+  const text = plain(answer.text);
+  if (text.length <= 600) return text;
+  const cut = text.slice(0, 600);
+  return cut.slice(0, Math.max(cut.lastIndexOf(". ") + 1, 300));
+}
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -86,9 +99,18 @@ function App() {
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const askRef = useRef<string | null>(null);
+  const [speaking, setSpeaking] = useState(false);
+  const speakerAnalyser = useRef(new HostAnalyser());
+  // Answers to a dictated ask are read aloud; typed asks stay quiet unless
+  // you press the speaker on the answer.
+  const dictated = useRef(false);
+  const askedByVoice = useRef(false);
   const voice = useVoice((heard, final) => {
     setText(heard);
-    if (final) setTimeout(() => input.current?.focus(), 0);
+    if (final) {
+      dictated.current = heard.trim().length > 0;
+      setTimeout(() => input.current?.focus(), 0);
+    }
   });
   const voiceRef = useRef(voice);
   voiceRef.current = voice;
@@ -102,8 +124,15 @@ function App() {
         case "approval":
           setApproval({ id: m.id, title: m.title, detail: m.detail });
           break;
-        case "answer":
-          setAnswer({ ask: askRef.current ?? "", text: m.text, brief: m.brief });
+        case "answer": {
+          const next = { ask: askRef.current ?? "", text: m.text, brief: m.brief };
+          setAnswer(next);
+          if (askedByVoice.current) send({ type: "speak", text: spoken(next) });
+          break;
+        }
+        case "speaking":
+          setSpeaking(m.on);
+          if (!m.on) speakerAnalyser.current.clear();
           break;
         case "error":
           setError(m.message);
@@ -116,9 +145,15 @@ function App() {
           } else voiceRef.current.stop();
           break;
         case "voice":
+          if (m.source === "speaker") {
+            speakerAnalyser.current.write(m.sampleRate, m.time, m.freq);
+            break;
+          }
+          voiceRef.current.receive(m);
+          break;
         case "transcript":
         case "voice-error":
-          voice.receive(m);
+          voiceRef.current.receive(m);
           break;
         case "done":
           setApproval(null);
@@ -152,17 +187,21 @@ function App() {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (voice.listening) voice.cancel();
+      else if (speaking) send({ type: "speak-stop" });
       else if (asking) send({ type: "cancel" });
       else setOpen(false);
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
-  }, [asking, voice.listening]);
+  }, [asking, voice.listening, speaking]);
 
-  const submit = (spoken?: string) => {
-    const ask = (spoken ?? text).trim();
+  const submit = (said?: string) => {
+    const ask = (said ?? text).trim();
     if (!ask || asking) return;
     askRef.current = ask;
+    askedByVoice.current = said !== undefined || dictated.current;
+    dictated.current = false;
+    if (speaking) send({ type: "speak-stop" });
     setAsking(ask);
     setAnswer(null);
     setError(null);
@@ -201,7 +240,11 @@ function App() {
 
   return (
     <div className="pr-root" ref={root}>
-      {voice.listening && !busy && <ListeningRing voice={voice} reduced={reduced} />}
+      {voice.listening && !busy ? (
+        <VoiceHalo state="listening" stream={voice.stream} analyser={voice.analyser.current} reduced={reduced} />
+      ) : speaking ? (
+        <VoiceHalo state="speaking" stream={null} analyser={speakerAnalyser.current} reduced={reduced} />
+      ) : null}
       <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
         {voice.error && !busy && (
           <Liquid.Item transition="smooth">
@@ -223,7 +266,13 @@ function App() {
               {busy && <p className="pr-ask">“{asking}”</p>}
               {approval && <ApprovalCard approval={approval} onDecide={decide} />}
               {error && !busy && <p className="pr-error">{error}</p>}
-              {answer && !busy && <AnswerView answer={answer} />}
+              {answer && !busy && (
+                <AnswerView
+                  answer={answer}
+                  speaking={speaking}
+                  onSpeak={() => send(speaking ? { type: "speak-stop" } : { type: "speak", text: spoken(answer) })}
+                />
+              )}
             </div>
           </Liquid.Item>
         )}
@@ -250,7 +299,10 @@ function App() {
                 value={text}
                 disabled={busy}
                 placeholder={busy ? "Astrid is on it…" : voice.listening ? "Listening…" : "Ask about your email…"}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (!e.target.value.trim()) dictated.current = false;
+                }}
                 aria-label="Ask Astrid"
               />
               {!busy && (!text.trim() || voice.listening) && (
@@ -409,20 +461,33 @@ class HostAnalyser {
   }
 }
 
-/** The voice ring floats above the input on the bare desktop, no card behind it. */
-function ListeningRing({ voice, reduced }: { voice: Voice; reduced: boolean }) {
+/**
+ * The voice ring floats above the input on the bare desktop, no card behind
+ * it: following your mic while you talk, and Astrid's own voice while she speaks.
+ */
+function VoiceHalo({
+  state,
+  stream,
+  analyser,
+  reduced,
+}: {
+  state: "listening" | "speaking";
+  stream: MediaStream | null;
+  analyser: HostAnalyser;
+  reduced: boolean;
+}) {
   return (
     <div className="pr-listen-ring" aria-hidden>
       <VoiceRing
         size={200}
         theme="dark"
-        state="listening"
-        stream={voice.stream}
-        analyser={voice.stream ? undefined : (voice.analyser.current as unknown as AnalyserNode)}
+        state={state}
+        stream={stream}
+        analyser={stream ? undefined : (analyser as unknown as AnalyserNode)}
         paused={reduced}
       />
       <span className="pr-listen-mark">
-        <AstridLogo expression="listening" />
+        <AstridLogo expression={state === "listening" ? "listening" : "composing"} />
       </span>
     </div>
   );
@@ -446,14 +511,31 @@ function ApprovalCard({ approval, onDecide }: { approval: Approval; onDecide: (o
   );
 }
 
-function AnswerView({ answer }: { answer: Answer }) {
+function SpeakButton({ speaking, onSpeak }: { speaking: boolean; onSpeak: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`pr-speak${speaking ? " pr-speak-on" : ""}`}
+      aria-label={speaking ? "Stop speaking" : "Read aloud"}
+      title={speaking ? "Stop · Esc" : "Read aloud"}
+      onClick={onSpeak}
+    >
+      <HugeiconsIcon icon={speaking ? StopIcon : VolumeHighIcon} size={14} strokeWidth={2} />
+    </button>
+  );
+}
+
+function AnswerView({ answer, speaking, onSpeak }: { answer: Answer; speaking: boolean; onSpeak: () => void }) {
   const { brief } = answer;
   const sources = new Map((brief?.sources ?? []).map((s) => [s.id, s]));
   const [done, setDone] = useState<Set<number>>(new Set());
   if (!brief) {
     return (
       <div className="pr-brief">
-        <p className="pr-asked">{answer.ask}</p>
+        <div className="pr-answer-head">
+          <p className="pr-asked">{answer.ask}</p>
+          <SpeakButton speaking={speaking} onSpeak={onSpeak} />
+        </div>
         <Prose text={answer.text} />
       </div>
     );
@@ -461,7 +543,10 @@ function AnswerView({ answer }: { answer: Answer }) {
   return (
     <div className="pr-brief">
       <header>
-        <span className="pr-eyebrow">BRIEF · {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+        <div className="pr-answer-head">
+          <span className="pr-eyebrow">BRIEF · {new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+          <SpeakButton speaking={speaking} onSpeak={onSpeak} />
+        </div>
         {brief.title && <h1>{brief.title}</h1>}
         {brief.summary && <p className="pr-caption">{brief.summary}</p>}
       </header>

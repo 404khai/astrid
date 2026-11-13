@@ -436,3 +436,28 @@ button {
   width: 40px;
   height: 32px;
 }
+.pr-answer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pr-speak {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+.pr-speak:hover,
+.pr-speak-on {
+  color: var(--ink);
+  background: #262626;
+}
+.pr-speak:focus-visible {
+  outline: 2px solid var(--eye);
+  outline-offset: 2px;
+}

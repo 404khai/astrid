@@ -1,0 +1,13 @@
+[project]
+name = "astrid-voice"
+version = "0.1.0"
+description = "Astrid's local text-to-speech process (ADR 0035): Kokoro-82M on MLX, JSON lines in, PCM out."
+requires-python = ">=3.11,<3.13"
+dependencies = ["mlx-audio>=0.6.5", "misaki[en]>=0.9"]
+
+[project.scripts]
+astrid-voice = "astrid_voice:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

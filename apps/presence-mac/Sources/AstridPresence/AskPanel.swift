@@ -15,6 +15,9 @@ struct AskConfig {
     var astrid: URL
     var model: String
     var mail: String?
+    /// The `astrid-voice` executable (ADR 0035); nil uses macOS's built-in voice.
+    var voiceCommand: URL?
+    var voiceName = "af_heart"
 }
 
 final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
@@ -37,6 +40,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private let voice = VoiceInput()
     private var hotkey: Hotkey?
     private var dragTimer: Timer?
+    private let speaker: Speaker
 
     init(config: AskConfig) {
         self.config = config
@@ -46,6 +50,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         // scripts load with a real origin (file:// gives them a null origin).
         configuration.setURLSchemeHandler(UIFiles(root: config.ui.deletingLastPathComponent()), forURLScheme: "astrid-ui")
         web = WKWebView(frame: .zero, configuration: configuration)
+        speaker = Speaker(command: config.voiceCommand, voice: config.voiceName)
         super.init()
         configuration.userContentController.add(self, name: "astrid")
         panel.isOpaque = false
@@ -68,6 +73,12 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         RunLoop.main.add(timer, forMode: .common)
         pointerTimer = timer
         voice.onFrame = { [weak self] frame in self?.deliver(frame.message) }
+        speaker.onFrame = { [weak self] frame in
+            var message = frame.message
+            message["source"] = "speaker"
+            self?.deliver(message)
+        }
+        speaker.onSpeaking = { [weak self] on in self?.deliver(["type": "speaking", "on": on]) }
         voice.onTranscript = { [weak self] text, final in self?.deliver(["type": "transcript", "text": text, "final": final]) }
         voice.onError = { [weak self] message in self?.deliver(["type": "voice-error", "message": message]) }
         // Hold ⌥Space anywhere to talk; the page opens itself and drives the mic.
@@ -117,13 +128,26 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             }
         case "expanded":
             if body["expanded"] as? Bool == true {
+                speaker.prepare()
                 NSApp.activate(ignoringOtherApps: true)
                 panel.makeKey()
             } else {
                 panel.resignKey()
             }
         case "listen":
-            if body["on"] as? Bool == true { voice.start() } else { voice.stop() }
+            // Talking over Astrid interrupts her (barge-in).
+            if body["on"] as? Bool == true {
+                speaker.stop()
+                speaker.prepare()
+                voice.start()
+            } else {
+                voice.stop()
+        speaker.shutdown()
+            }
+        case "speak":
+            if let text = body["text"] as? String { speaker.say(String(text.prefix(4000))) }
+        case "speak-stop":
+            speaker.stop()
         case "ask", "approve", "cancel":
             forward(body)
         case "open":

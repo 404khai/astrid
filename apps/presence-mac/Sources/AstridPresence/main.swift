@@ -27,6 +27,9 @@ OPTIONS
                    ask (ADR 0033). Answers come from `astrid presence-ask`.
   --ask-model M    Model for --ask (default claude-code/sonnet).
   --ask-mail SRC   gmail, apple, all or none (default gmail).
+  --ask-voice V    Kokoro voice for spoken replies (default af_heart).
+  --voice-cmd PATH The astrid-voice executable (default: apps/astrid-voice/.venv/bin/astrid-voice;
+                   without it, macOS's built-in voice speaks).
   --astrid PATH    The astrid binary (default: target/debug/astrid in the repo).
   --ask-ui PATH    The built ask UI (default: web/dist-presence/presence.html).
   --snapshot DIR   Debug: once a second, write PNGs of Astrid's own overlay layers
@@ -57,6 +60,8 @@ var captureSource = CaptureSource.screen
 var askMode = false
 var askModel = "claude-code/sonnet"
 var askMail: String? = "gmail"
+var askVoice = "af_heart"
+var voiceCommandPath: String?
 var astridPath: String?
 var askUIPath: String?
 var arguments = CommandLine.arguments.dropFirst()
@@ -120,6 +125,12 @@ while let argument = arguments.popFirst() {
     case "--astrid":
         guard let value = arguments.popFirst() else { fail("--astrid needs a path") }
         astridPath = value
+    case "--ask-voice":
+        guard let value = arguments.popFirst(), value.range(of: "^[a-z]{2}_[a-z]+$", options: .regularExpression) != nil else { fail("--ask-voice needs a Kokoro voice like af_heart") }
+        askVoice = value
+    case "--voice-cmd":
+        guard let value = arguments.popFirst() else { fail("--voice-cmd needs a path") }
+        voiceCommandPath = value
     case "--ask-ui":
         guard let value = arguments.popFirst() else { fail("--ask-ui needs a path") }
         askUIPath = value
@@ -153,7 +164,8 @@ if askMode {
     guard let astrid = astridPath.map({ URL(fileURLWithPath: $0) }) ?? repoFile("target/debug/astrid") else {
         fail("astrid binary not found: run `cargo build` in the repo, or pass --astrid")
     }
-    askConfig = AskConfig(ui: ui, astrid: astrid, model: askModel, mail: askMail)
+    let voiceCommand = voiceCommandPath.map { URL(fileURLWithPath: $0) } ?? repoFile("apps/astrid-voice/.venv/bin/astrid-voice")
+    askConfig = AskConfig(ui: ui, astrid: astrid, model: askModel, mail: askMail, voiceCommand: voiceCommand, voiceName: askVoice)
     // The ask surface replaces the scripted demo; Astrid waits in the corner.
     if sourceCount == 0 { source = .script([]) }
 }
