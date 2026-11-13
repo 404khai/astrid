@@ -15,7 +15,8 @@ export type Incoming =
   | { type: "answer"; text: string; brief: Brief | null }
   | { type: "error"; message: string }
   | { type: "done"; outcome: string }
-  | { type: "voice"; sampleRate: number; time: string; freq: string }
+  | { type: "voice"; sampleRate: number; time: string; freq: string; source?: "speaker" }
+  | { type: "speaking"; on: boolean }
   | { type: "hotkey"; down: boolean }
   | { type: "transcript"; text: string; final: boolean }
   | { type: "voice-error"; message: string };
@@ -25,6 +26,8 @@ export type Outgoing =
   | { type: "approve"; id: number; approve: boolean }
   | { type: "cancel" }
   | { type: "listen"; on: boolean }
+  | { type: "speak"; text: string }
+  | { type: "speak-stop" }
   | { type: "open"; url: string }
   | { type: "size"; width: number; height: number }
   | { type: "drag"; dx: number; dy: number }
@@ -71,6 +74,8 @@ export function send(message: Outgoing) {
   else if (message.type === "ask") mock(message.text);
   else if (message.type === "approve") pendingMock?.(message.approve);
   else if (message.type === "listen") mockListen(message.on);
+  else if (message.type === "speak") mockSpeak(message.text);
+  else if (message.type === "speak-stop") speechSynthesis.cancel();
 }
 
 /** In a plain browser (vite dev), a scripted run so the UI can be designed. */
@@ -148,4 +153,13 @@ if (!native()) {
     held = false;
     listener({ type: "hotkey", down: false });
   });
+}
+
+/** Dev stand-in for astrid-voice: the browser's own speech, no ring data. */
+function mockSpeak(text: string) {
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.onstart = () => listener({ type: "speaking", on: true });
+  utterance.onend = utterance.onerror = () => listener({ type: "speaking", on: false });
+  speechSynthesis.speak(utterance);
 }
