@@ -23,6 +23,12 @@ OPTIONS
   --resident       Stay in the menu bar and own timers/alarms (ADR 0029), saved in
                    ~/Library/Application Support/Astrid/timers.json.
   --timers-file PATH  Use another timers file (testing).
+  --ask            Show only the Astrid mark in the bottom-right corner; click it to
+                   ask (ADR 0033). Answers come from `astrid presence-ask`.
+  --ask-model M    Model for --ask (default claude-code/sonnet).
+  --ask-mail SRC   gmail, apple, all or none (default gmail).
+  --astrid PATH    The astrid binary (default: target/debug/astrid in the repo).
+  --ask-ui PATH    The built ask UI (default: web/dist-presence/presence.html).
   --snapshot DIR   Debug: once a second, write PNGs of Astrid's own overlay layers
                    (never the screen beneath) to DIR.
   -h, --help       Show this help.
@@ -48,6 +54,11 @@ var resident = false
 var timersURL = TimerStore.defaultURL
 var snapshotDirectory: URL?
 var captureSource = CaptureSource.screen
+var askMode = false
+var askModel = "claude-code/sonnet"
+var askMail: String? = "gmail"
+var astridPath: String?
+var askUIPath: String?
 var arguments = CommandLine.arguments.dropFirst()
 var sourceCount = 0
 
@@ -98,6 +109,20 @@ while let argument = arguments.popFirst() {
     case "--timers-file":
         guard let path = arguments.popFirst() else { fail("--timers-file needs a path") }
         timersURL = URL(fileURLWithPath: path)
+    case "--ask":
+        askMode = true
+    case "--ask-model":
+        guard let value = arguments.popFirst() else { fail("--ask-model needs a model") }
+        askModel = value
+    case "--ask-mail":
+        guard let value = arguments.popFirst(), ["gmail", "apple", "all", "none"].contains(value) else { fail("--ask-mail needs gmail, apple, all or none") }
+        askMail = value == "none" ? nil : value
+    case "--astrid":
+        guard let value = arguments.popFirst() else { fail("--astrid needs a path") }
+        astridPath = value
+    case "--ask-ui":
+        guard let value = arguments.popFirst() else { fail("--ask-ui needs a path") }
+        askUIPath = value
     case "--snapshot":
         guard let path = arguments.popFirst() else { fail("--snapshot needs a directory") }
         let url = URL(fileURLWithPath: path, isDirectory: true)
@@ -109,8 +134,32 @@ while let argument = arguments.popFirst() {
 }
 if sourceCount > 1 { fail("choose one of --demo, --script or --stdin") }
 
+/// Walks up from this executable to the repository that contains `relative`.
+func repoFile(_ relative: String) -> URL? {
+    var dir = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath().deletingLastPathComponent()
+    for _ in 0..<10 {
+        let candidate = dir.appendingPathComponent(relative)
+        if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+        dir.deleteLastPathComponent()
+    }
+    return nil
+}
+
+var askConfig: AskConfig?
+if askMode {
+    guard let ui = askUIPath.map({ URL(fileURLWithPath: $0) }) ?? repoFile("web/dist-presence/presence.html") else {
+        fail("ask UI not built: run `npx vite build -c vite.presence.config.ts` in web/, or pass --ask-ui")
+    }
+    guard let astrid = astridPath.map({ URL(fileURLWithPath: $0) }) ?? repoFile("target/debug/astrid") else {
+        fail("astrid binary not found: run `cargo build` in the repo, or pass --astrid")
+    }
+    askConfig = AskConfig(ui: ui, astrid: astrid, model: askModel, mail: askMail)
+    // The ask surface replaces the scripted demo; Astrid waits in the corner.
+    if sourceCount == 0 { source = .script([]) }
+}
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, captureSource: captureSource, resident: resident, timersURL: timersURL)
+let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, captureSource: captureSource, resident: resident, timersURL: timersURL, ask: askConfig)
 app.delegate = controller
 app.run()

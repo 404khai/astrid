@@ -1,0 +1,395 @@
+/* Astrid's on-screen ask surface (ADR 0033): transparent page inside the
+   presence app's panel. Same language as the docs' agent states. */
+:root {
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --ink: #f4f4f4;
+  --muted: #9a9a9a;
+  --line: #2a2a2a;
+  --accent: #6575ff;
+  --button: #4459f9;
+  --eye: #00f7d5;
+  color-scheme: dark;
+}
+html,
+body {
+  margin: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 400 15px/22px var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+#root {
+  display: inline-block;
+}
+.pr-root {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 18px;
+  width: 440px;
+  box-sizing: border-box;
+}
+.pr-collapsed {
+  width: auto;
+  padding: 10px;
+}
+.pr-mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 56px;
+  animation: pr-bob 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 2px 4px #0006);
+}
+.pr-mark,
+.pr-input-mark,
+.pr-handle {
+  cursor: grab;
+  touch-action: none;
+}
+.pr-mark .astrid-logo {
+  width: 52px;
+  height: 42px;
+}
+.pr-mark:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+@keyframes pr-bob {
+  50% {
+    transform: translate(2px, 2px) rotate(-3deg);
+  }
+}
+
+/* Input row: input pill + the send button that morphs out of it. */
+.pr-input-row {
+  display: flex;
+  align-items: center;
+  /* Wide enough that the goo bridge snaps once the send button settles. */
+  gap: 24px;
+  width: 100%;
+  margin-top: 10px;
+}
+.pr-input-row > :first-child {
+  flex: 1;
+}
+.pr-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 18px 0 12px;
+  border-radius: 24px;
+}
+.pr-input-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.pr-input-mark .astrid-logo {
+  width: 26px;
+  height: 21px;
+}
+.pr-input input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  outline: none;
+  color: var(--ink);
+  font: 400 15px/22px var(--sans);
+  user-select: text;
+}
+.pr-input input::placeholder {
+  color: #6b6b6b;
+}
+.pr-send {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: var(--button);
+}
+.pr-send {
+  transition: opacity 0.18s ease, background-color 0.18s ease;
+}
+.pr-send-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.pr-send:focus-visible {
+  outline: 2px solid var(--eye);
+  outline-offset: 2px;
+}
+
+/* Status + answer card. */
+.pr-card {
+  width: 404px;
+  box-sizing: border-box;
+  max-height: 520px;
+  overflow-y: auto;
+  padding: 18px 20px 20px;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  user-select: text;
+}
+.pr-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font: 400 11px/16px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #cfcfcf;
+}
+.pr-status .astrid-logo {
+  width: 22px;
+  height: 18px;
+}
+.pr-ask,
+.pr-asked {
+  margin: 0;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--muted);
+}
+.pr-asked {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.pr-error {
+  margin: 0;
+  font: 400 12px/18px var(--mono);
+  color: #ff8a8a;
+}
+.pr-eyebrow {
+  font: 400 10px/14px var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+/* Approval. */
+.pr-approval {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #1d1d1d;
+  box-shadow: inset 0 0 0 1px #333;
+}
+.pr-approval p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+}
+.pr-approval small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 17px;
+}
+.pr-approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+.pr-btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
+  font: 500 13px/18px var(--sans);
+  background: var(--button);
+  color: #fff;
+}
+.pr-btn-ghost {
+  background: #262626;
+  color: #cfcfcf;
+}
+.pr-btn:focus-visible {
+  outline: 2px solid var(--eye);
+  outline-offset: 2px;
+}
+
+/* Brief (after Ardia's daily briefs). */
+.pr-brief {
+  display: grid;
+  gap: 16px;
+}
+.pr-brief header {
+  display: grid;
+  gap: 6px;
+}
+.pr-brief h1 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.pr-caption {
+  margin: 0;
+  color: #bdbdbd;
+  font-size: 14px;
+  line-height: 20px;
+}
+.pr-brief h2 {
+  margin: 0 0 8px;
+  font: 400 10px/14px var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pr-todos,
+.pr-updates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.pr-todos li,
+.pr-updates li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.pr-todos li > span,
+.pr-updates li > span:not(.pr-badge) {
+  flex: 1;
+}
+.pr-check {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1.5px #555;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.pr-todos li.done .pr-check {
+  background: var(--eye);
+  box-shadow: none;
+}
+.pr-todos li.done > span {
+  color: #6f6f6f;
+  text-decoration: line-through;
+}
+.pr-updates b {
+  flex: none;
+  width: 22px;
+  font: 400 11px/20px var(--mono);
+  color: var(--accent);
+}
+
+/* Source badges with a popup centred above. */
+.pr-badge {
+  position: relative;
+  flex: none;
+}
+.pr-badge > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: #222;
+  box-shadow: inset 0 0 0 1px #333;
+  font: 400 11px/14px var(--mono);
+  color: #cfcfcf;
+}
+.pr-badge > button:disabled {
+  cursor: default;
+}
+.pr-badge > button:not(:disabled):hover {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.pr-badge-label > button {
+  font-family: var(--sans);
+  font-size: 12px;
+}
+.pr-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  width: max-content;
+  max-width: 240px;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #0d0d0d;
+  box-shadow: 0 0 0 1px #333, 0 10px 24px #000c;
+  font-size: 12px;
+  line-height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s, transform 0.12s;
+  z-index: 2;
+}
+.pr-pop span {
+  color: var(--muted);
+}
+.pr-pop i {
+  font: 400 10px/14px var(--mono);
+  color: var(--accent);
+  font-style: normal;
+}
+.pr-badge:hover .pr-pop {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.pr-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.pr-sources .pr-pop {
+  left: 0;
+  transform: translate(0, 4px);
+}
+.pr-sources .pr-badge:hover .pr-pop {
+  transform: translate(0, 0);
+}
+
+/* Plain answers. */
+.pr-prose p,
+.pr-prose ul {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 21px;
+}
+.pr-prose ul {
+  padding-left: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-mark {
+    animation: none;
+  }
+  .pr-pop,
+  .pr-check {
+    transition: none;
+  }
+}
