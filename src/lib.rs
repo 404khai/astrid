@@ -5,6 +5,7 @@ pub mod anthropic;
 pub mod auth;
 pub mod cancellation;
 pub mod changes;
+pub mod claude_code;
 pub mod context;
 pub mod events;
 pub mod file_lookup;
