@@ -43,7 +43,11 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     private var timers = TimerStore()
     private var nextTimerCheck = 0.0
 
-    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?, captureSource: CaptureSource = .screen, resident: Bool = false, timersURL: URL = TimerStore.defaultURL) {
+    private let askConfig: AskConfig?
+    private var ask: AskController?
+
+    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?, captureSource: CaptureSource = .screen, resident: Bool = false, timersURL: URL = TimerStore.defaultURL, ask: AskConfig? = nil) {
+        self.askConfig = ask
         self.captureSource = captureSource
         self.resident = resident
         self.timersURL = timersURL
@@ -65,6 +69,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
         installSignalHandlers()
         installStatusItem()
+        if let askConfig { ask = AskController(config: askConfig) }
         rebuildScenes()
         if let primary = layout.displays.first {
             motion.jump(to: CGPoint(x: primary.frame.midX, y: primary.frame.midY))
@@ -397,6 +402,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        ask?.stop()
         timer?.invalidate()
         scenes.forEach { $0.close() }
         Output.emit(["type": "bye"])

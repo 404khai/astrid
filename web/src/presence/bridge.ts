@@ -1,0 +1,90 @@
+/** Messages between the ask surface and the native presence app (ADR 0033). */
+export type Brief = {
+  title?: string;
+  summary?: string;
+  todos?: { text: string; source?: number }[];
+  updates?: { text: string; source?: number }[];
+  sources?: { id: number; kind?: string; from?: string; subject?: string; date?: string; message_id?: string }[];
+};
+
+export type Incoming =
+  | { type: "ready"; model?: string }
+  | { type: "state"; state: string; label: string }
+  | { type: "delta"; text: string }
+  | { type: "approval"; id: number; title: string; detail: Record<string, unknown> }
+  | { type: "answer"; text: string; brief: Brief | null }
+  | { type: "error"; message: string }
+  | { type: "done"; outcome: string };
+
+export type Outgoing =
+  | { type: "ask"; text: string }
+  | { type: "approve"; id: number; approve: boolean }
+  | { type: "cancel" }
+  | { type: "open"; url: string }
+  | { type: "size"; width: number; height: number }
+  | { type: "expanded"; expanded: boolean };
+
+declare global {
+  interface Window {
+    webkit?: { messageHandlers?: { astrid?: { postMessage(message: Outgoing): void } } };
+    astrid?: { receive(message: Incoming): void };
+  }
+}
+
+const native = () => window.webkit?.messageHandlers?.astrid;
+let listener: (message: Incoming) => void = () => {};
+
+/** The native app calls window.astrid.receive(...) for every runtime event. */
+window.astrid = { receive: (message) => listener(message) };
+
+export function listen(handler: (message: Incoming) => void) {
+  listener = handler;
+}
+
+export function send(message: Outgoing) {
+  const bridge = native();
+  if (bridge) bridge.postMessage(message);
+  else if (message.type === "ask") mock(message.text);
+  else if (message.type === "approve") pendingMock?.(message.approve);
+}
+
+/** In a plain browser (vite dev), a scripted run so the UI can be designed. */
+let pendingMock: ((ok: boolean) => void) | null = null;
+function mock(text: string) {
+  const say = (m: Incoming, ms: number) => new Promise<void>((r) => setTimeout(() => (listener(m), r()), ms));
+  (async () => {
+    await say({ type: "state", state: "working", label: "Thinking" }, 300);
+    await say({ type: "approval", id: 1, title: `Search Gmail for “newer_than:2d”?`, detail: {} }, 900);
+    const ok = await new Promise<boolean>((r) => (pendingMock = r));
+    if (!ok) return say({ type: "error", message: "mail access was not approved" }, 200);
+    await say({ type: "state", state: "searching", label: "Searching mail" }, 200);
+    await say({ type: "state", state: "weaving", label: "Reading an email" }, 1400);
+    await say({ type: "state", state: "composing", label: "Writing" }, 1400);
+    await say(
+      {
+        type: "answer",
+        text: `You asked: ${text}`,
+        brief: {
+          title: "Two replies need you today",
+          summary: "A flight change and a design review are waiting; the rest is receipts.",
+          todos: [
+            { text: "Confirm the new 09:40 departure with Elodie", source: 1 },
+            { text: "Leave comments on the onboarding review before Friday", source: 2 },
+          ],
+          updates: [
+            { text: "Your Lagos flight moved 25 minutes earlier; seat 14A kept.", source: 1 },
+            { text: "Stripe sent the October receipt for $24.00.", source: 3 },
+          ],
+          sources: [
+            { id: 1, kind: "gmail", from: "Élodie Martin", subject: "Flight to Lagos confirmed", date: "Nov 12" },
+            { id: 2, kind: "gmail", from: "Ada Okafor", subject: "Onboarding review", date: "Nov 12" },
+            { id: 3, kind: "gmail", from: "Stripe", subject: "Your receipt", date: "Nov 11" },
+          ],
+        },
+      },
+      200,
+    );
+    await say({ type: "done", outcome: "completed" }, 50);
+    await say({ type: "state", state: "idle", label: "Ready" }, 50);
+  })();
+}

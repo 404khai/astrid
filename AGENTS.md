@@ -53,6 +53,12 @@ off, every Astrid tool call returned to Astrid's runtime. Branch `feat/claude-ag
 into the stack, #31 (mail, timers, Claude, OpenCode, Claude Agent SDK) merged to main, and
 #30 (local look) reconciled with main and merged.
 
+**Presence ask surface 2026-11-13.** Maintainer: "switch back to feat/presence-overlay ...
+allow me to do this gmail stuff on presence ... logo without a cursor ... gooey input ...
+agent state components ... dia lvl polish of briefs". [ADR 0033](docs/adr/0033-presence-ask-surface.md):
+`astrid-presence --ask` + `astrid presence-ask`; web UI in `web/src/presence`. Branch
+`feat/presence-overlay` fast-forwarded to main first. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

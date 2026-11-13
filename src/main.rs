@@ -24,6 +24,7 @@ mod console;
 #[path = "instabox_cli.rs"]
 mod instabox;
 mod logo;
+mod presence_ask;
 mod remote_cli;
 mod sessions;
 use console::Console;
@@ -308,6 +309,15 @@ enum Commands {
     Claude {
         #[command(subcommand)]
         command: ClaudeCommand,
+    },
+    /// JSON-lines ask surface for the presence app (ADR 0033).
+    #[command(hide = true)]
+    PresenceAsk {
+        #[arg(long)]
+        model: String,
+        /// Read-only mail sources: apple, gmail or all.
+        #[arg(long, value_parser = ["apple", "gmail", "all"])]
+        mail_source: Option<String>,
     },
     /// Gmail sign-in for read-only mail search (ADR 0028).
     Mail {
@@ -1017,6 +1027,16 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     });
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
+        Some(Commands::PresenceAsk { model, mail_source }) => {
+            let workspace = presence_ask::workspace()?;
+            let mut tools = Tools::new(workspace, Duration::from_secs(1))?;
+            if let Some(choice) = mail_source.as_deref() {
+                tools = tools.with_mail(mail_tools(choice)?);
+            }
+            let provider =
+                provider_for(&model, auth::default_directory()?, tools.workspace().root()).await?;
+            return presence_ask::serve(provider, tools, model).await;
+        }
         Some(Commands::Mail { command }) => return mail_command(command).await,
         Some(Commands::Claude { command }) => return claude_command(command),
         Some(Commands::Opencode { command }) => return opencode_command(command).await,
@@ -1027,6 +1047,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         Commands::Instabox { command } => return instabox::run(command).await,
         Commands::Mail { command } => return mail_command(command).await,
+        Commands::PresenceAsk { .. } => unreachable!("handled before provider setup"),
         Commands::Claude { command } => return claude_command(command),
         Commands::Opencode { command } => return opencode_command(command).await,
         Commands::Batch {
@@ -1269,38 +1290,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             if let Some(choice) = mail.as_deref() {
                 tools = tools.with_mail(mail_tools(choice)?);
             }
-            // ADR 0030: exact claude-* model IDs use the Anthropic adapter.
-            let provider: Box<dyn astrid::model::ModelProvider> = if let Some(inner) =
-                model.strip_prefix(astrid::claude_code::PREFIX)
-            {
-                // ADR 0032: Claude Agent SDK on whatever account Claude Code is logged into.
-                if !astrid::claude_code::valid_model(inner) {
-                    return Err(format!("unsupported Claude Code model {inner:?}; use opus, sonnet, haiku, fable or a claude-* id").into());
-                }
-                eprintln!(
-                    "Using Claude Code's login through the Claude Agent SDK. Anthropic's terms restrict subscription use in third-party apps; this is your call."
-                );
-                Box::new(astrid::claude_code::ClaudeCodeProvider::new(
-                    astrid::claude_code::Bridge::locate()?,
-                    tools.workspace().root().to_path_buf(),
-                ))
-            } else if let Some(id) = model.strip_prefix(astrid::opencode::PREFIX) {
-                // ADR 0031: OpenCode Go, checked against the live public catalog.
-                let info = astrid::opencode::lookup(id).await?;
-                Box::new(astrid::opencode::OpenCodeProvider::new(
-                    astrid::opencode::ApiKey::load()?,
-                    info,
-                )?)
-            } else if model.starts_with("claude-") {
-                if !astrid::anthropic::supported_model(&model) {
-                    return Err(format!("unsupported Claude model {model:?}; use claude-opus-5-5, claude-sonnet-5-5, claude-fable-5-1, claude-opus-5 or claude-haiku-4-5").into());
-                }
-                Box::new(astrid::anthropic::ClaudeProvider::new(
-                    astrid::anthropic::ApiKey::load()?,
-                )?)
-            } else {
-                Box::new(OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?)
-            };
+            let provider = provider_for(&model, directory, tools.workspace().root()).await?;
             let policy = run_policy(notes, mode, read_policy, write_policy, shell_policy);
             let task = if notes {
                 eprintln!("{}", notes_notice(&model, tools.workspace(), policy));
@@ -1331,6 +1321,47 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+/// Chooses the model provider from the model id prefix (ADRs 0030–0032).
+async fn provider_for(
+    model: &str,
+    directory: std::path::PathBuf,
+    workspace: &std::path::Path,
+) -> Result<Box<dyn astrid::model::ModelProvider>, Box<dyn std::error::Error>> {
+    // ADR 0030: exact claude-* model IDs use the Anthropic adapter.
+    let provider: Box<dyn astrid::model::ModelProvider> = if let Some(inner) =
+        model.strip_prefix(astrid::claude_code::PREFIX)
+    {
+        // ADR 0032: Claude Agent SDK on whatever account Claude Code is logged into.
+        if !astrid::claude_code::valid_model(inner) {
+            return Err(format!("unsupported Claude Code model {inner:?}; use opus, sonnet, haiku, fable or a claude-* id").into());
+        }
+        eprintln!(
+            "Using Claude Code's login through the Claude Agent SDK. Anthropic's terms restrict subscription use in third-party apps; this is your call."
+        );
+        Box::new(astrid::claude_code::ClaudeCodeProvider::new(
+            astrid::claude_code::Bridge::locate()?,
+            workspace.to_path_buf(),
+        ))
+    } else if let Some(id) = model.strip_prefix(astrid::opencode::PREFIX) {
+        // ADR 0031: OpenCode Go, checked against the live public catalog.
+        let info = astrid::opencode::lookup(id).await?;
+        Box::new(astrid::opencode::OpenCodeProvider::new(
+            astrid::opencode::ApiKey::load()?,
+            info,
+        )?)
+    } else if model.starts_with("claude-") {
+        if !astrid::anthropic::supported_model(model) {
+            return Err(format!("unsupported Claude model {model:?}; use claude-opus-5-5, claude-sonnet-5-5, claude-fable-5-1, claude-opus-5 or claude-haiku-4-5").into());
+        }
+        Box::new(astrid::anthropic::ClaudeProvider::new(
+            astrid::anthropic::ApiKey::load()?,
+        )?)
+    } else {
+        Box::new(OpenAiProvider::new(Arc::new(ChatGptAuth::new(directory)?))?)
+    };
+    Ok(provider)
 }
 
 /// Invocation-only local look configuration. Nothing is persisted.
