@@ -13,12 +13,21 @@ final class AppSettings: ObservableObject {
     @Published var lightTheme: String { didSet { defaults.set(lightTheme, forKey: "theme.light") } }
     @Published var darkTheme: String { didSet { defaults.set(darkTheme, forKey: "theme.dark") } }
     @Published var sidebarShown: Bool { didSet { defaults.set(sidebarShown, forKey: "sidebar.shown") } }
+    /// The docked sidebar's width, dragged from its right edge.
+    @Published var sidebarWidth: Double { didSet { defaults.set(sidebarWidth, forKey: "sidebar.width") } }
     @Published var storedModel: String { didSet { defaults.set(storedModel, forKey: "ask.model") } }
     @Published var storedMail: String { didSet { defaults.set(storedMail, forKey: "ask.mail") } }
     /// Not stored: whether the settings sheet is open.
     @Published var showSettings = false
 
     static let mailSources = ["gmail", "apple", "all", "none"]
+    static let sidebarMin = 200.0
+    static let sidebarMax = 380.0
+    static let sidebarDefault = 264.0
+    /// The window buttons show only on a docked sidebar at least this wide.
+    static let trafficLightsMinWidth = 236.0
+
+    var trafficLightsVisible: Bool { sidebarShown && sidebarWidth >= Self.trafficLightsMinWidth }
 
     init(modelOverride: String?, mailOverride: String?) {
         self.modelOverride = modelOverride
@@ -27,6 +36,8 @@ final class AppSettings: ObservableObject {
         lightTheme = defaults.string(forKey: "theme.light") ?? Themes.defaultLight
         darkTheme = defaults.string(forKey: "theme.dark") ?? Themes.defaultDark
         sidebarShown = defaults.object(forKey: "sidebar.shown") as? Bool ?? true
+        let width = defaults.object(forKey: "sidebar.width") as? Double ?? Self.sidebarDefault
+        sidebarWidth = min(max(width, Self.sidebarMin), Self.sidebarMax)
         storedModel = defaults.string(forKey: "ask.model") ?? "claude-code/sonnet"
         let mail = defaults.string(forKey: "ask.mail") ?? "gmail"
         storedMail = Self.mailSources.contains(mail) ? mail : "gmail"
