@@ -4008,8 +4008,7 @@ kbd {
   flex: none;
 }
 .brand-menu button:hover,
-.brand-menu button:focus-visible,
-.brand-menu button:focus {
+.brand-menu button:focus-visible {
   background: #242424;
   color: #fff;
 }
