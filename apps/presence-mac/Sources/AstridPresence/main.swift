@@ -28,8 +28,8 @@ OPTIONS
   --ask            Show only the Astrid mark in the bottom-right corner; click it to
                    ask (ADR 0033). Answers come from `astrid presence-ask`.
   --ask-model M    Model for --ask (default claude-code/sonnet).
-  --operator-model M  Image model for `/operator` in the ask input (ADR 0038):
-                   gpt-5.6-sol (default), gpt-5.6-terra or gpt-5.6-luna.
+  --operator-model M  Image model for operator walkthroughs (ADR 0038):
+                   claude-code/sonnet (default), claude-code/opus or gpt-5.6-sol/terra/luna.
   --ask-mail SRC   gmail, apple, all or none (default gmail).
   --ask-voice V    Kokoro voice for spoken replies (default af_heart).
   --voice-cmd PATH The astrid-voice executable (default: apps/astrid-voice/.venv/bin/astrid-voice;
@@ -131,8 +131,8 @@ while let argument = arguments.popFirst() {
         guard let value = arguments.popFirst(), ["gmail", "apple", "all", "none"].contains(value) else { fail("--ask-mail needs gmail, apple, all or none") }
         askMail = value == "none" ? nil : value
     case "--operator-model":
-        guard let value = arguments.popFirst(), ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].contains(value) else {
-            fail("--operator-model needs gpt-5.6-sol, gpt-5.6-terra or gpt-5.6-luna")
+        guard let value = arguments.popFirst(), ["claude-code/sonnet", "claude-code/opus", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].contains(value) else {
+            fail("--operator-model needs claude-code/sonnet, claude-code/opus or gpt-5.6-sol/terra/luna")
         }
         operatorModel = value
     case "--astrid":

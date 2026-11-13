@@ -96,6 +96,21 @@ pub fn compose_task(ask: &str, history: &[Turn]) -> String {
     task
 }
 
+/// ADR 0038: lets the ask model hand screen tasks to operator, so the user can
+/// just say what they want ("turn on dark mode") without `/operator`.
+pub const OPERATOR_HINT: &str = "If the user wants to get something done on their Mac's screen (change a setting, use an app or a website, find a button or menu) and seeing their screen would help, do not answer in text: reply with only one fenced code block tagged `operator-start` containing JSON {\"goal\": the task as one short imperative sentence}. Astrid then asks to look at their screen and walks them through it step by step. Answer normally anything you can answer without their screen, including email questions and drawings.";
+
+/// The goal from a reply that hands the ask to operator, if it is one.
+pub fn operator_request(reply: &str) -> Option<String> {
+    let start = reply.find("```operator-start")?;
+    let rest = &reply[start + "```operator-start".len()..];
+    let end = rest.find("```")?;
+    let value: Value = serde_json::from_str(rest[..end].trim()).ok()?;
+    let goal = value["goal"].as_str()?.trim();
+    (!goal.is_empty() && goal.chars().count() <= 300 && !goal.chars().any(char::is_control))
+        .then(|| goal.to_owned())
+}
+
 /// Asks the model to finish with a machine-readable brief the UI renders.
 pub const BRIEF_INSTRUCTIONS: &str = "You are answering inside Astrid's on-screen ask panel. Use the mail tools when the question is about email. Keep it short and concrete. Unless you are drawing on the canvas, end your reply with exactly one fenced code block tagged `brief` containing JSON: {\"title\": short headline, \"summary\": one sentence, \"todos\": [{\"text\": action the user should take, \"source\": n}], \"updates\": [{\"text\": what happened, \"source\": n}], \"sources\": [{\"id\": n, \"kind\": \"gmail\" or \"apple\", \"from\": sender name, \"subject\": subject, \"date\": short date, \"message_id\": id from mail_search}]}. Number sources from 1; omit empty lists; every todo and update cites a source when one exists. Do not invent emails.";
 
@@ -369,7 +384,11 @@ pub async fn serve(
             observability: None,
             context_budget: Some(Default::default()),
             model: model.clone(),
-            task: compose_task(&ask, &history),
+            task: if operator.is_some() {
+                format!("{}\n\n{OPERATOR_HINT}", compose_task(&ask, &history))
+            } else {
+                compose_task(&ask, &history)
+            },
             max_model_calls: 8,
             permissions: PermissionPolicy::read_only(),
         };
@@ -396,7 +415,19 @@ pub async fn serve(
         let (result, ()) = tokio::join!(run, forward);
         match result {
             Ok(result) => {
+                let handoff = match &result.outcome {
+                    RunOutcome::Completed if operator.is_some() => {
+                        operator_request(&result.final_text)
+                    }
+                    _ => None,
+                };
                 let outcome = match &result.outcome {
+                    // The ask model inferred a screen task: operator takes over.
+                    RunOutcome::Completed if let Some(goal) = handoff => {
+                        operate(&goal, operator.as_ref(), &bridge, &cancel)
+                            .await
+                            .to_string()
+                    }
                     RunOutcome::Completed => {
                         // Providers that don't stream text still get their drawing.
                         if !canvas.started() {
@@ -525,6 +556,23 @@ mod tests {
         assert!(task.starts_with(
             "Earlier in this conversation (context only):\nUser: draw a pump\nAstrid: Here is a pump.\n\nThe user now asks:\nmake it bigger\n\n"
         ));
+    }
+
+    #[test]
+    fn replies_can_hand_a_screen_task_to_operator() {
+        assert_eq!(
+            operator_request("```operator-start\n{\"goal\": \"Turn on dark mode\"}\n```")
+                .as_deref(),
+            Some("Turn on dark mode")
+        );
+        for reply in [
+            "Dark mode is in System Settings.",
+            "```operator-start\n{\"goal\": \"\"}\n```",
+            "```operator-start\n{not json}\n```",
+            "```operator-start\n{\"goal\": \"a\\nb\"}\n```",
+        ] {
+            assert_eq!(operator_request(reply), None, "{reply}");
+        }
     }
 
     #[test]

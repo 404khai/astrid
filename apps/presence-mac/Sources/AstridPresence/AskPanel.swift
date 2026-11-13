@@ -173,6 +173,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             speaker.stop()
         case "ask", "approve", "cancel":
             forward(body)
+        case "utterance":
+            // ADR 0038 voice: an answer to the operator card on screen.
+            if let text = body["text"] as? String { send(["type": "utterance", "text": String(text.prefix(500))]) }
         case "open":
             // Only Gmail message links, opened in the user's browser.
             if let text = body["url"] as? String, let url = URL(string: text), url.scheme == "https", url.host == "mail.google.com" {
@@ -288,9 +291,13 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             return
         case "step":
             host?.operatorStep(object)
+            // The page keeps a copy so voice can answer it and read it aloud.
+            deliver(["type": "operator-card", "id": object["id"] ?? 0, "text": object["text"] ?? "",
+                     "buttons": (object["buttons"] as? [[String: Any]] ?? []).compactMap { $0["label"] as? String }])
             return
         case "step_clear":
             host?.operatorStepClear(id: (object["id"] as? NSNumber)?.intValue)
+            deliver(["type": "operator-card-clear", "id": object["id"] ?? 0])
             return
         case "done":
             host?.operatorEnded()

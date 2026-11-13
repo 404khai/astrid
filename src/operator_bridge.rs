@@ -40,6 +40,8 @@ pub struct Bridge {
     frames: Waiters<String, Result<Vec<u8>, String>>,
     choices: Waiters<u64, String>,
     acts: Waiters<String, String>,
+    /// The card on screen and its buttons, for answers spoken in voice mode.
+    current: Mutex<Option<(u64, Vec<Choice>)>>,
     /// Request id of the latest captured frame; "Do it" is checked against it.
     last_frame: Mutex<Option<String>>,
     next_card: AtomicU64,
@@ -62,6 +64,7 @@ impl Bridge {
             frames: Mutex::default(),
             choices: Mutex::default(),
             acts: Mutex::default(),
+            current: Mutex::default(),
             last_frame: Mutex::default(),
             next_card: AtomicU64::new(0),
         }
@@ -92,6 +95,29 @@ impl Bridge {
                 let card = message["id"].as_u64().unwrap_or(0);
                 if let Some(tx) = take(&self.choices, &card) {
                     let _ = tx.send(message["choice"].as_str().unwrap_or("stop").to_owned());
+                }
+            }
+            Some("utterance") => {
+                // Voice mode: "do it", "show me", "done", "stop"... for the card on screen.
+                let said: String = message["text"]
+                    .as_str()
+                    .unwrap_or("")
+                    .chars()
+                    .take(500)
+                    .collect();
+                let current = self
+                    .current
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone();
+                let choice = current
+                    .as_ref()
+                    .and_then(|(_, offered)| astrid::operator::choice_from_speech(&said, offered));
+                (self.emit)(json!({"type":"heard","text":said,"choice":choice.map(Choice::id)}));
+                if let (Some((id, _)), Some(choice)) = (current, choice)
+                    && let Some(tx) = take(&self.choices, &id)
+                {
+                    let _ = tx.send(choice.id().to_owned());
                 }
             }
             Some("acted") => {
@@ -149,6 +175,11 @@ impl OperatorUi for Session {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(id, tx);
+        *self
+            .bridge
+            .current
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = Some((id, card.buttons.clone()));
         (self.bridge.emit)(card.wire(id, self.display));
         let choice = tokio::select! {biased;
             _ = self.cancel.cancelled() => None,
@@ -156,6 +187,11 @@ impl OperatorUi for Session {
             reply = rx => reply.ok(),
         };
         take(&self.bridge.choices, &id);
+        self.bridge
+            .current
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take_if(|(shown, _)| *shown == id);
         (self.bridge.emit)(json!({"type":"step_clear","id":id}));
         // Only a button the card actually offered counts.
         choice
@@ -244,6 +280,37 @@ mod tests {
         bridge.receive(&json!({"type":"frame","request_id":request["request_id"],"png_base64":STANDARD.encode(b"png")}));
         assert_eq!(task.await.unwrap().unwrap(), b"png");
         assert!(!bridge.receive(&json!({"type":"ask"})));
+    }
+
+    #[tokio::test]
+    async fn spoken_answers_press_the_card_on_screen() {
+        let (bridge, out) = bridge();
+        let session = Arc::new(Session {
+            bridge: bridge.clone(),
+            display: 0,
+            cancel: Cancellation::default(),
+        });
+        let card = Card {
+            step: Some((2, 3)),
+            text: "Click Export.".into(),
+            buttons: vec![Choice::DoIt, Choice::ShowMe, Choice::Stop],
+            at: Some((10, 20)),
+        };
+        let task = {
+            let session = session.clone();
+            tokio::spawn(async move { session.card(card).await })
+        };
+        tokio::task::yield_now().await;
+        // Unclear speech presses nothing; the card keeps waiting.
+        bridge.receive(&json!({"type":"utterance","text":"hmm what's that"}));
+        assert_eq!(last(&out, "heard")["choice"], Value::Null);
+        assert!(!task.is_finished());
+        bridge.receive(&json!({"type":"utterance","text":"Yeah, go ahead and do it."}));
+        assert_eq!(task.await.unwrap(), Choice::DoIt);
+        assert_eq!(last(&out, "heard")["choice"], "do");
+        // With no card on screen, speech is heard but presses nothing.
+        bridge.receive(&json!({"type":"utterance","text":"stop"}));
+        assert_eq!(last(&out, "heard")["choice"], Value::Null);
     }
 
     #[tokio::test]
