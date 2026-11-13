@@ -87,7 +87,6 @@ export function BrandLink({
 
   const open = (event: ReactMouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    // The context-menu key reports no pointer position; anchor under the logo instead.
     const bounds = event.currentTarget.getBoundingClientRect();
     const keyboard = event.clientX === 0 && event.clientY === 0;
     setCopied(false);
