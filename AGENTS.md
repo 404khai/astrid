@@ -87,6 +87,12 @@ the canvas page, additive bounded `history` on `presence-ask`. Branch `feat/astr
 Radian-browser sidebar, themes for sidebar and content, and a Rex-style settings modal
 (`references/radian`, `references/rex`); recorded as an ADR 0037 amendment on the same branch.
 
+**Presence intro wave 2026-11-13.** Maintainer: "when the presence mascot first comes on my screen, use
+this https://libraries.dev/waves design to come around the edges of my mac. it should appear from the
+bottom middle to the top, and go". ADR 0026 amendment: vendored MIT Distortion Waves band and sparks,
+runtime-compiled Metal in a click-through panel, once per launch, skipped under Reduce Motion or
+`--no-intro`; no lens/blur over the screen. Branch `feat/presence-intro-wave` from main. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
