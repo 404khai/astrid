@@ -1,0 +1,173 @@
+/* Agent states: the mark with its thinking orb, push-to-talk and the liquid answer. */
+.as-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+.as-stage {
+  cursor: default;
+  height: 180px;
+  display: grid;
+  place-items: center;
+}
+.as-pair {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: follow-bob 2.4s ease-in-out infinite;
+}
+.as-pair .astrid-logo {
+  width: 70px;
+  height: 56px;
+}
+.as-demo {
+  max-width: 1300px;
+  margin: 1px auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.as-listen,
+.as-output {
+  background: #181818;
+  padding: 32px;
+}
+.as-listen {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 20px;
+  text-align: center;
+}
+.as-listen-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.as-listen-mark {
+  position: absolute;
+}
+.as-listen-mark .astrid-logo {
+  width: 44px;
+  height: 35px;
+}
+.as-listen-copy {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+.as-listen-copy p {
+  font-size: 15px;
+  line-height: 22px;
+  max-width: 300px;
+}
+.as-button {
+  font: 400 12px/18px var(--mono);
+  letter-spacing: 0.06em;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: #101010;
+}
+.as-button:hover {
+  border-color: var(--accent);
+}
+.as-output {
+  min-height: 460px;
+}
+.as-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  padding: 0 18px 0 14px;
+  margin-bottom: 10px;
+  border-radius: 21px;
+  font: 400 12px/18px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.as-pill .astrid-logo {
+  width: 22px;
+  height: 18px;
+}
+.as-box {
+  min-height: 300px;
+  padding: 26px 30px 30px;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.as-ask {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.as-title {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 500;
+}
+.as-line {
+  font-size: 16px;
+  line-height: 24px;
+  color: #d6d6d6;
+}
+.as-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font: 400 14px/20px var(--mono);
+}
+.as-step > span {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--button);
+  font-size: 12px;
+}
+.as-meta {
+  margin-top: 6px;
+  font: 400 11px/18px var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+.as-caret {
+  width: 9px;
+  height: 18px;
+  background: #00f7d5;
+  animation: as-caret 1s steps(2) infinite;
+}
+@keyframes as-caret {
+  50% {
+    opacity: 0;
+  }
+}
+@media (max-width: 950px) {
+  .as-demo {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 650px) {
+  .as-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .as-listen,
+  .as-output {
+    padding: 20px;
+  }
+  .as-box {
+    padding: 22px 20px 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .as-pair,
+  .as-caret {
+    animation: none;
+  }
+}

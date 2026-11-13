@@ -20,6 +20,9 @@ importers:
       '@hugeicons/react':
         specifier: ^1.1.10
         version: 1.1.10(react@19.3.0)
+      liquid-gooey:
+        specifier: ^0.2.2
+        version: 0.2.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -29,6 +32,12 @@ importers:
       runeicons-react:
         specifier: file:vendor/runeicons-react
         version: file:vendor/runeicons-react(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      thinking-orbs:
+        specifier: ^0.3.2
+        version: 0.3.2(react@19.3.0)
+      voice-ring:
+        specifier: ^0.2.0
+        version: 0.2.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
     devDependencies:
       '@playwright/test':
         specifier: ^1.56.0
@@ -573,6 +582,12 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  liquid-gooey@0.2.2:
+    resolution: {integrity: sha512-UnnNSYdZoNHXowmHKo2pOF6suI1+pLMKf7qBMj1wT6wG3u0gqXP7qiLVMpCjJM2ETkr/GqF8n4fcuIgWb1fHQQ==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
@@ -644,6 +659,11 @@ packages:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
 
+  thinking-orbs@0.3.2:
+    resolution: {integrity: sha512-QZFeBaPEzqhjiZoXy961EvDgaXk2WgXacF3Rbz+Sj5IfzDzBvTC86vdREUHniBffYibJFKSwbfllxLUdI/Xv6g==}
+    peerDependencies:
+      react: '>=18.0.0'
+
   tinyglobby@0.2.17:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
@@ -698,6 +718,12 @@ packages:
         optional: true
       yaml:
         optional: true
+
+  voice-ring@0.2.0:
+    resolution: {integrity: sha512-o9zpE/SV3OLOezGq8r47l3vuXi2SjlU6UyJxnll6KHpRSbCu3JojAWfT+/b9RD1odZlFqUJ1qXBg8hcusEymPg==}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
 
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
@@ -1118,6 +1144,11 @@ snapshots:
 
   json5@2.2.3: {}
 
+  liquid-gooey@0.2.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
+
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
@@ -1196,6 +1227,10 @@ snapshots:
 
   source-map-js@1.2.2: {}
 
+  thinking-orbs@0.3.2(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+
   tinyglobby@0.2.17:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.7)
@@ -1219,5 +1254,10 @@ snapshots:
       tinyglobby: 0.2.17
     optionalDependencies:
       fsevents: 2.3.3
+
+  voice-ring@0.2.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   yallist@3.1.1: {}
