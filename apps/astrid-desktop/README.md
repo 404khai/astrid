@@ -10,7 +10,7 @@ double-click to reset.
 The sidebar follows the Radian browser: glass buttons, a search pill whose
 sliders open Settings (⌘,), and an inset content card. ⌃⌘S hides the sidebar; then rest
 the pointer on the window's left edge to peek it: it slides in exactly as
-when opened, but over the chat instead of pushing it, as in Arc.
+when opened, but inside the chat card, over its content, instead of pushing it.
 Drag the sidebar's edge to resize it. The window buttons show only while the
 sidebar is open and wide enough for them.
 Settings follows Rex: General (model, mail source) and Themes, with four

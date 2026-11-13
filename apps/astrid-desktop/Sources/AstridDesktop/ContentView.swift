@@ -5,9 +5,10 @@ import SwiftUI
 /// The window, after the maintainer's Radian browser: a sidebar drawn on the
 /// window's translucent material under a theme tint, and the main content as
 /// an inset rounded card. There is one sidebar, and it always moves the same
-/// way: it slides in from the left edge and slides back out. Opened (docked),
-/// it pushes the card over; peeking (pointer on the left edge while closed), it
-/// slides in exactly the same way but over the card, which stays put. The
+/// way: it slides in from the left and slides back out. Opened (docked), it
+/// pushes the card over; peeking (pointer on the left edge while closed), it
+/// slides in the same way inside the card's box, over the card's content,
+/// and the card stays put. The
 /// window buttons show only on a docked sidebar wide enough to hold them.
 struct RootView: View {
     @ObservedObject var model: ChatModel
@@ -43,8 +44,13 @@ struct RootView: View {
                     .accessibilityHidden(true)
             }
 
+            // The sidebar slides inside a frame. Docked, the frame is the
+            // window's left column; peeking, it is the card's own inset box
+            // (same 8 pt margins, the card's rounded left corners), so the
+            // sidebar stays within the card's bounds and never covers the
+            // window margins.
             Sidebar(model: model, settings: settings, peeking: !docked,
-                    lights: settings.trafficLightsVisible ? lights : TrafficLights(maxX: nil, centerY: lights.centerY))
+                    lights: settings.trafficLightsVisible ? lights : TrafficLights(maxX: nil, centerY: lights.centerY - (docked ? 0 : 8)))
                 .frame(width: width)
                 .frame(maxHeight: .infinity)
                 // Docked, the window's own tinted material shows through. Over
@@ -57,11 +63,14 @@ struct RootView: View {
                     }
                     .opacity(docked ? 0 : 1)
                 }
-                .shadow(color: .black.opacity(docked ? 0 : (palette.spec.dark ? 0.3 : 0.12)), radius: 14, x: 3)
+                .offset(x: visible ? 0 : -(width + 24))
+                .frame(width: width, alignment: .leading)
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: docked ? 0 : 12, bottomLeadingRadius: docked ? 0 : 12, style: .continuous))
+                .shadow(color: .black.opacity(docked || !peeking ? 0 : (palette.spec.dark ? 0.3 : 0.12)), radius: 12, x: 3)
                 .overlay(alignment: .trailing) {
                     if docked { ResizeHandle(width: $settings.sidebarWidth).offset(x: 4) }
                 }
-                .offset(x: visible ? 0 : -(width + 24))
+                .padding(docked ? 0 : 8)
                 .allowsHitTesting(visible)
                 .accessibilityHidden(!visible)
                 .onHover { inside in if !docked { setPeek(inside) } }

@@ -122,8 +122,9 @@ maintainer asked for a full desktop app on that same native stack, with macOS
      lets the card fill the window. As in Arc, resting the pointer on the left
      edge then **peeks** it. Peeking is the same sidebar with the same
      slide-in motion as opening it; the only difference is that opening
-     pushes the content card over, while a peek slides over the card, which
-     stays put. Docking from a peek leaves the sidebar where it is and moves
+     pushes the content card over, while a peek slides in inside the card's
+     inset box (its 8 pt margins and rounded left corners) over the card's
+     content, and the card stays put. Docking from a peek leaves the sidebar where it is and moves
      only the card. Its toggle docks the sidebar, and
      leaving the panel hides it. The docked sidebar is resizable from its
      right edge (200–380 pt). The top row follows Radian: the toggle on the
