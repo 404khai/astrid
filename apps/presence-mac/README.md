@@ -24,6 +24,13 @@ Quit with **Ctrl-C** in the terminal, the **Astrid icon in the menu bar → Quit
 Astrid Presence**, or a `{"v":1,"type":"quit"}` event. `--exit-at-end` quits
 once the input ends and the queue drains.
 
+The first time Astrid comes on screen, a colour wave (Libraries.dev
+[Distortion Waves](https://libraries.dev/waves), MIT, vendored in
+`Sources/AstridPresence/Waves`) rises from the bottom middle of the main display
+to the top, lingers on the screen's edges and goes. `--no-intro` skips it, as
+does Reduce Motion; `ASTRID_WAVE_FRAMES=/tmp/wave .build/debug/astrid-presence`
+renders a few of its frames offscreen to PNGs.
+
 `--snapshot DIR` writes PNGs of Astrid's own layers (never the screen beneath)
 once a second; it is how the host is checked without Screen Recording access.
 

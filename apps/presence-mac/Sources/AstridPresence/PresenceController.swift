@@ -45,9 +45,13 @@ final class PresenceController: NSObject, NSApplicationDelegate {
 
     private let askConfig: AskConfig?
     private var ask: AskController?
+    /// The intro wave plays once, the first time Astrid comes on screen.
+    private let intro: Bool
+    private var introPlayed = false
 
-    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?, captureSource: CaptureSource = .screen, resident: Bool = false, timersURL: URL = TimerStore.defaultURL, ask: AskConfig? = nil) {
+    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?, captureSource: CaptureSource = .screen, resident: Bool = false, timersURL: URL = TimerStore.defaultURL, ask: AskConfig? = nil, intro: Bool = true) {
         self.askConfig = ask
+        self.intro = intro
         self.captureSource = captureSource
         self.resident = resident
         self.timersURL = timersURL
@@ -59,6 +63,14 @@ final class PresenceController: NSObject, NSApplicationDelegate {
 
     private var reduceMotion: Bool { forceReduceMotion || systemReduceMotion }
 
+    /// The Distortion Waves intro on the main display, once per launch; never
+    /// under Reduce Motion or with --no-intro.
+    private func playIntro() {
+        guard intro, !introPlayed, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        introPlayed = true
+        IntroWave.play(on: screen)
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         systemReduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -69,7 +81,11 @@ final class PresenceController: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
         installSignalHandlers()
         installStatusItem()
-        if let askConfig { ask = AskController(config: askConfig) }
+        if let askConfig {
+            ask = AskController(config: askConfig)
+            // In --ask mode the mark is on screen from launch.
+            playIntro()
+        }
         rebuildScenes()
         if let primary = layout.displays.first {
             motion.jump(to: CGPoint(x: primary.frame.midX, y: primary.frame.midY))
@@ -152,6 +168,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         do {
             switch event {
             case let .show(at):
+                playIntro()
                 if let at { motion.jump(to: try layout.resolve(at)) }
                 motion.show(now: now, reduceMotion: reduceMotion)
             case .hide:

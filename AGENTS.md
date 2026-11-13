@@ -75,6 +75,12 @@ created ... weaving, composing and sketching". [ADR 0036](docs/adr/0036-live-can
 a streamed, runtime-validated `canvas` shape block drawn by trusted templates in a presence canvas panel; no
 model-written code, no new tool or permission. Branch `feat/live-canvas` from main. PR, no merge.
 
+**Presence intro wave 2026-11-13.** Maintainer: "when the presence mascot first comes on my screen, use
+this https://libraries.dev/waves design to come around the edges of my mac. it should appear from the
+bottom middle to the top, and go". ADR 0026 amendment: vendored MIT Distortion Waves band and sparks,
+runtime-compiled Metal in a click-through panel, once per launch, skipped under Reduce Motion or
+`--no-intro`; no lens/blur over the screen. Branch `feat/presence-intro-wave` from main. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
