@@ -3972,3 +3972,56 @@ kbd {
   stroke-width: 1.7;
   fill: currentColor;
 }
+
+/* Logo context menu: copy the mark, brand guidelines, open in new tab. */
+.brand-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 260px;
+  padding: 6px;
+  background: #161616;
+  border: 1px solid #2c2c2c;
+  border-radius: 14px;
+  box-shadow: 0 18px 48px #000c;
+  animation: brand-menu-in 120ms ease-out;
+}
+.brand-menu-group + .brand-menu-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #2c2c2c;
+}
+.brand-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: left;
+  outline: none;
+}
+.brand-menu button svg {
+  flex: none;
+}
+.brand-menu button:hover,
+.brand-menu button:focus-visible,
+.brand-menu button:focus {
+  background: #242424;
+  color: #fff;
+}
+@keyframes brand-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand-menu {
+    animation: none;
+  }
+}
