@@ -481,6 +481,99 @@ impl Choice {
     }
 }
 
+/// Maps something the user said to one of the card's offered buttons, for
+/// voice mode. Only offered buttons count; anything unclear is None and the
+/// card keeps waiting. "Stop" words win, so "don't do it" never acts.
+pub fn choice_from_speech(text: &str, offered: &[Choice]) -> Option<Choice> {
+    let words: String = text
+        .to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '\'' {
+                c
+            } else {
+                ' '
+            }
+        })
+        .collect();
+    let said = format!(
+        " {} ",
+        words.split_whitespace().collect::<Vec<_>>().join(" ")
+    );
+    let has = |phrases: &[&str]| phrases.iter().any(|p| said.contains(&format!(" {p} ")));
+    let stop = [
+        "stop",
+        "cancel",
+        "quit",
+        "never mind",
+        "nevermind",
+        "no",
+        "don't",
+        "dont",
+        "wait",
+    ];
+    let table: [(Choice, &[&str]); 6] = [
+        // "I'll do it myself" means show me, before any "do it".
+        (
+            Choice::ShowMe,
+            &["i'll do it", "i will do it", "myself", "let me"],
+        ),
+        (
+            Choice::DoIt,
+            &[
+                "do it",
+                "do that",
+                "go ahead",
+                "you do it",
+                "for me",
+                "please do",
+                "click it",
+                "type it",
+            ],
+        ),
+        (
+            Choice::ShowMe,
+            &[
+                "show me",
+                "show",
+                "how",
+                "where",
+                "i'll do it",
+                "let me",
+                "point",
+            ],
+        ),
+        (
+            Choice::Done,
+            &[
+                "done", "did it", "i did", "finished", "next", "check", "ready", "i'm done",
+            ],
+        ),
+        (Choice::Look, &["look", "start", "begin", "go", "let's go"]),
+        (
+            Choice::Close,
+            &["close", "thanks", "thank you", "got it", "bye", "great"],
+        ),
+    ];
+    if has(&stop) {
+        return [Choice::Stop, Choice::Close]
+            .into_iter()
+            .find(|c| offered.contains(c));
+    }
+    if let Some(choice) = table
+        .iter()
+        .find(|(choice, phrases)| offered.contains(choice) && has(phrases))
+        .map(|(choice, _)| *choice)
+    {
+        return Some(choice);
+    }
+    // A plain yes picks the card's first button (Look, Do it, Done or Close).
+    if has(&["yes", "yeah", "yep", "sure", "ok", "okay", "please"]) {
+        return offered.first().copied().filter(|c| *c != Choice::Stop);
+    }
+    None
+}
+
 /// A step card: Astrid's eyes, "Step i of n", the text and its buttons,
 /// placed next to a point of the display (or centred without one).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -521,6 +614,14 @@ pub enum Outcome {
     Failed(String),
 }
 
+/// How the cards name the model: "Claude (sonnet)" for `claude-code/sonnet`.
+pub fn model_label(model: &str) -> String {
+    match model.strip_prefix(crate::claude_code::PREFIX) {
+        Some(alias) => format!("Claude ({alias})"),
+        None => model.to_owned(),
+    }
+}
+
 /// Runs one walkthrough to its end.
 pub async fn walk(
     goal: &str,
@@ -534,8 +635,9 @@ pub async fn walk(
     let start = Card {
         step: None,
         text: format!(
-            "I'll look at your screen (display {}) to guide you. Each look sends one screenshot to {model}; nothing is saved.",
-            display + 1
+            "I'll look at your screen (display {}) to guide you. Each look sends one screenshot to {}; nothing is saved.",
+            display + 1,
+            model_label(model)
         ),
         buttons: vec![Choice::Look, Choice::Stop],
         at: None,

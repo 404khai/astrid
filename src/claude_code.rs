@@ -18,6 +18,8 @@ use crate::{
 pub const PREFIX: &str = "claude-code/";
 const MAX_LINE: u64 = 4 * 1024 * 1024;
 const TURN_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+/// ADR 0025's total visual attempt, from handing the frame to the bridge.
+const VISUAL_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Accepts Claude Code aliases (`opus`, `sonnet`, `haiku`) and `claude-*` IDs.
 pub fn valid_model(model: &str) -> bool {
@@ -126,9 +128,9 @@ impl ClaudeCodeProvider {
             .ok_or_else(|| {
                 ModelError::Provider(format!("unsupported Claude Code model {:?}", request.model))
             })?;
-        if request.options.computer_use || request.options.look {
+        if request.options.computer_use {
             return Err(ModelError::Provider(
-                "screen tools are not supported through Claude Code".into(),
+                "InstaBox computer use is not supported through Claude Code".into(),
             ));
         }
         if request.options.effort.is_some() {
@@ -150,6 +152,10 @@ impl ClaudeCodeProvider {
         if !mail.is_empty() {
             definitions.extend(crate::mail::definitions(&mail));
         }
+        // ADR 0038: local look and presentation tools (look, point_at, sketch, say).
+        if request.options.look {
+            definitions.extend(crate::computer::look_definitions());
+        }
         let tools: Vec<Value> = definitions
             .iter()
             .map(|d| json!({"name":d["name"],"description":d["description"],"parameters":d["parameters"]}))
@@ -162,6 +168,49 @@ impl ClaudeCodeProvider {
             "cwd": self.cwd,
             "client": concat!("astrid/", env!("CARGO_PKG_VERSION")),
         }))
+    }
+
+    /// The request plus one approved look frame (ADR 0038). The image goes to
+    /// the bridge as base64 PNG beside the prompt, never into history.
+    fn visual_request(
+        &self,
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+    ) -> Result<Value, ModelError> {
+        if request.model != image.model()
+            || crate::computer::vision_destination("claude_agent_sdk", request.model).is_none()
+        {
+            return Err(ModelError::Provider(
+                "unverified image model binding".into(),
+            ));
+        }
+        let mut body = self.request(request)?;
+        let url = image.data_url().map_err(ModelError::Provider)?;
+        let data = url
+            .strip_prefix("data:image/png;base64,")
+            .ok_or_else(|| ModelError::Protocol("unexpected image encoding".into()))?;
+        body["image"] = json!({"media_type":"image/png","data":data,"text":image.frame_text()});
+        Ok(body)
+    }
+
+    fn visual_snapshot(body: &Value) -> ContextSnapshot {
+        let image = serde_json::to_vec(&body["image"])
+            .map(|b| b.len())
+            .unwrap_or(0);
+        // Exactly the text request's snapshot, plus one image entry.
+        let mut text_only = body.clone();
+        if let Some(fields) = text_only.as_object_mut() {
+            fields.remove("image");
+        }
+        let mut snapshot = Self::snapshot(&text_only);
+        snapshot.serialized_request_bytes += image;
+        snapshot.measurements.push(ContextMeasurement {
+            source: ContextSource::ImageInput,
+            entries: 1,
+            serialized_bytes: image,
+            contains_opaque_data: true,
+        });
+        snapshot
     }
 
     fn snapshot(request: &Value) -> ContextSnapshot {
@@ -237,6 +286,44 @@ impl ModelProvider for ClaudeCodeProvider {
         Ok(Some(Self::snapshot(&self.request(request)?)))
     }
 
+    fn measure_visual_request(
+        &self,
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+    ) -> Result<Option<ContextSnapshot>, ModelError> {
+        Ok(Some(Self::visual_snapshot(
+            &self.visual_request(request, image)?,
+        )))
+    }
+
+    async fn generate_visual(
+        &self,
+        request: &ModelRequest<'_>,
+        image: &crate::computer::VisionInput,
+        grant: &crate::computer::DisclosureGrant,
+        cancel: &crate::cancellation::Cancellation,
+        text: &mut dyn TextSink,
+    ) -> Result<ModelResponse, ModelError> {
+        // The grant is consumed against the live frame right before the bridge
+        // starts; the local frame is released on every path out of here.
+        let admitted = async {
+            let body = self.visual_request(request, image)?;
+            text.request_prepared(Self::visual_snapshot(&body)).await?;
+            grant
+                .consume(image, request.model, cancel)
+                .map_err(ModelError::Provider)?;
+            Ok::<_, ModelError>(body)
+        }
+        .await;
+        image.release();
+        let body = admitted?;
+        tokio::select! {biased;
+            _ = cancel.cancelled() => Err(ModelError::Provider("visual request cancelled; remote outcome unknown".into())),
+            result = tokio::time::timeout(VISUAL_TIMEOUT, self.run(body, text)) => result
+                .map_err(|_| ModelError::Provider("visual response deadline (60 seconds); remote outcome unknown".into()))?,
+        }
+    }
+
     async fn generate(
         &self,
         request: &ModelRequest<'_>,
@@ -244,6 +331,13 @@ impl ModelProvider for ClaudeCodeProvider {
     ) -> Result<ModelResponse, ModelError> {
         let body = self.request(request)?;
         text.request_prepared(Self::snapshot(&body)).await?;
+        self.run(body, text).await
+    }
+}
+
+impl ClaudeCodeProvider {
+    /// One bridge process: the request on stdin, JSON lines back.
+    async fn run(&self, body: Value, text: &mut dyn TextSink) -> Result<ModelResponse, ModelError> {
         let (program, args) = self
             .bridge
             .command
@@ -268,7 +362,9 @@ impl ModelProvider for ClaudeCodeProvider {
             .ok_or_else(|| ModelError::Provider("bridge stdin unavailable".into()))?;
         let payload = serde_json::to_vec(&body)
             .map_err(|_| ModelError::Protocol("request serialization failed".into()))?;
+        drop(body);
         stdin.write_all(&payload).await?;
+        drop(payload);
         drop(stdin);
         let mut reader = BufReader::new(
             child

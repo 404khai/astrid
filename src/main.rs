@@ -320,8 +320,9 @@ enum Commands {
         /// Read-only mail sources: apple, gmail or all.
         #[arg(long, value_parser = ["apple", "gmail", "all"])]
         mail_source: Option<String>,
-        /// Image model for `/operator` walkthroughs (ADR 0038; gpt-5.6 only).
-        #[arg(long, default_value = "gpt-5.6-sol")]
+        /// Image model for operator walkthroughs (ADR 0038): claude-code/sonnet,
+        /// claude-code/opus or gpt-5.6-sol/terra/luna.
+        #[arg(long, default_value = "claude-code/sonnet")]
         operator_model: String,
         /// Display operator looks at (0 = the display with the menu bar).
         #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=15))]
@@ -1048,9 +1049,14 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             let provider =
                 provider_for(&model, auth::default_directory()?, tools.workspace().root()).await?;
-            if !astrid::computer::supported_model(&operator_model) {
+            let operator_provider = if operator_model.starts_with(astrid::claude_code::PREFIX) {
+                "claude_agent_sdk"
+            } else {
+                "openai_codex_subscription"
+            };
+            if astrid::computer::vision_destination(operator_provider, &operator_model).is_none() {
                 return Err(format!(
-                    "--operator-model must be gpt-5.6-sol, gpt-5.6-terra or gpt-5.6-luna (ADR 0024), not {operator_model:?}"
+                    "--operator-model must be claude-code/sonnet, claude-code/opus or gpt-5.6-sol/terra/luna (ADR 0038), not {operator_model:?}"
                 )
                 .into());
             }

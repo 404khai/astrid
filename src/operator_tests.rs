@@ -456,3 +456,140 @@ async fn a_refused_action_shows_the_step_and_looks_only_after_done() {
     );
     assert_eq!(cards[2].buttons, vec![Choice::Done, Choice::Stop]);
 }
+
+/// Operator on Claude (ADR 0038): a fake Claude agent bridge that asks for a
+/// look when it has no frame, and answers the report when it gets one. It
+/// records each request so the test can see exactly what was sent.
+#[tokio::test]
+async fn operator_runs_on_claude_code_with_the_frame_as_an_image() {
+    use crate::claude_code::{Bridge, ClaudeCodeProvider};
+    let dir = tempfile::tempdir().unwrap();
+    let log = dir.path().join("requests");
+    std::fs::create_dir(&log).unwrap();
+    std::fs::write(
+        dir.path().join("report.json"),
+        json!({"type":"done","text":block(json!({"step":step(1, 1, 300, "click", json!({"kind":"click"}))})),"tool_calls":[]}).to_string(),
+    )
+    .unwrap();
+    let script = format!(
+        r#"n=$(ls {log} | wc -l | tr -d ' '); cat > {log}/$n.json
+if grep -q '"image":{{' {log}/$n.json; then cat {dir}/report.json; echo
+else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look","name":"look","arguments":"{{}}"}}]}}'; fi"#,
+        log = log.display(),
+        dir = dir.path().display()
+    );
+    let provider = ClaudeCodeProvider::new(
+        Bridge {
+            command: vec!["/bin/sh".into(), "-c".into(), script],
+        },
+        dir.path().to_path_buf(),
+    );
+    let host = Arc::new(FakeHost::default());
+    let tools = Tools::new(Workspace::new(dir.path()).unwrap(), Duration::from_secs(1))
+        .unwrap()
+        .with_computer(
+            Computer::local(
+                "test".into(),
+                0,
+                host.clone(),
+                Arc::new(DecodeWorker::inline()),
+            )
+            .unwrap(),
+        );
+    let mut eyes = RuntimeEyes {
+        provider: &provider,
+        tools: &tools,
+        model: "claude-code/sonnet".into(),
+    };
+    let ui = FakeUi {
+        choices: Mutex::new(vec![Choice::Look, Choice::Stop].into()),
+        ..FakeUi::default()
+    };
+    let outcome = walk(
+        "Export the report",
+        "claude-code/sonnet",
+        0,
+        &mut eyes,
+        &ui,
+        &Cancellation::default(),
+    )
+    .await;
+    assert!(matches!(outcome, Outcome::Stopped(_)), "{outcome:?}");
+    assert_eq!(*host.captures.lock().unwrap(), 1);
+    let cards = ui.cards.lock().unwrap().clone();
+    assert!(cards[0].text.contains("Claude (sonnet)"));
+    assert_eq!(cards[1].step, Some((1, 1)));
+    let read = |n: usize| -> Value {
+        serde_json::from_slice(&std::fs::read(log.join(format!("{n}.json"))).unwrap()).unwrap()
+    };
+    let (first, second) = (read(0), read(1));
+    // The look tool is offered to Claude; no image before the approved look.
+    assert!(
+        first["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["name"] == "look")
+    );
+    assert!(first["image"].is_null());
+    assert_eq!(first["model"], "sonnet");
+    // Exactly the one frame, as a PNG, with its frame text.
+    assert_eq!(second["image"]["media_type"], "image/png");
+    assert!(
+        second["image"]["data"]
+            .as_str()
+            .unwrap()
+            .starts_with("iVBOR")
+    );
+    assert!(
+        second["image"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("320x200")
+    );
+    assert!(
+        !second["prompt"].as_str().unwrap().contains("iVBOR"),
+        "the frame never enters the replayed history"
+    );
+    assert_eq!(std::fs::read_dir(&log).unwrap().count(), 2);
+}
+
+#[test]
+fn only_named_claude_and_gpt_models_may_see_a_look() {
+    use crate::computer::vision_destination;
+    assert!(vision_destination("claude_agent_sdk", "claude-code/sonnet").is_some());
+    assert!(vision_destination("claude_agent_sdk", "claude-code/opus").is_some());
+    assert!(vision_destination("claude_agent_sdk", "claude-code/haiku").is_none());
+    assert!(vision_destination("claude_agent_sdk", "gpt-5.6-sol").is_none());
+    assert!(vision_destination("openai_codex_subscription", "gpt-5.6-sol").is_some());
+    assert!(vision_destination("openai_codex_subscription", "claude-code/sonnet").is_none());
+    assert!(vision_destination("opencode_go", "opencode/kimi").is_none());
+    assert_eq!(model_label("claude-code/opus"), "Claude (opus)");
+    assert_eq!(model_label("gpt-5.6-sol"), "gpt-5.6-sol");
+}
+
+#[test]
+fn spoken_answers_map_to_offered_buttons_only() {
+    use Choice::*;
+    let step = [DoIt, ShowMe, Stop];
+    assert_eq!(choice_from_speech("Do it", &step), Some(DoIt));
+    assert_eq!(choice_from_speech("yes please", &step), Some(DoIt));
+    assert_eq!(choice_from_speech("Show me how.", &step), Some(ShowMe));
+    assert_eq!(choice_from_speech("I'll do it myself", &step), Some(ShowMe));
+    // Stop words win, so a negated "do it" never acts.
+    assert_eq!(choice_from_speech("don't do it", &step), Some(Stop));
+    assert_eq!(choice_from_speech("no", &step), Some(Stop));
+    assert_eq!(choice_from_speech("what is this", &step), None);
+    // Buttons not on the card are never pressed.
+    let show_only = [ShowMe, Stop];
+    assert_eq!(choice_from_speech("do it", &show_only), None);
+    assert_eq!(choice_from_speech("yes", &show_only), Some(ShowMe));
+    assert_eq!(choice_from_speech("ok done", &[Done, Stop]), Some(Done));
+    assert_eq!(
+        choice_from_speech("sure, take a look", &[Look, Stop]),
+        Some(Look)
+    );
+    assert_eq!(choice_from_speech("thanks!", &[Close]), Some(Close));
+    assert_eq!(choice_from_speech("cancel", &[Close]), Some(Close));
+    assert_eq!(choice_from_speech("yes", &[Stop]), None);
+}

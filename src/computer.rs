@@ -30,6 +30,9 @@ const LOOK_POLICY: &str = "v2-02-local-look-v1";
 /// ADR 0027 presentation calls per run (point_at, sketch, say).
 const MAX_PRESENTATIONS: usize = 24;
 const DESTINATION: &str = "https://api.openai.com/v1/responses";
+/// ADR 0038: a local look may also go to Claude through the Claude Agent SDK.
+const CLAUDE_DESTINATION: &str =
+    "Anthropic, through the Claude Agent SDK on this Mac's Claude Code login";
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ObserveKind {
@@ -566,7 +569,13 @@ impl ComputerRun {
             return Ok(None);
         }
         self.pending = false;
-        if !supported_model(model) || provider != "openai_codex_subscription" {
+        let local = self.is_local();
+        let verified = if local {
+            vision_destination(provider, model).is_some()
+        } else {
+            supported_model(model) && provider == "openai_codex_subscription"
+        };
+        if !verified {
             return Err("configured model/provider does not have verified CU image support".into());
         }
         let frame = self.frame.lock().unwrap_or_else(|e| e.into_inner());
@@ -574,7 +583,6 @@ impl ComputerRun {
             .as_ref()
             .filter(|f| Instant::now() < f.expires)
             .ok_or("image expired before disclosure")?;
-        let local = self.is_local();
         // A local look's single approval named this provider and model; any
         // other model would need a fresh approval, which this path never asks.
         if local && (provider, model) != (self.disclose_to.0.as_str(), self.disclose_to.1.as_str())
@@ -614,6 +622,25 @@ pub(crate) fn is_presentation(name: &str) -> bool {
 
 pub fn supported_model(model: &str) -> bool {
     matches!(model, "gpt-5.6-sol" | "gpt-5.6-terra" | "gpt-5.6-luna")
+}
+/// Where a local look's frame may be sent, for an exact provider and model
+/// (ADRs 0024, 0038). InstaBox computer use stays OpenAI-only.
+pub fn vision_destination(provider: &str, model: &str) -> Option<&'static str> {
+    match provider {
+        "openai_codex_subscription" if supported_model(model) => Some(DESTINATION),
+        "claude_agent_sdk" if matches!(model, "claude-code/sonnet" | "claude-code/opus") => {
+            Some(CLAUDE_DESTINATION)
+        }
+        _ => None,
+    }
+}
+/// What the approval says about retention for each destination.
+fn retention(provider: &str) -> Value {
+    if provider == "openai_codex_subscription" {
+        json!({"store": false})
+    } else {
+        json!({"store": "not applicable; Anthropic's Claude Code data policy applies"})
+    }
 }
 pub(crate) enum Prepared {
     Observe(ObserveRequest),
@@ -676,10 +703,10 @@ impl Prepared {
             }) => ascii_json(
                 &json!({"capability":"local.look","includes":["gui.observe","image.disclose"],"principal":owner.principal,"run_id":owner.run_id,"tool_call_id":id,"call_id":call_id,
                 "target":{"this_mac_display":look.display,"capture":"ScreenCaptureKit at 1x display points; Astrid's own overlay excluded; cursor hidden"},
-                "disclosure":{"provider":look.provider,"model":look.model,"destination":DESTINATION,"detail":"original","image_count":1,"store":false},
+                "disclosure":{"provider":look.provider,"model":look.model,"destination":vision_destination(&look.provider,&look.model).unwrap_or(DESTINATION),"detail":"original","image_count":1,"retention":retention(&look.provider)},
                 "policy":LOOK_POLICY,
                 "limits":{"png_bytes":MAX_PNG,"pixels":4096000,"dimension":2560,"looks_per_run":2,"window_seconds":30,"memory_retention_seconds":10,"response_deadline_seconds":60},
-                "warning":"Approving captures this whole display once AND sends that one frame to the named provider/model. No redaction. Other apps' windows, notifications and private content on that display are included. No image disk/history/trace storage; provider data policies still apply and store:false is not zero retention. Model outputs may describe what is on screen. Declining captures nothing."}),
+                "warning":"Approving captures this whole display once AND sends that one frame to the named provider/model. No redaction. Other apps' windows, notifications and private content on that display are included. No image disk/history/trace storage; provider data policies still apply (OpenAI store:false is not zero retention). Model outputs may describe what is on screen. Declining captures nothing."}),
             ),
             Self::Observe(r) => ascii_json(
                 &json!({"capability":"gui.observe","principal":r.owner.principal,"run_id":r.owner.run_id,"tool_call_id":r.id,"call_id":r.call_id,"machine_id":r.owner.machine_id,"kind":r.kind,"policy":OBSERVE_POLICY,
@@ -830,7 +857,7 @@ impl VisionInput {
     }
     pub(crate) fn description(&self) -> String {
         ascii_json(
-            &json!({"capability":"image.disclose","principal":self.binding.owner.principal,"run_id":self.binding.owner.run_id,"model_call_id":self.binding.model_call_id,"frame_id":self.binding.frame_id,"machine_id":self.binding.owner.machine_id,"native_width":self.binding.width,"native_height":self.binding.height,"provider":self.binding.provider,"model":self.binding.model,"destination":DESTINATION,"detail":"original","image_count":1,"image_token_estimate_with_margin":self.estimate(),"store":false,"response_deadline_seconds_from_post_admission":60,"upload_headers_and_image_deadline":"10 seconds from capture admission; application image buffers released before response wait","expires_in_ms":self.expires.saturating_duration_since(Instant::now()).as_millis(),"approval_deadline":"10 seconds from capture admission; timer is already running. Type yes then Return. Expiry is not denial.","warning":"Send this whole native screen to the named provider once. No redaction. Local image expires within 10s of capture admission, no image history/replay/persistence. Provider data policies still apply; store:false is not zero retention. Model outputs may describe sensitive content."}),
+            &json!({"capability":"image.disclose","principal":self.binding.owner.principal,"run_id":self.binding.owner.run_id,"model_call_id":self.binding.model_call_id,"frame_id":self.binding.frame_id,"machine_id":self.binding.owner.machine_id,"native_width":self.binding.width,"native_height":self.binding.height,"provider":self.binding.provider,"model":self.binding.model,"destination":vision_destination(&self.binding.provider,&self.binding.model).unwrap_or(DESTINATION),"detail":"original","image_count":1,"image_token_estimate_with_margin":self.estimate(),"store":false,"response_deadline_seconds_from_post_admission":60,"upload_headers_and_image_deadline":"10 seconds from capture admission; application image buffers released before response wait","expires_in_ms":self.expires.saturating_duration_since(Instant::now()).as_millis(),"approval_deadline":"10 seconds from capture admission; timer is already running. Type yes then Return. Expiry is not denial.","warning":"Send this whole native screen to the named provider once. No redaction. Local image expires within 10s of capture admission, no image history/replay/persistence. Provider data policies still apply; store:false is not zero retention. Model outputs may describe sensitive content."}),
         )
     }
     pub(crate) fn approve(&self) -> DisclosureGrant {
