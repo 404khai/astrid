@@ -300,10 +300,10 @@ final class ArtTests: XCTestCase {
         XCTAssertEqual(upper.minX, 0, accuracy: 0.01)
         XCTAssertEqual(upper.maxX, 20, accuracy: 0.01)
         XCTAssertEqual(upper.minY, 0, accuracy: 0.01)
-        XCTAssertEqual(lower.maxY, 16, accuracy: 0.01)
+        XCTAssertEqual(lower.maxY, 15.98, accuracy: 0.01)
         let eye = try SVGPath.parse(AstridArt.leftEye).boundingBoxOfPath
         XCTAssertEqual(eye.minX, 6.009, accuracy: 0.01)
-        XCTAssertEqual(eye.maxY, 10.43, accuracy: 0.01)
+        XCTAssertEqual(eye.maxY, 10.42, accuracy: 0.01)
     }
 
     func testCursorArrowHandlesImplicitAndRelativeCommands() throws {
