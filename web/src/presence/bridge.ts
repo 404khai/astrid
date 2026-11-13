@@ -19,7 +19,8 @@ export type Incoming =
   | { type: "speaking"; on: boolean }
   | { type: "hotkey"; down: boolean }
   | { type: "transcript"; text: string; final: boolean }
-  | { type: "voice-error"; message: string };
+  | { type: "voice-error"; message: string }
+  | { type: "canvas-open"; on: boolean };
 
 export type Outgoing =
   | { type: "ask"; text: string }

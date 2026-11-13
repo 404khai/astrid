@@ -247,7 +247,8 @@ body {
   background: var(--accent);
   color: #fff;
   font: 500 13px/18px var(--sans);
-  white-space: nowrap;
+  width: max-content;
+  max-width: 260px;
   box-shadow: 0 8px 20px #0008;
   animation: cv-tag 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
@@ -303,4 +304,9 @@ body {
   .cv-solid3 > text {
     animation: none;
   }
+}
+
+.cv-wire {
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

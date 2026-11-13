@@ -42,7 +42,11 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var dragTimer: Timer?
     private let speaker: Speaker
     /// ADR 0036: the live canvas, created on the first drawing.
-    private lazy var canvas = CanvasController(page: config.ui.deletingLastPathComponent().appendingPathComponent("canvas.html"))
+    private lazy var canvas: CanvasController = {
+        let canvas = CanvasController(page: config.ui.deletingLastPathComponent().appendingPathComponent("canvas.html"))
+        canvas.onVisible = { [weak self] on in self?.deliver(["type": "canvas-open", "on": on]) }
+        return canvas
+    }()
 
     init(config: AskConfig) {
         self.config = config

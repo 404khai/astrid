@@ -8,7 +8,7 @@ import type { OrbState } from "thinking-orbs";
 import { AstridLogo, type EyeExpression } from "../components/AstridLogo";
 import { astridCursor } from "../components/cursors";
 import { anchor, ShapeView, type Shape } from "./shapes";
-import { defaultCamera, flatten, ISO_CSS, project, solid, type Camera } from "./solids";
+import { defaultCamera, flatten, ISO_CSS, paintOrder, project, solid, type Camera } from "./solids";
 import { demo } from "./demo";
 import "./canvas.css";
 
@@ -93,12 +93,12 @@ function App() {
   // Built from the raw shapes for the current camera, so turning the figure
   // re-projects every solid, label and arrow. Solids are drawn back to front.
   const scene = useMemo(() => {
-    const solids = drawn
+    const solids = paintOrder(drawn
       .map((shape, n) => ({ shape, n, built: solid(shape, cam) }))
       .filter((s) => s.built)
       .map((s) => ({ ...s, built: s.built! }))
-      .sort((a, b) => a.built.depth - b.built.depth || a.n - b.n);
-    const flats = drawn.map((shape, n) => ({ shape: flatten(shape, cam), n })).filter((s) => s.shape.shape !== "slab" && s.shape.shape !== "cylinder");
+    );
+    const flats = drawn.map((shape, n) => ({ shape: flatten(shape, cam), n })).filter((s) => !solid(s.shape, cam));
     return { solids, flats, last: drawn.length - 1 };
   }, [drawn, cam]);
 
@@ -138,6 +138,8 @@ function App() {
     if (built) setTarget({ world: built.world });
     else if (next.shape === "point" && next.z !== undefined) setTarget({ world: [next.x!, next.y!, next.z] });
     else if (next.shape === "text" && next.z !== undefined) setTarget({ world: [next.x!, next.y!, next.z] });
+    else if (next.points?.length && (next.points[next.points.length - 1] as number[]).length === 3)
+      setTarget({ world: next.points[next.points.length - 1] as unknown as [number, number, number] });
     else if (next.shape === "arrow" && next.to!.length === 3) setTarget({ world: next.to as [number, number, number] });
     else {
       const at = anchor(next);
@@ -271,7 +273,7 @@ function App() {
   const activity = drawing ?? external;
   const look = activity ? looks[activity] : null;
   const [hx, hy] = astridCursor.hot;
-  const flip = cursor[0] > size.w - 340;
+  const flip = cursor[0] > size.w - 300;
   return (
     <main className={`cv-card${moving ? " cv-moving" : ""}`}>
       <style>{ISO_CSS}</style>

@@ -32,6 +32,8 @@ final class CanvasController: NSObject, WKScriptMessageHandler {
     }
 
     var isVisible: Bool { panel.isVisible }
+    /// Tells the ask surface when the canvas opens or closes.
+    var onVisible: (Bool) -> Void = { _ in }
 
     /// Shows the canvas centred on the screen holding `near`, leaving room
     /// below for the ask panel.
@@ -44,6 +46,7 @@ final class CanvasController: NSObject, WKScriptMessageHandler {
         let frame = NSRect(x: visible.midX - width / 2, y: visible.maxY - height - 24, width: width, height: height)
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
+        onVisible(true)
     }
 
     /// Relays one runtime message to the page; a drawing's start shows the panel.
@@ -76,6 +79,7 @@ final class CanvasController: NSObject, WKScriptMessageHandler {
             queued.removeAll()
         case "canvas-close":
             panel.orderOut(nil)
+            onVisible(false)
         case "drag-start":
             startDrag()
         default:

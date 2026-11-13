@@ -10,6 +10,8 @@ const lines = [
   { shape: "cylinder", x: 30, y: 0, z: 80, radius: 56, r2: 64, h: 90, axis: "x", fill: "violet", label: "turbine" },
   { shape: "cylinder", x: 120, y: 0, z: 80, radius: 60, r2: 36, h: 110, axis: "x", label: "nozzle" },
   { shape: "cylinder", x: -250, y: 0, z: 80, radius: 22, r2: 6, h: 30, axis: "x" },
+  { shape: "line", points: [[-200, -60, -24], [-200, 60, -24], [200, 60, -24]], stroke: "teal", width: 2 },
+  { shape: "line", points: [[-150, -70, -24], [150, -70, -24], [150, 40, -24]], stroke: "yellow", width: 2, dashed: true },
   { shape: "arrow", from: [-420, 0, 140], to: [-260, 0, 120], stroke: "blue" },
   { shape: "arrow", from: [240, 0, 80], to: [380, 0, 80], stroke: "red" },
   { shape: "text", x: -400, y: 0, z: 110, text: "Cold air in", size: 15, fill: "blue" },
