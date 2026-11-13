@@ -9,7 +9,8 @@ double-click to reset.
 
 The sidebar follows the Radian browser: glass buttons, a search pill whose
 sliders open Settings (⌘,), and an inset content card. ⌃⌘S hides the sidebar; then rest
-the pointer on the window's left edge to peek it over the chat, as in Arc.
+the pointer on the window's left edge to peek it: it slides in exactly as
+when opened, but over the chat instead of pushing it, as in Arc.
 Drag the sidebar's edge to resize it. The window buttons show only while the
 sidebar is open and wide enough for them.
 Settings follows Rex: General (model, mail source) and Themes, with four
@@ -36,6 +37,9 @@ swift build && swift test        # 19 deterministic tests (store, titles, child 
   the same read-only runs and mail approvals as the presence ask panel
   (ADR 0033). The model defaults to `claude-code/sonnet`; change it with
   `--model`, and choose the mail source with `--mail gmail|apple|all|none`.
+- **Icon.** `scripts/bundle.sh` compiles `AstridIcon.icon` from the repo root
+  (or `ASTRID_ICON=/path/to.icon`) with `actool`; without it the app keeps the
+  generic icon.
 - **Chats.** They are saved in `~/Library/Application Support/Astrid/Chats`
   (`--chats DIR` to use another folder).
 - **Debug.** `ASTRID_DESKTOP_SNAPSHOT=/path.png` saves the app's own window

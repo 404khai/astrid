@@ -4,10 +4,11 @@ import SwiftUI
 
 /// The window, after the maintainer's Radian browser: a sidebar drawn on the
 /// window's translucent material under a theme tint, and the main content as
-/// an inset rounded card. Collapsing the sidebar lets the card fill the window;
-/// then, as in Arc, resting the pointer on the left edge peeks the sidebar over
-/// the content. The window buttons show only on a docked sidebar wide enough
-/// to hold them.
+/// an inset rounded card. There is one sidebar, and it always moves the same
+/// way: it slides in from the left edge and slides back out. Opened (docked),
+/// it pushes the card over; peeking (pointer on the left edge while closed), it
+/// slides in exactly the same way but over the card, which stays put. The
+/// window buttons show only on a docked sidebar wide enough to hold them.
 struct RootView: View {
     @ObservedObject var model: ChatModel
     @ObservedObject var settings: AppSettings
@@ -18,28 +19,59 @@ struct RootView: View {
     /// Where AppKit put the window buttons, so the sidebar's top row lines up.
     @State private var lights = TrafficLights()
 
+    /// One motion for opening, closing, peeking and un-peeking.
+    static let slide = Animation.smooth(duration: 0.3)
+
     var body: some View {
         let palette = Palette(spec: settings.theme(dark: scheme == .dark))
-        HStack(spacing: 0) {
-            if settings.sidebarShown {
-                Sidebar(model: model, settings: settings, lights: settings.trafficLightsVisible ? lights : TrafficLights(maxX: nil, centerY: lights.centerY))
-                    .frame(width: settings.sidebarWidth)
-                    .overlay(alignment: .trailing) { ResizeHandle(width: $settings.sidebarWidth).offset(x: 4) }
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-            }
+        let docked = settings.sidebarShown
+        let visible = docked || peeking
+        let width = settings.sidebarWidth
+        ZStack(alignment: .leading) {
             ContentCard(model: model, settings: settings)
                 .padding(.vertical, 8)
                 .padding(.trailing, 8)
-                .padding(.leading, settings.sidebarShown ? 0 : 8)
-        }
-        .overlay(alignment: .leading) {
-            if !settings.sidebarShown { peek(palette) }
+                .padding(.leading, docked ? width : 8)
+
+            // Closed and not peeking: a strip on the left edge that peeks it.
+            if !visible {
+                Color.clear
+                    .frame(width: 10)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(.rect)
+                    .onHover { if $0 { setPeek(true) } }
+                    .accessibilityHidden(true)
+            }
+
+            Sidebar(model: model, settings: settings, peeking: !docked,
+                    lights: settings.trafficLightsVisible ? lights : TrafficLights(maxX: nil, centerY: lights.centerY))
+                .frame(width: width)
+                .frame(maxHeight: .infinity)
+                // Docked, the window's own tinted material shows through. Over
+                // the card it needs the same look of its own, so it fades in
+                // and out with the same motion.
+                .background {
+                    ZStack {
+                        Rectangle().fill(.ultraThinMaterial)
+                        palette.sidebar.opacity(min(1, palette.spec.sidebarOpacity + 0.2))
+                    }
+                    .opacity(docked ? 0 : 1)
+                }
+                .shadow(color: .black.opacity(docked ? 0 : (palette.spec.dark ? 0.3 : 0.12)), radius: 14, x: 3)
+                .overlay(alignment: .trailing) {
+                    if docked { ResizeHandle(width: $settings.sidebarWidth).offset(x: 4) }
+                }
+                .offset(x: visible ? 0 : -(width + 24))
+                .allowsHitTesting(visible)
+                .accessibilityHidden(!visible)
+                .onHover { inside in if !docked { setPeek(inside) } }
         }
         .background { palette.sidebar.opacity(palette.spec.sidebarOpacity) }
         .background(WindowChrome(trafficLights: settings.trafficLightsVisible, measured: $lights))
         .ignoresSafeArea()
         .environment(\.palette, palette)
-        .animation(.smooth(duration: 0.3), value: settings.sidebarShown)
+        .animation(Self.slide, value: docked)
+        .animation(Self.slide, value: peeking)
         .sheet(isPresented: $settings.showSettings) {
             SettingsView(model: model, settings: settings)
                 .environment(\.palette, palette)
@@ -47,6 +79,7 @@ struct RootView: View {
                 // Opaque, so the chat behind never shows through.
                 .presentationBackground(palette.content)
         }
+        // Docking from a peek keeps the sidebar where it is; only the card moves.
         .onChange(of: settings.sidebarShown) { _, shown in if shown { peeking = false } }
         // Debug: ASTRID_DESKTOP_PEEK=1 holds a closed sidebar peeking.
         .onAppear {
@@ -57,39 +90,6 @@ struct RootView: View {
         }
         .onChange(of: settings.model) { _, _ in model.reconfigure(model: settings.model, mail: settings.mail) }
         .onChange(of: settings.mail) { _, _ in model.reconfigure(model: settings.model, mail: settings.mail) }
-    }
-
-    /// A hover strip on the left edge and, while peeking, the sidebar itself:
-    /// flush with the window edge, full height, the same tint over a material,
-    /// lying over the content, which keeps its layout underneath.
-    @ViewBuilder
-    private func peek(_ palette: Palette) -> some View {
-        ZStack(alignment: .leading) {
-            Color.clear
-                .frame(width: 10)
-                .frame(maxHeight: .infinity)
-                .contentShape(.rect)
-                .onHover { if $0 { setPeek(true) } }
-                .accessibilityHidden(true)
-            if peeking {
-                Sidebar(model: model, settings: settings, peeking: true, lights: TrafficLights(maxX: nil, centerY: lights.centerY))
-                    .frame(width: settings.sidebarWidth)
-                    .frame(maxHeight: .infinity)
-                    .background {
-                        ZStack {
-                            Rectangle().fill(.ultraThinMaterial)
-                            palette.sidebar.opacity(min(1, palette.spec.sidebarOpacity + 0.2))
-                        }
-                    }
-                    .overlay(alignment: .trailing) {
-                        Rectangle().fill(palette.sidebarText.opacity(0.1)).frame(width: 0.5)
-                    }
-                    .shadow(color: .black.opacity(palette.spec.dark ? 0.35 : 0.15), radius: 14, x: 3)
-                    .onHover { setPeek($0) }
-                    .transition(.move(edge: .leading))
-            }
-        }
-        .animation(.smooth(duration: 0.25), value: peeking)
     }
 
     /// Shows at once; hides after a short grace so a brush past the edge

@@ -120,9 +120,11 @@ maintainer asked for a full desktop app on that same native stack, with macOS
 
      The main content is an inset rounded card. Collapsing the sidebar (⌃⌘S)
      lets the card fill the window. As in Arc, resting the pointer on the left
-     edge then **peeks** the sidebar: flush with the window edge, full
-     height and tinted like the docked one, lying over the content, which
-     keeps its layout underneath. Its toggle docks the sidebar, and
+     edge then **peeks** it. Peeking is the same sidebar with the same
+     slide-in motion as opening it; the only difference is that opening
+     pushes the content card over, while a peek slides over the card, which
+     stays put. Docking from a peek leaves the sidebar where it is and moves
+     only the card. Its toggle docks the sidebar, and
      leaving the panel hides it. The docked sidebar is resizable from its
      right edge (200–380 pt). The top row follows Radian: the toggle on the
      left and new chat on the right, on the window buttons' centre line
@@ -167,8 +169,11 @@ maintainer asked for a full desktop app on that same native stack, with macOS
 - **Follow-ups:** a follow-up gets the earlier text and drawing titles. It does
   not get the earlier shapes, so "make it bigger" redraws from the description.
 - **Out of this slice:** voice, look, multi-window, deleting or renaming
-  chats, imported themes and an app icon. An Icon Composer `.icon` can be
-  compiled into the bundle with `actool` when it exists.
+  chats and imported themes.
+- **App icon:** the maintainer's Icon Composer `AstridIcon.icon` is compiled by
+  `actool` into the bundle's `Assets.car` and an `.icns` at bundle time. It is
+  read from the repo root (or `ASTRID_ICON`) and is not committed, because one
+  of its layers is a third-party stock image and the repository is public.
 - **Cost of changing later:**
   - **Low** for the layout.
   - **Medium** for the chat file format, which is versioned.
