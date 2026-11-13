@@ -1228,12 +1228,8 @@ async fn local_capture_failure_and_look_limits_stop_without_retry() {
         panic!()
     };
     assert_eq!(data["successful"], false);
-    assert!(
-        data["failure"]
-            .as_str()
-            .unwrap()
-            .contains("Screen Recording")
-    );
+    // The host's categorical reason is kept (never screen content).
+    assert_eq!(data["failure"], "screen_recording_permission_required");
     assert!(run.stopped());
     assert_eq!(host.captures.lock().unwrap().len(), 1);
     assert!(run.prepare(ToolCallId::default(), &look, &cancel).is_err());

@@ -42,17 +42,15 @@ enum FrameCapture {
             case let .failure(failure): return .failure(failure)
             }
         }
-        guard let (png, fingerprint) = encode(image, width: width, height: height) else { return .failure(CaptureFailure(reason: "encode_failed")) }
+        guard let encoded = encode(image, width: width, height: height) else { return .failure(CaptureFailure(reason: "encode_failed")) }
+        guard let (png, fingerprint) = encoded.png.map({ ($0, encoded.fingerprint) }) else {
+            return .failure(CaptureFailure(reason: "frame_png_exceeds_1mib"))
+        }
         if let problem = FrameLimits.check(width: width, height: height, bytes: png.count) { return .failure(CaptureFailure(reason: problem)) }
         return .success(Frame(png: png, width: width, height: height, fingerprint: fingerprint))
     }
 
     private static func screenImage(screen: NSScreen, width: Int, height: Int) async -> Result<CGImage, CaptureFailure> {
-        guard CGPreflightScreenCaptureAccess() else {
-            // Shows the system prompt once; the grant takes effect on relaunch.
-            _ = CGRequestScreenCaptureAccess()
-            return .failure(CaptureFailure(reason: "screen_recording_permission_required"))
-        }
         guard let displayID = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID else {
             return .failure(CaptureFailure(reason: "display_unavailable"))
         }
@@ -71,28 +69,36 @@ enum FrameCapture {
             let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
             return .success(image)
         } catch {
+            // Try ScreenCaptureKit first: the preflight can lag behind a fresh
+            // grant. Only a refusal without access is reported as permission.
+            if !CGPreflightScreenCaptureAccess() {
+                // Shows the system prompt once; the grant takes effect on relaunch.
+                _ = CGRequestScreenCaptureAccess()
+                return .failure(CaptureFailure(reason: "screen_recording_permission_required"))
+            }
             return .failure(CaptureFailure(reason: "capture_failed"))
         }
     }
 
-    /// Redraws into an exact-size 8-bit RGBA sRGB bitmap so the runtime's strict
-    /// PNG validation (8-bit RGB/RGBA, non-interlaced) always applies.
-    static func encode(_ image: CGImage, width: Int, height: Int) -> (Data, Fingerprint)? {
+    /// Redraws into an exact-size sRGB bitmap, then writes an 8-bit RGB PNG that
+    /// fits the frame limit (FrameEncoding), so the runtime's strict PNG
+    /// validation (8-bit RGB/RGBA, non-interlaced) always applies.
+    /// The fingerprint, and the PNG fitted under the frame limit (nil if it
+    /// can't be, even quantized).
+    static func encode(_ image: CGImage, width: Int, height: Int) -> (png: Data?, fingerprint: Fingerprint)? {
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                 space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         context.interpolationQuality = .high
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        guard let flattened = context.makeImage(), let pixels = context.data else { return nil }
+        guard let pixels = context.data else { return nil }
         let bytes = [UInt8](UnsafeBufferPointer(start: pixels.assumingMemoryBound(to: UInt8.self), count: context.bytesPerRow * height))
         // A bitmap context's first row in memory is the image's top row, so
         // cells line up with display points (y down).
         let fingerprint = Fingerprint(rgba: bytes, width: width, height: height, bytesPerRow: context.bytesPerRow)
-        let data = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(destination, flattened, nil)
-        return CGImageDestinationFinalize(destination) ? (data as Data, fingerprint) : nil
+        let fitted = FrameEncoding.fit(rgba: bytes, width: width, height: height, bytesPerRow: context.bytesPerRow)
+        return (fitted?.png, fingerprint)
     }
 }
 

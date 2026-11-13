@@ -30,5 +30,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
-codesign --force --sign - "$APP" >/dev/null
+# Ad-hoc signing gives every build a new code hash, and macOS ties Screen
+# Recording / Accessibility grants to the signature, so each rebuild would lose
+# them. A designated requirement on the bundle id keeps grants across rebuilds.
+# Set ASTRID_SIGN_IDENTITY to a real signing identity to use that instead.
+if [ -n "${ASTRID_SIGN_IDENTITY:-}" ]; then
+  codesign --force --sign "$ASTRID_SIGN_IDENTITY" "$APP" >/dev/null
+else
+  codesign --force --sign - --identifier dev.astrid.presence \
+    -r='designated => identifier "dev.astrid.presence"' "$APP" >/dev/null
+fi
 echo "$APP"

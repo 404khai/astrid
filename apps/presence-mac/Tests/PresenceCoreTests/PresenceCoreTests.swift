@@ -1,4 +1,5 @@
 import CoreGraphics
+import ImageIO
 import XCTest
 @testable import PresenceCore
 
@@ -606,5 +607,53 @@ final class OperatorTests: XCTestCase {
         }
         let centred = StepCardLayout.origin(card: card, target: nil, display: display)
         XCTAssertEqual(centred.x, (1512 - 340) / 2)
+    }
+}
+
+final class FrameEncodingTests: XCTestCase {
+    /// A photo-like frame: gradients plus small per-pixel noise.
+    private func photo(width: Int, height: Int) -> [UInt8] {
+        var rgba = [UInt8](repeating: 255, count: width * height * 4)
+        var seed: UInt64 = 7
+        func noise() -> Int { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return Int(seed >> 61) - 4 }
+        for y in 0..<height {
+            for x in 0..<width {
+                let i = (y * width + x) * 4
+                rgba[i] = UInt8(clamping: x * 255 / width + noise())
+                rgba[i + 1] = UInt8(clamping: y * 255 / height + noise())
+                rgba[i + 2] = UInt8(clamping: (x + y) * 128 / (width + height) + noise())
+            }
+        }
+        return rgba
+    }
+
+    func testRealScreensAreFittedUnderTheLimitAtFullSize() throws {
+        let (w, h) = (400, 300)
+        let rgba = photo(width: w, height: h)
+        let full = try XCTUnwrap(FrameEncoding.fit(rgba: rgba, width: w, height: h, bytesPerRow: w * 4, limit: 10_000_000))
+        XCTAssertEqual(full.bits, 8)
+        // A tighter limit is met by quantizing, never by resizing.
+        let tight = try XCTUnwrap(FrameEncoding.fit(rgba: rgba, width: w, height: h, bytesPerRow: w * 4, limit: full.png.count / 2))
+        XCTAssertLessThan(tight.bits, 8)
+        XCTAssertLessThanOrEqual(tight.png.count, full.png.count / 2)
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(tight.png as CFData, nil))
+        let props = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+        XCTAssertEqual(props[kCGImagePropertyPixelWidth] as? Int, w)
+        XCTAssertEqual(props[kCGImagePropertyPixelHeight] as? Int, h)
+        XCTAssertEqual(props[kCGImagePropertyHasAlpha] as? Bool ?? false, false)
+        // Nothing fits an impossible limit.
+        XCTAssertNil(FrameEncoding.fit(rgba: rgba, width: w, height: h, bytesPerRow: w * 4, limit: 100))
+    }
+
+    func testQuantizingKeepsBlackAndWhite() {
+        let rgba: [UInt8] = [0, 255, 128, 255, 255, 0, 17, 255]
+        for bits in FrameEncoding.steps {
+            let rgb = FrameEncoding.rgb(rgba, width: 2, height: 1, bytesPerRow: 8, bits: bits)
+            XCTAssertEqual(rgb[0], 0)
+            XCTAssertEqual(rgb[1], 255)
+            XCTAssertEqual(rgb[3], 255)
+            XCTAssertEqual(rgb[4], 0)
+        }
+        XCTAssertEqual(FrameEncoding.rgb(rgba, width: 2, height: 1, bytesPerRow: 8, bits: 8), [0, 255, 128, 255, 0, 17])
     }
 }

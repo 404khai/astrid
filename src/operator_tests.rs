@@ -593,3 +593,66 @@ fn spoken_answers_map_to_offered_buttons_only() {
     assert_eq!(choice_from_speech("cancel", &[Close]), Some(Close));
     assert_eq!(choice_from_speech("yes", &[Stop]), None);
 }
+
+struct RefusingHost(&'static str);
+#[async_trait]
+impl crate::presence::LookHost for RefusingHost {
+    async fn capture(&self, _: u32, _: &Cancellation) -> Result<Vec<u8>, String> {
+        Err(format!("host capture failed: {}", self.0))
+    }
+    async fn present(&self, _: Value) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn a_failed_look_says_why_instead_of_computer_stopped() {
+    for (reason, expected) in [
+        (
+            "screen_recording_permission_required",
+            "quit Astrid Presence",
+        ),
+        ("frame_png_exceeds_1mib", "1 MiB frame limit"),
+        ("something_new", "The look failed (local_capture_failed)."),
+    ] {
+        let (origin, seen) = mock_model(vec![]).await;
+        let dir = tempfile::tempdir().unwrap();
+        let tools = Tools::new(Workspace::new(dir.path()).unwrap(), Duration::from_secs(1))
+            .unwrap()
+            .with_computer(
+                Computer::local(
+                    "test".into(),
+                    0,
+                    Arc::new(RefusingHost(reason)),
+                    Arc::new(DecodeWorker::inline()),
+                )
+                .unwrap(),
+            );
+        let provider = OpenAiProvider::with_endpoint(Arc::new(Auth), origin).unwrap();
+        let mut eyes = RuntimeEyes {
+            provider: &provider,
+            tools: &tools,
+            model: "gpt-5.6-sol".into(),
+        };
+        let ui = FakeUi {
+            choices: Mutex::new(vec![Choice::Look, Choice::Close].into()),
+            ..FakeUi::default()
+        };
+        let outcome = walk(
+            "x",
+            "gpt-5.6-sol",
+            0,
+            &mut eyes,
+            &ui,
+            &Cancellation::default(),
+        )
+        .await;
+        let Outcome::Failed(message) = outcome else {
+            panic!("{outcome:?}")
+        };
+        assert!(message.contains(expected), "{reason}: {message}");
+        assert!(!message.contains("computer_stopped"));
+        // The model asked for the look once and never got an image.
+        assert_eq!(seen.lock().unwrap().len(), 1);
+    }
+}

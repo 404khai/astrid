@@ -411,7 +411,11 @@ impl Eyes for RuntimeEyes<'_> {
         match &result.outcome {
             RunOutcome::Completed => {}
             RunOutcome::Cancelled => return Err("cancelled".into()),
-            RunOutcome::Failed { code, message } => return Err(format!("{code}: {message}")),
+            // A failed look says why (permission, frame size...), not just "stopped".
+            RunOutcome::Failed { code, message } => {
+                return Err(look_failure(&result.session.messages)
+                    .unwrap_or_else(|| format!("{code}: {message}")));
+            }
             RunOutcome::ModelCallLimitReached { .. } => {
                 return Err("the model did not answer within its step limit".into());
             }
@@ -434,6 +438,28 @@ impl Eyes for RuntimeEyes<'_> {
             .ok_or("Astrid didn't get a look at the screen")?;
         parse_report(&result.final_text, frame)
     }
+}
+
+/// Why the run's look failed, in words the user can act on.
+fn look_failure(messages: &[Message]) -> Option<String> {
+    let failure = messages.iter().rev().find_map(|m| match m {
+        Message::Tool(t) if t.name == "look" => match &t.outcome {
+            ToolOutcome::Success { data } if data["successful"] == false => {
+                data["failure"].as_str().map(str::to_owned)
+            }
+            ToolOutcome::Error { message, .. } => Some(message.clone()),
+            _ => None,
+        },
+        _ => None,
+    })?;
+    Some(match failure.as_str() {
+        "screen_recording_permission_required" => "Astrid Presence can't see the screen yet. Turn it on in System Settings → Privacy & Security → Screen Recording, then quit Astrid Presence from its menu-bar icon and open it again (macOS applies the grant on relaunch).".into(),
+        "frame_png_exceeds_1mib" => "Your screen was too detailed to send within the 1 MiB frame limit, even simplified. Try again with fewer busy windows or a plainer wallpaper.".into(),
+        "display_exceeds_frame_limits" => "That display is larger than 2560 points on a side, which looks don't support yet.".into(),
+        "display_unavailable" => "That display isn't connected.".into(),
+        "capture_timed_out" => "The screen capture didn't come back in time. Try again.".into(),
+        other => format!("The look failed ({other})."),
+    })
 }
 
 /// The buttons a step card can show.

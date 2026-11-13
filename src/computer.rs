@@ -364,11 +364,10 @@ impl ComputerRun {
                                     .capture(&self.owner.machine_id, cancel)
                                     .await
                                     .map_err(crate::computer_wire::WireError::capture_failure)?,
-                                Target::Local { host, display } => {
-                                    host.capture(*display, cancel).await.map_err(|_| {
-                                        "local capture failed (see presence host; Screen Recording permission may be required)"
-                                    })?
-                                }
+                                Target::Local { host, display } => host
+                                    .capture(*display, cancel)
+                                    .await
+                                    .map_err(|e| local_capture_failure(&e))?,
                             };
                             self.traffic = self.traffic.saturating_add(bytes.len());
                             if self.traffic > 2 * MAX_PNG {
@@ -620,6 +619,25 @@ pub(crate) fn is_presentation(name: &str) -> bool {
     matches!(name, "point_at" | "sketch" | "say")
 }
 
+/// The presence host's categorical capture reason, kept for the user
+/// (never screen content). Unknown reasons stay generic.
+pub fn local_capture_failure(error: &str) -> &'static str {
+    const KNOWN: [&str; 6] = [
+        "screen_recording_permission_required",
+        "frame_png_exceeds_1mib",
+        "display_exceeds_frame_limits",
+        "display_unavailable",
+        "encode_failed",
+        "capture_failed",
+    ];
+    if let Some(reason) = KNOWN.iter().find(|r| error.contains(*r)) {
+        return reason;
+    }
+    if error.contains("timed out") {
+        return "capture_timed_out";
+    }
+    "local_capture_failed"
+}
 pub fn supported_model(model: &str) -> bool {
     matches!(model, "gpt-5.6-sol" | "gpt-5.6-terra" | "gpt-5.6-luna")
 }

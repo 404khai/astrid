@@ -145,6 +145,27 @@ operator's model, and voice operator)".
   say. Spoken asks get spoken cards. A spoken "do it" counts as the same press
   as clicking it: it approves exactly that card's action and the following look.
 
+## Amendment 2026-11-14: real frames, real reasons
+
+The maintainer's first try stopped with "computer stopped" after granting
+Screen Recording. Development frames were synthetic and flat; a real 1x screen
+(photo wallpaper, gradients) encodes to more than ADR 0022's 1 MiB PNG cap, and
+the host's reason was replaced by a generic stop message.
+
+- **Fit, don't resize.** The host now writes 8-bit RGB PNGs (no alpha) and, only
+  if the full-colour frame is over 1 MiB, quantizes colours to 6, 5, then 4 bits
+  per channel until it fits. The size and coordinates stay exact (1x display
+  points) and every limit is unchanged. A photo-like 1512×982 test frame is
+  2.4 MB in full colour and 0.75 MB at 4 bits; the runtime's decode worker
+  accepts the result.
+- **Say why.** The host's categorical reason (`screen_recording_permission_required`,
+  `frame_png_exceeds_1mib`, ...) is kept in the look result and shown to the
+  user as an actionable sentence, never as `computer_stopped`.
+- **Permission.** The host tries ScreenCaptureKit before trusting the permission
+  preflight (which can lag a fresh grant), and the bundle gets a designated
+  requirement on `dev.astrid.presence`, so ad-hoc rebuilds no longer invalidate
+  Screen Recording and Accessibility grants.
+
 ## Alternatives considered
 
 - **(b) A time-boxed "watching" grant.** Fewer presses, but it is a standing
