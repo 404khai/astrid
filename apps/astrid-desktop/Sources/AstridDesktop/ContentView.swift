@@ -2,60 +2,225 @@ import AppKit
 import DesktopCore
 import SwiftUI
 
-/// Sidebar of chats on the left, the selected chat on the right (ADR 0037).
-/// The sidebar and toolbar take macOS 26's Liquid Glass from the system; the
-/// composer and approval cards use `glassEffect` directly.
-struct ContentView: View {
+/// The window, after the maintainer's Radian browser: a sidebar drawn on the
+/// window's translucent material under a theme tint, and the main content as
+/// an inset rounded card. Collapsing the sidebar lets the card fill the window.
+struct RootView: View {
     @ObservedObject var model: ChatModel
+    @ObservedObject var settings: AppSettings
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        NavigationSplitView {
-            Sidebar(model: model)
-                .navigationSplitViewColumnWidth(min: 210, ideal: 250, max: 340)
-        } detail: {
-            ThreadView(model: model)
+        let palette = Palette(spec: settings.theme(dark: scheme == .dark))
+        HStack(spacing: 0) {
+            if settings.sidebarShown {
+                Sidebar(model: model, settings: settings)
+                    .frame(width: 264)
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+            ContentCard(model: model, settings: settings)
+                .padding(.vertical, 8)
+                .padding(.trailing, 8)
+                .padding(.leading, settings.sidebarShown ? 0 : 8)
         }
-        .onAppear {
-            // The sidebar list can clear its selection as the window first
-            // appears; open on the most recent chat, as the model intends.
-            if !restored { model.selection = model.selection ?? model.chats.first?.id }
-            restored = true
+        .background { palette.sidebar.opacity(palette.spec.sidebarOpacity) }
+        .ignoresSafeArea()
+        .environment(\.palette, palette)
+        .animation(.smooth(duration: 0.3), value: settings.sidebarShown)
+        .sheet(isPresented: $settings.showSettings) {
+            SettingsView(model: model, settings: settings)
+                .environment(\.palette, palette)
+                .tint(palette.accent)
+                // Opaque, so the chat behind never shows through.
+                .presentationBackground(palette.content)
         }
+        .onChange(of: settings.model) { _, _ in model.reconfigure(model: settings.model, mail: settings.mail) }
+        .onChange(of: settings.mail) { _, _ in model.reconfigure(model: settings.model, mail: settings.mail) }
     }
+}
 
-    @State private var restored = false
+/// A round Liquid Glass toolbar button, like Radian's back and reload.
+struct GlassCircle: View {
+    var symbol: String
+    var help: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .medium))
+                .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .controlSize(.large)
+        .help(help)
+        .accessibilityLabel(help)
+    }
 }
 
 struct Sidebar: View {
     @ObservedObject var model: ChatModel
+    @ObservedObject var settings: AppSettings
+    @Environment(\.palette) private var palette
 
     var body: some View {
-        List(selection: $model.selection) {
-            ForEach(model.chats) { chat in
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(chat.title)
-                        .lineLimit(1)
-                    Text(chat.updated, format: .relative(presentation: .named))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 3)
-                .tag(chat.id as UUID?)
+        VStack(alignment: .leading, spacing: 10) {
+            // Leaves the traffic lights their corner, like Radian's top row.
+            HStack(spacing: 8) {
+                Spacer()
+                GlassCircle(symbol: "sidebar.left", help: "Hide Sidebar (⌃⌘S)") { settings.sidebarShown = false }
+                GlassCircle(symbol: "square.and.pencil", help: "New Chat (⌘N)") { model.newChat() }
             }
+            .frame(height: 32)
+
+            SearchPill(query: $model.query) { settings.showSettings = true }
+
+            VStack(spacing: 2) {
+                SidebarRow(symbol: "plus", title: "New Chat", selected: false) { model.newChat() }
+                Divider().opacity(0.5).padding(.vertical, 4)
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(model.visibleChats) { chat in
+                            SidebarRow(symbol: chat.messages.contains { $0.diagram != nil } ? "scribble.variable" : "bubble.left",
+                                       title: chat.title, selected: chat.id == model.selection) { model.selection = chat.id }
+                                .help(chat.updated.formatted(.relative(presentation: .named)))
+                        }
+                        if model.visibleChats.isEmpty {
+                            Text(model.chats.isEmpty ? "Your chats will show up here." : "No chats match.")
+                                .font(.callout)
+                                .foregroundStyle(palette.sidebarText.opacity(0.55))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 12)
+                                .padding(.top, 6)
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
+            }
+
+            HStack {
+                AstridMark(ui: model.config.ui, size: 18)
+                    .foregroundStyle(palette.sidebarText)
+                    .frame(width: 38, height: 38)
+                    .glassEffect(.regular, in: .circle)
+                    .accessibilityHidden(true)
+                Spacer()
+                GlassCircle(symbol: "gearshape", help: "Settings (⌘,)") { settings.showSettings = true }
+            }
+            .padding(.bottom, 12)
         }
+        .padding(.horizontal, 12)
+        .foregroundStyle(palette.sidebarText)
+    }
+}
+
+/// Radian's address field, here searching chats; the sliders open Settings.
+struct SearchPill: View {
+    @Binding var query: String
+    var openSettings: () -> Void
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(palette.sidebarText.opacity(0.6))
+            TextField("Search chats", text: $query)
+                .textFieldStyle(.plain)
+            if !query.isEmpty {
+                Button { query = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(palette.sidebarText.opacity(0.5))
+                    .accessibilityLabel("Clear search")
+            }
+            Button(action: openSettings) { Image(systemName: "slider.horizontal.3") }
+                .buttonStyle(.plain)
+                .help("Settings")
+                .accessibilityLabel("Settings")
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 38)
+        .glassEffect(.regular, in: .rect(cornerRadius: 13))
+    }
+}
+
+/// One sidebar row; the selected one is a raised, lightly outlined capsule.
+struct SidebarRow: View {
+    var symbol: String
+    var title: String
+    var selected: Bool
+    var action: () -> Void
+    @Environment(\.palette) private var palette
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.system(size: 13))
+                    .frame(width: 18)
+                    .opacity(0.8)
+                Text(title)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(palette.sidebarText.opacity(palette.spec.dark ? 0.11 : 0.07))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(palette.sidebarText.opacity(0.10), lineWidth: 0.5)
+                        }
+                        .shadow(color: .black.opacity(palette.spec.dark ? 0.25 : 0.08), radius: 2, y: 1)
+                } else if hovering {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(palette.sidebarText.opacity(0.05))
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// The main content: an inset rounded card in the theme's content colour.
+struct ContentCard: View {
+    @ObservedObject var model: ChatModel
+    @ObservedObject var settings: AppSettings
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                if !settings.sidebarShown {
+                    // The traffic lights sit over the card's corner now.
+                    Spacer().frame(width: 64)
+                    GlassCircle(symbol: "sidebar.left", help: "Show Sidebar (⌃⌘S)") { settings.sidebarShown = true }
+                    GlassCircle(symbol: "square.and.pencil", help: "New Chat (⌘N)") { model.newChat() }
+                }
+                Text(model.selected?.title ?? "New Chat")
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 50)
+            ThreadView(model: model)
+        }
+        .foregroundStyle(palette.text)
+        .background(palette.content)
+        .clipShape(.rect(cornerRadius: 12, style: .continuous))
         .overlay {
-            if model.chats.isEmpty {
-                ContentUnavailableView("No chats yet", systemImage: "bubble.left.and.text.bubble.right", description: Text("What you ask Astrid stays here."))
-            }
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(palette.text.opacity(0.07), lineWidth: 0.5)
         }
-        .toolbar {
-            ToolbarItem {
-                Button { model.newChat() } label: {
-                    Label("New Chat", systemImage: "square.and.pencil")
-                }
-                .help("New chat (⌘N)")
-            }
-        }
+        .shadow(color: .black.opacity(palette.spec.dark ? 0.35 : 0.10), radius: 10, y: 2)
     }
 }
 
@@ -74,7 +239,7 @@ struct ThreadView: View {
                 }
                 .frame(maxWidth: 760)
                 .padding(.horizontal, 28)
-                .padding(.top, 24)
+                .padding(.top, 12)
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity)
             }
@@ -92,8 +257,6 @@ struct ThreadView: View {
         .overlay {
             if thread.isEmpty { EmptyThread(ui: model.config.ui) }
         }
-        .navigationTitle(model.selected?.title ?? "New Chat")
-        .navigationSubtitle(model.selected.map { "\($0.messages.count) messages" } ?? "")
     }
 }
 
@@ -116,16 +279,17 @@ struct AstridMark: View {
 
 struct EmptyThread: View {
     var ui: URL
+    @Environment(\.palette) private var palette
 
     var body: some View {
         VStack(spacing: 14) {
             AstridMark(ui: ui, size: 54)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.secondary)
             Text("Ask Astrid")
                 .font(.title2.weight(.semibold))
             Text("Each chat keeps what you sent, Astrid's replies\nand the drawings she made.")
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.secondary)
         }
         .padding(.bottom, 60)
     }
@@ -134,6 +298,7 @@ struct EmptyThread: View {
 struct MessageRow: View {
     @ObservedObject var model: ChatModel
     var message: ChatMessage
+    @Environment(\.palette) private var palette
 
     private var live: LiveReply? {
         model.live.flatMap { $0.id == message.id ? $0 : nil }
@@ -148,7 +313,7 @@ struct MessageRow: View {
                     .textSelection(.enabled)
                     .padding(.horizontal, 15)
                     .padding(.vertical, 10)
-                    .background(Color.accentColor.opacity(0.16), in: .rect(cornerRadius: 18))
+                    .background(palette.bubble, in: .rect(cornerRadius: 18))
             }
         case .astrid:
             reply
@@ -163,7 +328,7 @@ struct MessageRow: View {
                 if let live {
                     Text(live.drawing ? "Sketching" : live.label)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.secondary)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 3)
                         .glassEffect(.regular, in: .capsule)
@@ -188,7 +353,7 @@ struct MessageRow: View {
             if live == nil, let outcome = message.outcome, outcome != "completed" {
                 Label(outcome == "cancelled" ? "Stopped" : outcome == "limit" ? "Hit its step limit" : "Didn't finish", systemImage: "exclamationmark.circle")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -202,6 +367,7 @@ struct MessageRow: View {
 /// A reply's brief (ADR 0033), as a quiet card under the text.
 struct BriefView: View {
     var brief: JSONValue
+    @Environment(\.palette) private var palette
 
     private func texts(_ key: String) -> [String] {
         brief[key]?.array?.compactMap { $0["text"]?.string } ?? []
@@ -210,7 +376,7 @@ struct BriefView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = brief["title"]?.string { Text(title).font(.headline) }
-            if let summary = brief["summary"]?.string { Text(summary).foregroundStyle(.secondary) }
+            if let summary = brief["summary"]?.string { Text(summary).foregroundStyle(palette.secondary) }
             ForEach(Array(texts("todos").enumerated()), id: \.offset) { _, text in
                 Label(text, systemImage: "circle")
             }
@@ -228,31 +394,33 @@ struct BriefView: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.secondary)
             }
         }
         .textSelection(.enabled)
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 14))
+        .background(palette.text.opacity(0.05), in: .rect(cornerRadius: 14))
     }
 }
 
 struct ApprovalCard: View {
     var title: String
     var decide: (Bool) -> Void
+    @Environment(\.palette) private var palette
 
     var body: some View {
         GlassEffectContainer(spacing: 8) {
             HStack(spacing: 10) {
                 Image(systemName: "envelope.badge.shield.half.filled")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondary)
                 Text(title).lineLimit(2)
                 Spacer(minLength: 8)
                 Button("Don't") { decide(false) }
                     .buttonStyle(.glass)
                 Button("Allow once") { decide(true) }
                     .buttonStyle(.glassProminent)
+                    .tint(palette.accent)
                     .keyboardShortcut(.defaultAction)
             }
             .padding(12)
@@ -264,6 +432,7 @@ struct ApprovalCard: View {
 struct Composer: View {
     @ObservedObject var model: ChatModel
     @FocusState private var focused: Bool
+    @Environment(\.palette) private var palette
 
     private var running: Bool { model.live != nil }
     private var elsewhere: Bool { model.live.map { $0.chatID != model.selection } ?? false }
@@ -273,7 +442,7 @@ struct Composer: View {
             if elsewhere {
                 Text("Astrid is answering in another chat.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.secondary)
             }
             if let error = model.saveError {
                 Text(error).font(.caption).foregroundStyle(.red)
@@ -302,6 +471,7 @@ struct Composer: View {
                             Image(systemName: "arrow.up").fontWeight(.semibold).frame(width: 22, height: 22)
                         }
                         .buttonStyle(.glassProminent)
+                        .tint(palette.accent)
                         .buttonBorderShape(.circle)
                         .controlSize(.large)
                         .disabled(!model.canSend)
@@ -312,7 +482,7 @@ struct Composer: View {
         }
         .frame(maxWidth: 760)
         .padding(.horizontal, 28)
-        .padding(.bottom, 18)
+        .padding(.bottom, 16)
         .padding(.top, 6)
         .frame(maxWidth: .infinity)
         .onAppear { focused = true }

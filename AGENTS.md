@@ -83,7 +83,9 @@ accepts a native SwiftUI/AppKit desktop app as the desktop direction for this te
 `apps/astrid-desktop` (`Astrid.app`, `dev.astrid.desktop`, macOS 26 Liquid Glass), separate from presence,
 chats in `~/Library/Application Support/Astrid/Chats`, titles from the first message, inline diagrams via
 the canvas page, additive bounded `history` on `presence-ask`. Branch `feat/astrid-desktop` from main
-`d7627233`. No voice, look, settings or multi-window. PR, no merge.
+`d7627233`. No voice, look or multi-window. PR, no merge. Same day, the maintainer asked for a
+Radian-browser sidebar, themes for sidebar and content, and a Rex-style settings modal
+(`references/radian`, `references/rex`); recorded as an ADR 0037 amendment on the same branch.
 
 # Visual upload/response deadline amendment — 2026-10-23
 

@@ -165,3 +165,45 @@ final class AskEventTests: XCTestCase {
         XCTAssertEqual(AskChild(config: .init(astrid: url, model: "m", mail: nil)).arguments, ["presence-ask", "--model", "m"])
     }
 }
+
+final class ThemeTests: XCTestCase {
+    func testBuiltInThemesAreWellFormed() {
+        XCTAssertEqual(Set(Themes.all.map(\.id)).count, Themes.all.count)
+        XCTAssertTrue(Themes.light.allSatisfy { !$0.dark })
+        XCTAssertTrue(Themes.dark.allSatisfy(\.dark))
+        for theme in Themes.all {
+            for hex in theme.swatches + [theme.sidebarText] { XCTAssertNotNil(hexComponents(hex), "\(theme.id) \(hex)") }
+            XCTAssertTrue((0...1).contains(theme.sidebarOpacity))
+        }
+        XCTAssertEqual(Themes.light.first?.id, Themes.defaultLight)
+        XCTAssertEqual(Themes.dark.first?.id, Themes.defaultDark)
+    }
+
+    func testUnknownOrOtherModeThemesFallBackToTheDefault() {
+        XCTAssertEqual(Themes.resolve("ember", dark: true).id, "ember")
+        XCTAssertEqual(Themes.resolve("ember", dark: false).id, Themes.defaultLight)
+        XCTAssertEqual(Themes.resolve("nope", dark: true).id, Themes.defaultDark)
+        XCTAssertEqual(Themes.resolve(nil, dark: false).id, Themes.defaultLight)
+    }
+
+    func testHexParsing() {
+        let parsed = hexComponents("#FF8000")
+        XCTAssertEqual(parsed?.r, 1)
+        XCTAssertEqual(parsed?.b, 0)
+        XCTAssertNil(hexComponents("FF8000"))
+        XCTAssertNil(hexComponents("#GG0000"))
+        XCTAssertNil(hexComponents("#FFF"))
+    }
+}
+
+final class ChatSearchTests: XCTestCase {
+    func testEveryWordMustMatchTitleOrMessages() {
+        var pump = ChatSession(first: ChatMessage(role: .user, text: "draw a water pump"))
+        pump.append(ChatMessage(role: .astrid, text: "Here is the impeller."))
+        let inbox = ChatSession(first: ChatMessage(role: .user, text: "What needs a reply?"))
+        XCTAssertEqual(ChatSearch.filter([pump, inbox], query: "").count, 2)
+        XCTAssertEqual(ChatSearch.filter([pump, inbox], query: "  PUMP impeller ").map(\.id), [pump.id])
+        XCTAssertEqual(ChatSearch.filter([pump, inbox], query: "reply").map(\.id), [inbox.id])
+        XCTAssertEqual(ChatSearch.filter([pump, inbox], query: "pump reply"), [])
+    }
+}

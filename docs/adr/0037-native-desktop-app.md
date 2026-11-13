@@ -104,6 +104,37 @@ maintainer asked for a full desktop app on that same native stack, with macOS
    - **Child lifetime:** the child ends when the app quits, or when its stdin
      closes because the app was killed.
 
+8. **Look, themes and settings (amended 2026-11-13).** The maintainer: "design
+   the sidebar to be like my radian browser ... allow me to theme the app, like
+   sidebar and main content ... a settings modal and themes" (references in
+   `references/radian`, `references/rex`).
+   - **Sidebar, after Radian.** The window has a hidden title bar and the
+     system's window material (`containerBackground(.thinMaterial, for:
+     .window)`) under a theme tint. On it:
+     - round `.glass` buttons beside the traffic lights (hide sidebar, new chat)
+     - a glass search pill that filters chats, with a sliders button that opens
+       Settings
+     - a "+ New Chat" row, then one-line chat rows; the selected one is a
+       raised, outlined capsule
+     - the Astrid mark and a Settings button at the bottom
+
+     The main content is an inset rounded card. Collapsing the sidebar (⌃⌘S)
+     lets the card fill the window. This custom sidebar replaces the
+     `NavigationSplitView` above; Liquid Glass stays on every control.
+   - **Themes.** Each theme sets the sidebar tint and its strength, the
+     sidebar text, the content card, text, secondary text, accent and the
+     user's bubble. There are four light and four dark built-ins, as plain hex
+     data in `DesktopCore`. The light and dark themes are chosen separately,
+     and the app follows the system appearance or a forced Light or Dark.
+     Drawings keep their dark canvas.
+   - **Settings, after Rex.** A sheet (⌘,) with a searchable page list:
+     - **General:** the ask model and mail source. They apply from the next ask
+       by restarting the app's own child, and launch flags win over them.
+     - **Themes:** Appearance, then Light Mode and Dark Mode rows of theme
+       cards, each with a Default and Built-in group.
+   - **Storage.** Preferences live in the app's UserDefaults domain. They carry
+     no new authority: mail stays read-only with an approval for every call.
+
 ## Alternatives considered
 
 - **A new executable target in `apps/presence-mac`.** It would raise presence
@@ -126,8 +157,9 @@ maintainer asked for a full desktop app on that same native stack, with macOS
   are separate apps that share libraries and the web UI build.
 - **Follow-ups:** a follow-up gets the earlier text and drawing titles. It does
   not get the earlier shapes, so "make it bigger" redraws from the description.
-- **Out of this slice:** voice, look, settings, multi-window, deleting or
-  renaming chats, search and an app icon.
+- **Out of this slice:** voice, look, multi-window, deleting or renaming
+  chats, imported themes and an app icon. An Icon Composer `.icon` can be
+  compiled into the bundle with `actool` when it exists.
 - **Cost of changing later:**
   - **Low** for the layout.
   - **Medium** for the chat file format, which is versioned.

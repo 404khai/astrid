@@ -10,9 +10,9 @@ USAGE
   astrid-desktop [--model M] [--mail SRC] [--astrid PATH] [--ui DIR] [--chats DIR]
 
 OPTIONS
-  --model M      Model for asks (default claude-code/sonnet).
-  --mail SRC     gmail, apple, all or none (default gmail). Mail stays read-only,
-                 with an Allow once card for every mail call (ADRs 0028/0033).
+  --model M      Model for asks, over the one in Settings (default claude-code/sonnet).
+  --mail SRC     gmail, apple, all or none, over Settings (default gmail). Mail stays
+                 read-only, with an Allow once card for every mail call (ADRs 0028/0033).
   --astrid PATH  The astrid binary (default: target/debug/astrid in the repo).
   --ui DIR       The built web UI (default: web/dist-presence in the repo).
   --chats DIR    Where chats are kept (default
@@ -39,8 +39,8 @@ func repoFile(_ relative: String) -> URL? {
     return nil
 }
 
-var model = "claude-code/sonnet"
-var mail: String? = "gmail"
+var model: String?
+var mail: String?
 var astridPath: String?
 var uiPath: String?
 var chatsPath: String?
@@ -55,7 +55,7 @@ while let argument = arguments.popFirst() {
         model = value
     case "--mail":
         guard let value = arguments.popFirst(), ["gmail", "apple", "all", "none"].contains(value) else { fail("--mail needs gmail, apple, all or none") }
-        mail = value == "none" ? nil : value
+        mail = value
     case "--astrid":
         guard let value = arguments.popFirst() else { fail("--astrid needs a path") }
         astridPath = value
@@ -81,8 +81,10 @@ guard let ui = uiPath.map({ URL(fileURLWithPath: $0, isDirectory: true) }) ?? re
 let astrid = astridPath.map { URL(fileURLWithPath: $0) } ?? repoFile("target/debug/astrid") ?? URL(fileURLWithPath: "/usr/local/bin/astrid")
 let configuration = DesktopConfig(
     ui: ui,
-    child: AskChild.Config(astrid: astrid, model: model, mail: mail),
-    chats: chatsPath.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? ChatStore.defaultDirectory
+    astrid: astrid,
+    chats: chatsPath.map { URL(fileURLWithPath: $0, isDirectory: true) } ?? ChatStore.defaultDirectory,
+    modelOverride: model,
+    mailOverride: mail
 )
 
 DesktopApp.configuration = configuration

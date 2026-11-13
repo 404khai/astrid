@@ -4,8 +4,11 @@ import Foundation
 
 struct DesktopConfig {
     var ui: URL
-    var child: AskChild.Config
+    var astrid: URL
     var chats: URL
+    /// Launch flags that win over the stored settings.
+    var modelOverride: String?
+    var mailOverride: String?
 }
 
 /// Astrid's reply while it is being made: streamed text, the drawing so far,
@@ -36,6 +39,8 @@ final class ChatModel: ObservableObject {
     /// The selected chat; nil is a new chat that is saved once you send.
     @Published var selection: UUID?
     @Published var draft = ""
+    /// The sidebar's search text.
+    @Published var query = ""
     @Published private(set) var live: LiveReply?
     @Published private(set) var saveError: String?
     /// Replies whose drawing should stream in rather than appear at once.
@@ -43,14 +48,30 @@ final class ChatModel: ObservableObject {
 
     let config: DesktopConfig
     private let store: ChatStore
-    private let child: AskChild
+    private var child: AskChild
+    private(set) var childConfig: AskChild.Config
 
-    init(config: DesktopConfig) {
+    init(config: DesktopConfig, model: String, mail: String) {
         self.config = config
         store = ChatStore(directory: config.chats)
-        child = AskChild(config: config.child)
+        childConfig = AskChild.Config(astrid: config.astrid, model: model, mail: mail == "none" ? nil : mail)
+        child = AskChild(config: childConfig)
         chats = store.loadAll()
         selection = chats.first?.id
+        child.onEvent = { [weak self] event in self?.handle(event) }
+    }
+
+    /// Chats matching the sidebar search.
+    var visibleChats: [ChatSession] { ChatSearch.filter(chats, query: query) }
+
+    /// Uses another model or mail source from the next ask on. Waits while an
+    /// ask is running; the old child is stopped and a new one starts on demand.
+    func reconfigure(model: String, mail: String) {
+        let next = AskChild.Config(astrid: config.astrid, model: model, mail: mail == "none" ? nil : mail)
+        guard live == nil, next.model != childConfig.model || next.mail != childConfig.mail else { return }
+        child.stop()
+        childConfig = next
+        child = AskChild(config: next)
         child.onEvent = { [weak self] event in self?.handle(event) }
     }
 
@@ -93,7 +114,7 @@ final class ChatModel: ObservableObject {
         var reply = LiveReply(chatID: chat.id)
         animated.insert(reply.id)
         if !child.ask(message.text, history: history) {
-            reply.error = "Could not start Astrid's runtime at \(config.child.astrid.path). Run `cargo build` in the repo, or pass --astrid."
+            reply.error = "Could not start Astrid's runtime at \(config.astrid.path). Run `cargo build` in the repo, or pass --astrid."
             live = reply
             finish(outcome: "failed")
             return
