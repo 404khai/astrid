@@ -77,6 +77,26 @@ for runs, grants and limits, so the host must be a thin client.
    `--reduce-motion`) removes glides, trailing, fades, bob, blink and
    look-around; eyes still follow the pointer directly.
 
+6. **Intro wave (amended 2026-11-13).** The maintainer: "when the presence
+   mascot first comes on my screen, use this https://libraries.dev/waves design
+   to come around the edges of my mac. it should appear from the bottom middle
+   to the top, and go".
+   - **When:** the first time Astrid comes on screen, which is at launch with
+     `--ask`, or on the first `show` otherwise. A colourful wave rises from a pill
+     at the bottom middle of the main display to the top, leaves its colour on
+     the screen's edges, and clears, in about 3.6 s.
+   - **How:** the wave is Libraries.dev Distortion Waves (vertical type, colourful
+     palette, MIT, vendored in `Sources/AstridPresence/Waves`, licence in
+     `ThirdParty/distortion-waves`). It is drawn in its own click-through,
+     non-activating panel at `.screenSaver` level. The band shader is compiled at
+     run time by the Metal framework into a `CAMetalLayer`, so building presence
+     needs no Xcode Metal toolchain. The sparks are plain layers.
+   - **Limits:** only the colour band and sparks are used. The library's lens and
+     blur distort the content beneath, which the overlay never reads, so they are
+     left out.
+   - **Opt out:** skipped under Reduce Motion and with `--no-intro`.
+     `ASTRID_WAVE_FRAMES=DIR` renders frames offscreen for checks.
+
 ## Alternatives considered
 
 - **Tauri transparent windows** (D1 b): web rendering matches the site, but

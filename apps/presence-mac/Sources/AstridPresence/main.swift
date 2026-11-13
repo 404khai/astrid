@@ -16,6 +16,8 @@ OPTIONS
   --stdin          Read JSON-lines events from standard input as they arrive.
   --print-demo     Print the demo for the current displays as JSON lines and exit.
   --reduce-motion  Behave as if Reduce Motion were on (it is also followed live).
+  --no-intro       Skip the colour wave that rises up the screen the first time
+                   Astrid appears (it is also skipped under Reduce Motion).
   --exit-at-end    Quit after the input ends and the queue drains.
   --capture-source screen|synthetic
                    Where `capture` events read frames (default screen, which needs
@@ -52,6 +54,7 @@ func currentLayout() -> DisplayLayout {
 
 var source: PresenceController.Source = .demo
 var reduceMotion = false
+var intro = true
 var exitAtEnd = false
 var resident = false
 var timersURL = TimerStore.defaultURL
@@ -102,6 +105,8 @@ while let argument = arguments.popFirst() {
         exit(0)
     case "--reduce-motion":
         reduceMotion = true
+    case "--no-intro":
+        intro = false
     case "--exit-at-end":
         exitAtEnd = true
     case "--capture-source":
@@ -170,8 +175,18 @@ if askMode {
     if sourceCount == 0 { source = .script([]) }
 }
 
+// Debug: ASTRID_WAVE_FRAMES=DIR renders the intro wave offscreen to PNGs and exits.
+if let path = ProcessInfo.processInfo.environment["ASTRID_WAVE_FRAMES"] {
+    do {
+        try IntroWave.renderFrames(to: URL(fileURLWithPath: path, isDirectory: true))
+        exit(0)
+    } catch {
+        fail("intro wave frames: \(error)")
+    }
+}
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, captureSource: captureSource, resident: resident, timersURL: timersURL, ask: askConfig)
+let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, captureSource: captureSource, resident: resident, timersURL: timersURL, ask: askConfig, intro: intro)
 app.delegate = controller
 app.run()
