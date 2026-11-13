@@ -1,9 +1,11 @@
 //! Sequential, observable execution with headless conversational sessions and optional local idle snapshots.
 
 pub mod agent;
+pub mod anthropic;
 pub mod auth;
 pub mod cancellation;
 pub mod changes;
+pub mod claude_code;
 pub mod context;
 pub mod events;
 pub mod file_lookup;
@@ -11,6 +13,7 @@ pub mod model;
 pub mod native;
 pub mod observability;
 pub mod openai;
+pub mod opencode;
 pub mod output;
 pub mod permissions;
 pub mod routing;
@@ -29,6 +32,8 @@ pub mod computer_wire;
 pub mod desktop;
 pub mod instabox;
 pub mod presence;
+pub mod keychain;
+pub mod mail;
 pub mod remote;
 
 mod visual_upload;

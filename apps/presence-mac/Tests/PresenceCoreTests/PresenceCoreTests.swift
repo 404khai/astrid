@@ -409,3 +409,70 @@ final class CaptureProtocolTests: XCTestCase {
         XCTAssertEqual(targets[2].box, CGRect(x: 1150, y: 159, width: 120, height: 36))
     }
 }
+
+final class TimerTests: XCTestCase {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+
+    func testTimerEventsParseAndRoundTrip() throws {
+        let events: [PresenceEvent] = [
+            .timerStart(id: "tea", seconds: 180, label: "Tea"),
+            .timerCancel(id: "tea"),
+            .alarmSet(id: "wake-1", at: Date(timeIntervalSince1970: 1_800_003_600), label: "Wake up"),
+            .timersList,
+        ]
+        for event in events {
+            XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(event)), event)
+        }
+        XCTAssertEqual(try PresenceProtocol.parse(line: #"{"v":1,"type":"alarm_set","id":"a","at":"2027-01-15T07:30:00+01:00"}"#),
+                       .alarmSet(id: "a", at: PresenceProtocol.isoDate("2027-01-15T06:30:00Z")!, label: ""))
+        for bad in [
+            #"{"v":1,"type":"timer_start","id":"t","label":"x"}"#,
+            #"{"v":1,"type":"timer_start","id":"bad id","seconds":5}"#,
+            #"{"v":1,"type":"alarm_set","id":"a","at":"tomorrow 7am"}"#,
+            #"{"v":1,"type":"alarm_set","id":"a","at":"2027-01-15T07:30:00"}"#,
+        ] {
+            XCTAssertThrowsError(try PresenceProtocol.parse(line: bad), bad)
+        }
+    }
+
+    func testLimitsOrderingAndSingleFiring() throws {
+        var store = TimerStore()
+        let tea = try store.startTimer(id: "tea", seconds: 180, label: "  Tea  ", now: now)
+        XCTAssertEqual(tea.label, "Tea")
+        _ = try store.setAlarm(id: "wake", at: now.addingTimeInterval(60), label: "Wake", now: now)
+        XCTAssertEqual(store.entries.map(\.id), ["wake", "tea"])
+        XCTAssertThrowsError(try store.startTimer(id: "tea", seconds: 5, label: "", now: now))
+        XCTAssertThrowsError(try store.startTimer(id: "x", seconds: 0, label: "", now: now))
+        XCTAssertThrowsError(try store.startTimer(id: "x", seconds: 86_401, label: "", now: now))
+        XCTAssertThrowsError(try store.setAlarm(id: "x", at: now.addingTimeInterval(-1), label: "", now: now))
+        XCTAssertThrowsError(try store.setAlarm(id: "x", at: now.addingTimeInterval(8 * 86_400), label: "", now: now))
+        XCTAssertThrowsError(try store.startTimer(id: "x", seconds: 5, label: String(repeating: "a", count: 121), now: now))
+        XCTAssertThrowsError(try store.startTimer(id: "x", seconds: 5, label: "a\u{7}b", now: now))
+        XCTAssertEqual(store.takeDue(now: now.addingTimeInterval(59)), [])
+        XCTAssertEqual(store.takeDue(now: now.addingTimeInterval(200)).map(\.id), ["wake", "tea"])
+        XCTAssertEqual(store.takeDue(now: now.addingTimeInterval(300)), [], "each entry fires once")
+        for i in 0..<TimerStore.maxActive { _ = try store.startTimer(id: "t\(i)", seconds: 10, label: "", now: now) }
+        XCTAssertThrowsError(try store.startTimer(id: "over", seconds: 10, label: "", now: now))
+        XCTAssertNotNil(store.cancel(id: "t3"))
+        XCTAssertNil(store.cancel(id: "t3"))
+    }
+
+    func testPersistenceIsOwnerOnlyAndLateTimersFireOnLoad() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = dir.appendingPathComponent("Astrid/timers.json")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        var store = TimerStore()
+        _ = try store.startTimer(id: "tea", seconds: 60, label: "Tea", now: now)
+        try store.save(to: url)
+        let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+        XCTAssertEqual(mode, 0o600)
+        var loaded = TimerStore.load(from: url)
+        XCTAssertEqual(loaded, store)
+        let late = now.addingTimeInterval(60 + 600)
+        let fired = loaded.takeDue(now: late)
+        XCTAssertEqual(fired.map(\.id), ["tea"])
+        XCTAssertEqual(timerFiredText(fired[0], now: late), "Timer done: Tea (late 10 min)")
+        try Data("garbage".utf8).write(to: url)
+        XCTAssertEqual(TimerStore.load(from: url), TimerStore())
+    }
+}

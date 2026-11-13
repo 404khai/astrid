@@ -1,4 +1,5 @@
 import AppKit
+import UserNotifications
 import PresenceCore
 import QuartzCore
 
@@ -36,9 +37,16 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     private var inputEnded = false
     private var statusItem: NSStatusItem?
     private var signalSources: [DispatchSourceSignal] = []
+    /// ADR 0029: resident hosts own timers and stay in the menu bar.
+    private let resident: Bool
+    private let timersURL: URL
+    private var timers = TimerStore()
+    private var nextTimerCheck = 0.0
 
-    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?, captureSource: CaptureSource = .screen) {
+    init(source: Source, forceReduceMotion: Bool, exitAtEnd: Bool, snapshotDirectory: URL?, captureSource: CaptureSource = .screen, resident: Bool = false, timersURL: URL = TimerStore.defaultURL) {
         self.captureSource = captureSource
+        self.resident = resident
+        self.timersURL = timersURL
         self.source = source
         self.snapshotDirectory = snapshotDirectory
         self.forceReduceMotion = forceReduceMotion
@@ -125,7 +133,12 @@ final class PresenceController: NSObject, NSApplicationDelegate {
             writeSnapshots()
         }
 
-        if exitAtEnd, inputEnded, player.isIdle, !motion.isMoving, capturesInFlight == 0 {
+        if resident, now >= nextTimerCheck {
+            nextTimerCheck = now + 0.25
+            fireDueTimers()
+        }
+
+        if exitAtEnd, !resident, inputEnded, player.isIdle, !motion.isMoving, capturesInFlight == 0 {
             NSApp.terminate(nil)
         }
     }
@@ -162,6 +175,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
                 NSApp.terminate(nil)
             case let .capture(requestId, display):
                 capture(requestId: requestId, display: display)
+            case .timerStart, .timerCancel, .alarmSet, .timersList:
+                try applyTimer(event)
             }
         } catch let error as PresenceProtocolError {
             Output.error(error.message, line: nil)
@@ -242,6 +257,106 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         systemReduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
 
+    // MARK: Timers and alarms (ADR 0029)
+
+    private func loadTimers() {
+        guard resident else { return }
+        timers = TimerStore.load(from: timersURL)
+        if Bundle.main.bundleIdentifier != nil {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
+        // Anything that came due while the host was not running fires now, once.
+        fireDueTimers()
+    }
+
+    private func applyTimer(_ event: PresenceEvent) throws {
+        guard resident else { throw PresenceProtocolError("timers need a resident host (--resident)") }
+        let now = Date()
+        switch event {
+        case let .timerStart(id, seconds, label):
+            let entry = try timers.startTimer(id: id, seconds: seconds, label: label, now: now)
+            Output.emit(["type": "timer_set", "id": entry.id, "kind": "timer", "fires_at": ISO8601DateFormatter().string(from: entry.fireAt)])
+        case let .alarmSet(id, at, label):
+            let entry = try timers.setAlarm(id: id, at: at, label: label, now: now)
+            Output.emit(["type": "timer_set", "id": entry.id, "kind": "alarm", "fires_at": ISO8601DateFormatter().string(from: entry.fireAt)])
+        case let .timerCancel(id):
+            guard timers.cancel(id: id) != nil else { throw PresenceProtocolError("no timer \(id)") }
+            Output.emit(["type": "timer_cancelled", "id": id])
+        case .timersList:
+            Output.emit(["type": "timers", "timers": timers.entries.map(timerJSON)])
+            return
+        default:
+            return
+        }
+        persistTimers()
+    }
+
+    private func timerJSON(_ entry: TimerEntry) -> [String: Any] {
+        ["id": entry.id, "kind": entry.kind.rawValue, "label": entry.label, "fires_at": ISO8601DateFormatter().string(from: entry.fireAt)]
+    }
+
+    private func persistTimers() {
+        do { try timers.save(to: timersURL) } catch { Output.error("could not save timers", line: nil) }
+        rebuildTimerMenu()
+    }
+
+    private func fireDueTimers() {
+        let now = Date()
+        let due = timers.takeDue(now: now)
+        guard !due.isEmpty else { return }
+        persistTimers()
+        for entry in due {
+            let text = timerFiredText(entry, now: now)
+            Output.emit(["type": "timer_fired", "id": entry.id, "kind": entry.kind.rawValue, "label": entry.label, "late_seconds": max(0, Int(now.timeIntervalSince(entry.fireAt)))])
+            // Show Astrid near the pointer with a subtitle, chime and notify.
+            let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+            let pointer = DisplayLayout.cocoaToQuartz(point: NSEvent.mouseLocation, primaryHeight: primaryHeight)
+            if !motion.visible { motion.jump(to: CGPoint(x: pointer.x + 40, y: pointer.y + 40)) }
+            motion.show(now: CACurrentMediaTime(), reduceMotion: reduceMotion)
+            subtitle = text
+            subtitleClearsAt = CACurrentMediaTime() + 8
+            NSSound(named: "Glass")?.play()
+            if Bundle.main.bundleIdentifier != nil {
+                let content = UNMutableNotificationContent()
+                content.title = entry.kind == .alarm ? "Astrid alarm" : "Astrid timer"
+                content.body = text
+                content.sound = .default
+                UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "astrid-\(entry.id)", content: content, trigger: nil))
+            }
+        }
+    }
+
+    private var timerMenuItems: [NSMenuItem] = []
+
+    private func rebuildTimerMenu() {
+        guard let menu = statusItem?.menu else { return }
+        timerMenuItems.forEach { menu.removeItem($0) }
+        timerMenuItems = []
+        guard resident else { return }
+        let header = NSMenuItem(title: timers.entries.isEmpty ? "No timers" : "Timers (click to cancel)", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        var items = [header]
+        let format = DateFormatter()
+        format.timeStyle = .short
+        format.dateStyle = .none
+        for entry in timers.entries {
+            let name = entry.label.isEmpty ? entry.id : entry.label
+            let item = NSMenuItem(title: "\(entry.kind == .alarm ? "⏰" : "⏲") \(name) at \(format.string(from: entry.fireAt))", action: #selector(cancelTimerFromMenu(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = entry.id
+            items.append(item)
+        }
+        items.append(.separator())
+        for (offset, item) in items.enumerated() { menu.insertItem(item, at: 2 + offset) }
+        timerMenuItems = items
+    }
+
+    @objc private func cancelTimerFromMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String, timers.cancel(id: id) != nil else { return }
+        Output.emit(["type": "timer_cancelled", "id": id])
+        persistTimers()
+    }
+
     // MARK: Menu bar and quitting
 
     private func installStatusItem() {
@@ -249,7 +364,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         item.button?.image = StatusIcon.make()
         item.button?.toolTip = "Astrid presence"
         let menu = NSMenu()
-        let title = NSMenuItem(title: "Astrid presence (scripted, no screen access)", action: nil, keyEquivalent: "")
+        let title = NSMenuItem(title: resident ? "Astrid (resident: timers and alarms)" : "Astrid presence (scripted, no screen access)", action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
         menu.addItem(.separator())
@@ -259,6 +374,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Quit Astrid Presence", action: #selector(quit), keyEquivalent: "q").target = self
         item.menu = menu
         statusItem = item
+        loadTimers()
+        rebuildTimerMenu()
     }
 
     @objc private func toggleVisible() {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { RuneIcon } from "runeicons-react";
 import { AstridLogo } from "./components/AstridLogo";
 import { AstridHome } from "./components/AstridHome";
+import { BrandLink } from "./components/BrandMenu";
 import { Bento } from "./components/Bento";
 import { DnaExplainer } from "./components/DnaExplainer";
 import { Everyday } from "./components/Everyday";
@@ -120,9 +121,9 @@ function Navigation() {
         <a href="#spatial">Spatial</a>
         <a href="#gameplan">Gameplan</a>
       </nav>
-      <a className="brand" href="#" aria-label="Astrid home">
+      <BrandLink className="brand" href="#" label="Astrid home">
         <AstridLogo animated tracking />
-      </a>
+      </BrandLink>
       <a className="mobile-nav-box mobile-github" href={repo}>
         GitHub
         <Icon name="arrow-up-right" />

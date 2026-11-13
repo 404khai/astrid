@@ -915,6 +915,8 @@ impl ExecutionState {
                                         | "instabox_observe"
                                         | "instabox_action"
                                         | "look"
+                                        | "mail_search"
+                                        | "mail_read"
                                 )
                                 && !self.cancellation_acknowledged,
                         )?;

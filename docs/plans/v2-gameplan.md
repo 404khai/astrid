@@ -154,8 +154,8 @@ approval, as with ADRs 0021–0025.
 |---|---|---|
 | V2-00 | **Direction and website** (this branch) | New positioning, site redesign, this gameplan. |
 | V2-01 | **Presence on the Mac** (`apps/presence-mac`, merged PR #29) | Overlay host draws Astrid's cursor, ink and subtitles from a scripted event stream; multi-display, Spaces, full-screen apps, reduced motion, click-through verified. No model. |
-| V2-02 | **Ask, look, point** ([plan](v2-02-ask-look-point.md); blocked on Proposed ADR 0027) | Typed ask → one granted frame → vision model → `point_at` / `sketch` on the right target; grounding suite baseline recorded. |
-| V2-03a | **Everyday tools** | Timers and alarms that survive the chat; reminders and calendar events through EventKit with confirm cards; read-only local mail search. Each tool is mocked, then trialled live on exact scope. |
+| V2-02 | **Ask, look, point** ([plan](v2-02-ask-look-point.md); ADR 0027 accepted; PR #30) | Typed ask → one granted frame → vision model → `point_at` / `sketch` on the right target; grounding suite baseline recorded. |
+| V2-03a | **Everyday tools** (mail + timers in review; ADRs 0028/0029; EventKit next) | Timers and alarms that survive the chat; reminders and calendar events through EventKit with confirm cards; read-only local mail search. Each tool is mocked, then trialled live on exact scope. |
 | V2-03 | **Voice** | Push-to-talk, streaming STT/TTS, subtitles, barge-in cancellation; latency spans in traces. |
 | V2-04 | **Anatomy figures, live** | `show_figure` renders a sandboxed, interactive figure card next to the subject; figure checks pass. |
 | V2-05 | **Guided walkthroughs** | Multi-step tasks with wait/re-look/verify; never advances on an unverified step. |
@@ -221,6 +221,7 @@ approval, as with ADRs 0021–0025.
 - Cost of changing later: **Medium.**
 - Decision: *Let the presence host stay resident in the menu bar and own
   timers and alarms?*
+- **Answer (2026-11-11):** yes; see [ADR 0029](../adr/0029-resident-presence-timers.md).
 
 ## 5. Website (done on this branch)
 

@@ -55,6 +55,9 @@ pub struct RequestOptions {
     pub computer_use: bool,
     /// ADR 0027 local look and presentation tools.
     pub look: bool,
+    /// ADR 0028 mail tools for these enabled sources.
+    pub mail_apple: bool,
+    pub mail_gmail: bool,
     pub effort: Option<ReasoningEffort>,
     pub replay: ReplayMode,
 }

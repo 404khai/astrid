@@ -6,6 +6,7 @@ import "@fontsource/space-grotesk/latin-700.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import { AstridCursor } from "../components/AstridCursor";
 import { AstridLogo } from "../components/AstridLogo";
+import { BrandLink } from "../components/BrandMenu";
 import { BounceSidebar } from "../components/nexvyn/BounceSidebar";
 import { NavigationCompass } from "../components/nexvyn/NavigationCompass";
 import { ScrollIndicator } from "../components/nexvyn/ScrollIndicator";
@@ -226,11 +227,11 @@ function Docs() {
   return (
     <div className="docs">
       <aside className="docs-side">
-        <a className="docs-brand" href="/">
+        <BrandLink className="docs-brand" href="/" label="Astrid home">
           <AstridLogo animated tracking />
           <span>ASTRID</span>
           <small>DOCS</small>
-        </a>
+        </BrandLink>
         <BounceSidebar
           items={pages.map((entry) => entry.title)}
           value={index}
