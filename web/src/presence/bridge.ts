@@ -14,12 +14,16 @@ export type Incoming =
   | { type: "approval"; id: number; title: string; detail: Record<string, unknown> }
   | { type: "answer"; text: string; brief: Brief | null }
   | { type: "error"; message: string }
-  | { type: "done"; outcome: string };
+  | { type: "done"; outcome: string }
+  | { type: "voice"; level: number }
+  | { type: "transcript"; text: string; final: boolean }
+  | { type: "voice-error"; message: string };
 
 export type Outgoing =
   | { type: "ask"; text: string }
   | { type: "approve"; id: number; approve: boolean }
   | { type: "cancel" }
+  | { type: "listen"; on: boolean }
   | { type: "open"; url: string }
   | { type: "size"; width: number; height: number }
   | { type: "drag"; dx: number; dy: number }
@@ -32,7 +36,7 @@ declare global {
   }
 }
 
-const native = () => window.webkit?.messageHandlers?.astrid;
+export const native = () => window.webkit?.messageHandlers?.astrid;
 let listener: (message: Incoming) => void = () => {};
 
 /** The native app calls window.astrid.receive(...) for every runtime event,
@@ -64,6 +68,7 @@ export function send(message: Outgoing) {
   if (bridge) bridge.postMessage(message);
   else if (message.type === "ask") mock(message.text);
   else if (message.type === "approve") pendingMock?.(message.approve);
+  else if (message.type === "listen") mockListen(message.on);
 }
 
 /** In a plain browser (vite dev), a scripted run so the UI can be designed. */
@@ -108,4 +113,21 @@ function mock(text: string) {
     await say({ type: "done", outcome: "completed" }, 50);
     await say({ type: "state", state: "idle", label: "Ready" }, 50);
   })();
+}
+
+/** Dev stand-in for on-device speech: the ring follows the browser mic, and a
+ * scripted transcript types itself out while listening. */
+let mockWords: number | undefined;
+function mockListen(on: boolean) {
+  const words = "what came in from Elodie today".split(" ");
+  window.clearInterval(mockWords);
+  if (on) {
+    let n = 0;
+    mockWords = window.setInterval(() => {
+      n = Math.min(n + 1, words.length);
+      listener({ type: "transcript", text: words.slice(0, n).join(" "), final: false });
+    }, 350);
+  } else {
+    setTimeout(() => listener({ type: "transcript", text: words.join(" "), final: true }), 250);
+  }
 }

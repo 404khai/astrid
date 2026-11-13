@@ -34,6 +34,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private static let margin: CGFloat = 20
     private var pointerTimer: Timer?
     private var lastPointer = NSPoint(x: -1, y: -1)
+    private let voice = VoiceInput()
 
     init(config: AskConfig) {
         self.config = config
@@ -64,6 +65,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.trackPointer() }
         RunLoop.main.add(timer, forMode: .common)
         pointerTimer = timer
+        voice.onLevel = { [weak self] level in self?.deliver(["type": "voice", "level": level]) }
+        voice.onTranscript = { [weak self] text, final in self?.deliver(["type": "transcript", "text": text, "final": final]) }
+        voice.onError = { [weak self] message in self?.deliver(["type": "voice-error", "message": message]) }
     }
 
     private func trackPointer() {
@@ -112,6 +116,8 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             } else {
                 panel.resignKey()
             }
+        case "listen":
+            if body["on"] as? Bool == true { voice.start() } else { voice.stop() }
         case "ask", "approve", "cancel":
             forward(body)
         case "open":
@@ -195,6 +201,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
 
     func stop() {
         pointerTimer?.invalidate()
+        voice.stop()
         child?.terminate()
     }
 }

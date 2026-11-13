@@ -7,9 +7,10 @@ import { Liquid } from "liquid-gooey";
 import { ThinkingOrb } from "thinking-orbs";
 import type { OrbState } from "thinking-orbs";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowUp02Icon, Mail01Icon } from "@hugeicons/core-free-icons";
+import { ArrowUp02Icon, Mail01Icon, Mic01Icon } from "@hugeicons/core-free-icons";
+import { VoiceRing, useMicrophone } from "voice-ring";
 import { AstridLogo, type EyeExpression } from "../components/AstridLogo";
-import { listen, send, type Brief, type Incoming } from "./bridge";
+import { listen, native, send, type Brief, type Incoming } from "./bridge";
 import "./presence.css";
 
 /** Runtime states → the docs' agent states (thinking orb + eye expression). */
@@ -78,6 +79,7 @@ function App() {
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const askRef = useRef<string | null>(null);
+  const voice = useVoice((heard) => submit(heard));
 
   useEffect(() => {
     listen((m: Incoming) => {
@@ -93,6 +95,11 @@ function App() {
           break;
         case "error":
           setError(m.message);
+          break;
+        case "voice":
+        case "transcript":
+        case "voice-error":
+          voice.receive(m);
           break;
         case "done":
           setApproval(null);
@@ -125,15 +132,16 @@ function App() {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (asking) send({ type: "cancel" });
+      if (voice.listening) voice.cancel();
+      else if (asking) send({ type: "cancel" });
       else setOpen(false);
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
-  }, [asking]);
+  }, [asking, voice.listening]);
 
-  const submit = () => {
-    const ask = text.trim();
+  const submit = (spoken?: string) => {
+    const ask = (spoken ?? text).trim();
     if (!ask || asking) return;
     askRef.current = ask;
     setAsking(ask);
@@ -175,7 +183,12 @@ function App() {
   return (
     <div className="pr-root" ref={root}>
       <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
-        {(busy || answer || error) && (
+        {(voice.listening || voice.heard !== null || voice.error) && !busy && (
+          <Liquid.Item transition="smooth">
+            <ListeningCard voice={voice} reduced={reduced} />
+          </Liquid.Item>
+        )}
+        {(busy || answer || error) && !voice.listening && (
           <Liquid.Item transition="smooth">
             <div className="pr-card" aria-live="polite">
               {busy && (
@@ -218,6 +231,17 @@ function App() {
                 onChange={(e) => setText(e.target.value)}
                 aria-label="Ask Astrid"
               />
+              {!busy && !text.trim() && (
+                <button
+                  type="button"
+                  className={`pr-mic${voice.listening ? " pr-mic-on" : ""}`}
+                  aria-label={voice.listening ? "Stop listening and send" : "Hold to talk"}
+                  aria-pressed={voice.listening}
+                  {...voice.handlers}
+                >
+                  <HugeiconsIcon icon={Mic01Icon} size={18} strokeWidth={2} />
+                </button>
+              )}
             </form>
           </Liquid.Item>
           {/* The send button lives behind the input's right edge and springs out
@@ -231,7 +255,7 @@ function App() {
               type="button"
               className={`pr-send${text.trim() && !busy ? "" : " pr-send-hidden"}`}
               aria-label="Send"
-              onClick={submit}
+              onClick={() => submit()}
               tabIndex={text.trim() && !busy ? 0 : -1}
             >
               <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={2} />
@@ -239,6 +263,115 @@ function App() {
           </Liquid.Item>
         </div>
       </Liquid>
+    </div>
+  );
+}
+
+type Voice = ReturnType<typeof useVoice>;
+
+/**
+ * Push-to-talk (V2-03, ADR 0034). Hold the mic to talk and let go to send; a
+ * quick tap keeps listening until the next tap. The native host owns the mic
+ * and on-device speech and streams back the level and transcript. In a plain
+ * browser the ring follows the page's own microphone instead.
+ */
+function useVoice(onHeard: (text: string) => void) {
+  const [listening, setListening] = useState(false);
+  const [heard, setHeard] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const level = useRef(0);
+  const pressed = useRef(0);
+  const cancelled = useRef(false);
+  const heardRef = useRef(onHeard);
+  heardRef.current = onHeard;
+  const mic = useMicrophone();
+
+  const start = () => {
+    if (listening) return;
+    cancelled.current = false;
+    level.current = 0;
+    setHeard("");
+    setError(null);
+    setListening(true);
+    if (!native() && mic.supported) mic.start();
+    send({ type: "listen", on: true });
+  };
+  const stop = () => {
+    if (!listening) return;
+    setListening(false);
+    if (!native()) mic.stop();
+    send({ type: "listen", on: false });
+  };
+  const cancel = () => {
+    cancelled.current = true;
+    stop();
+    setHeard(null);
+  };
+
+  const receive = (m: Incoming) => {
+    if (m.type === "voice") level.current = m.level;
+    else if (m.type === "voice-error") {
+      setListening(false);
+      setHeard(null);
+      setError(m.message);
+    } else if (m.type === "transcript") {
+      if (cancelled.current) return;
+      setHeard(m.text);
+      if (m.final) {
+        setListening(false);
+        setHeard(null);
+        if (m.text.trim()) heardRef.current(m.text);
+      }
+    }
+  };
+
+  const handlers = {
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      if (listening) return stop();
+      pressed.current = performance.now();
+      start();
+    },
+    onPointerUp: () => {
+      // A hold sends on release; a tap leaves the mic open until the next tap.
+      if (pressed.current && performance.now() - pressed.current > 350) stop();
+      pressed.current = 0;
+    },
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key !== " " && e.key !== "Enter") return;
+      e.preventDefault();
+      if (!e.repeat) (listening ? stop : start)();
+    },
+  };
+
+  return { listening, heard, error, level, stream: native() ? null : mic.stream, start, stop, cancel, receive, handlers };
+}
+
+function ListeningCard({ voice, reduced }: { voice: Voice; reduced: boolean }) {
+  return (
+    <div className="pr-listen">
+      <div className="pr-listen-ring">
+        <VoiceRing
+          size={132}
+          theme="dark"
+          state={voice.listening ? "listening" : voice.error ? "idle" : "processing"}
+          stream={voice.stream}
+          level={voice.stream ? undefined : () => voice.level.current}
+          paused={reduced}
+        />
+        <span className="pr-listen-mark">
+          <AstridLogo expression="listening" />
+        </span>
+      </div>
+      {voice.error ? (
+        <p className="pr-error">{voice.error}</p>
+      ) : (
+        <p className={`pr-heard${voice.heard ? "" : " pr-heard-empty"}`} aria-live="polite">
+          {voice.heard || (voice.listening ? "Listening…" : "")}
+        </p>
+      )}
+      {!voice.error && <span className="pr-eyebrow">ON-DEVICE · NOTHING SAVED</span>}
     </div>
   );
 }

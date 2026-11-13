@@ -25,6 +25,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleVersion</key><string>1</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Astrid listens only while you hold the mic. Audio stays on this Mac.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Astrid turns what you say into text on this Mac, without sending audio anywhere.</string>
 </dict>
 </plist>
 PLIST
