@@ -1240,9 +1240,21 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 tools = tools.with_mail(mail_tools(choice)?);
             }
             // ADR 0030: exact claude-* model IDs use the Anthropic adapter.
-            let provider: Box<dyn astrid::model::ModelProvider> = if let Some(id) =
-                model.strip_prefix(astrid::opencode::PREFIX)
+            let provider: Box<dyn astrid::model::ModelProvider> = if let Some(inner) =
+                model.strip_prefix(astrid::claude_code::PREFIX)
             {
+                // ADR 0032: Claude Agent SDK on whatever account Claude Code is logged into.
+                if !astrid::claude_code::valid_model(inner) {
+                    return Err(format!("unsupported Claude Code model {inner:?}; use opus, sonnet, haiku, fable or a claude-* id").into());
+                }
+                eprintln!(
+                    "Using Claude Code's login through the Claude Agent SDK. Anthropic's terms restrict subscription use in third-party apps; this is your call."
+                );
+                Box::new(astrid::claude_code::ClaudeCodeProvider::new(
+                    astrid::claude_code::Bridge::locate()?,
+                    tools.workspace().root().to_path_buf(),
+                ))
+            } else if let Some(id) = model.strip_prefix(astrid::opencode::PREFIX) {
                 // ADR 0031: OpenCode Go, checked against the live public catalog.
                 let info = astrid::opencode::lookup(id).await?;
                 Box::new(astrid::opencode::OpenCodeProvider::new(

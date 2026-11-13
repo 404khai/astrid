@@ -41,6 +41,12 @@ opencode v2 provider and merge as well". PR #32 merged into the stack;
 models with the required user agent and session header. Branch `feat/opencode-provider`
 stacked on `feat/everyday-mail-timers`, merged into that stack; main still needs #31.
 
+**Claude Agent SDK provider 2026-11-13.** Maintainer: "build and integrate the sdk, I don't
+mind" after being told Anthropic restricts subscription use in third-party apps.
+[ADR 0032](docs/adr/0032-claude-agent-sdk-provider.md): `claude-code/<model>` runs one
+bounded Claude Code turn per model call via `apps/claude-agent-bridge`; built-in tools
+off, every Astrid tool call returned to Astrid's runtime. Branch `feat/claude-agent-sdk`.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
