@@ -1,7 +1,8 @@
 //! `astrid presence-ask`: a JSON-lines client of the runtime for the presence
 //! app's ask surface (ADR 0033). One fresh read-only run per ask.
 //!
-//! stdin:  {"type":"ask","text":...} | {"type":"approve","id":n,"approve":bool} | {"type":"cancel"}
+//! stdin:  {"type":"ask","text":...,"history"?:[{"role":"user"|"astrid","text":..}]}
+//!         | {"type":"approve","id":n,"approve":bool} | {"type":"cancel"}
 //! stdout: {"type":"ready"} | {"type":"state","state":..,"label":..} | {"type":"delta","text":..}
 //!         | {"type":"approval","id":n,"title":..,"detail":..} | {"type":"answer","text":..,"brief":{..}|null}
 //!         | {"type":"canvas","event":"begin"|"shape"|"end",..} (ADR 0036)
@@ -26,6 +27,71 @@ use std::{
 };
 
 const MAX_ASK: usize = 4000;
+/// Bounds on the earlier turns a desktop chat sends with a follow-up (ADR 0037).
+const MAX_HISTORY_TURNS: usize = 12;
+const MAX_HISTORY_TURN: usize = 2000;
+const MAX_HISTORY: usize = 12_000;
+
+/// One earlier turn of a chat: who said it, and what.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Turn {
+    pub user: bool,
+    pub text: String,
+}
+
+/// Reads an ask's optional `history`, keeping the most recent turns that fit
+/// the bounds. Malformed entries are skipped; long turns are cut.
+pub fn history_from(value: &Value) -> Vec<Turn> {
+    let Some(list) = value.as_array() else {
+        return Vec::new();
+    };
+    let mut turns = Vec::new();
+    let mut total = 0;
+    for entry in list.iter().rev() {
+        let user = match entry["role"].as_str() {
+            Some("user") => true,
+            Some("astrid") => false,
+            _ => continue,
+        };
+        let text: String = entry["text"]
+            .as_str()
+            .unwrap_or("")
+            .trim()
+            .chars()
+            .take(MAX_HISTORY_TURN)
+            .collect();
+        if text.is_empty() {
+            continue;
+        }
+        let size = text.chars().count();
+        if turns.len() == MAX_HISTORY_TURNS || total + size > MAX_HISTORY {
+            break;
+        }
+        total += size;
+        turns.push(Turn { user, text });
+    }
+    turns.reverse();
+    turns
+}
+
+/// The run's task: earlier turns as context (never as instructions to act on),
+/// then the ask and the surface's instructions. With no history this is the
+/// same task the presence ask panel has always sent.
+pub fn compose_task(ask: &str, history: &[Turn]) -> String {
+    let mut task = String::new();
+    if !history.is_empty() {
+        task.push_str("Earlier in this conversation (context only):\n");
+        for turn in history {
+            let who = if turn.user { "User" } else { "Astrid" };
+            task.push_str(&format!("{who}: {}\n", turn.text));
+        }
+        task.push_str("\nThe user now asks:\n");
+    }
+    task.push_str(&format!(
+        "{ask}\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}"
+    ));
+    task
+}
 
 /// Asks the model to finish with a machine-readable brief the UI renders.
 pub const BRIEF_INSTRUCTIONS: &str = "You are answering inside Astrid's on-screen ask panel. Use the mail tools when the question is about email. Keep it short and concrete. Unless you are drawing on the canvas, end your reply with exactly one fenced code block tagged `brief` containing JSON: {\"title\": short headline, \"summary\": one sentence, \"todos\": [{\"text\": action the user should take, \"source\": n}], \"updates\": [{\"text\": what happened, \"source\": n}], \"sources\": [{\"id\": n, \"kind\": \"gmail\" or \"apple\", \"from\": sender name, \"subject\": subject, \"date\": short date, \"message_id\": id from mail_search}]}. Number sources from 1; omit empty lists; every todo and update cites a source when one exists. Do not invent emails.";
@@ -119,7 +185,7 @@ pub async fn serve(
     model: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let pending: Pending = Arc::default();
-    let (asks_tx, mut asks_rx) = tokio::sync::mpsc::channel::<String>(4);
+    let (asks_tx, mut asks_rx) = tokio::sync::mpsc::channel::<(String, Vec<Turn>)>(4);
     let cancel_slot: Arc<Mutex<Option<Cancellation>>> = Arc::default();
     {
         let pending = pending.clone();
@@ -145,7 +211,8 @@ pub async fn serve(
                             .take(MAX_ASK)
                             .collect::<String>();
                         if !text.is_empty() {
-                            let _ = asks_tx.blocking_send(text);
+                            let history = history_from(&message["history"]);
+                            let _ = asks_tx.blocking_send((text, history));
                         }
                     }
                     Some("approve") => {
@@ -181,7 +248,7 @@ pub async fn serve(
         });
     }
     emit(json!({"type":"ready","model":model}));
-    while let Some(ask) = asks_rx.recv().await {
+    while let Some((ask, history)) = asks_rx.recv().await {
         let cancel = Cancellation::default();
         *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(cancel.clone());
         let (events_tx, mut events_rx) =
@@ -195,7 +262,7 @@ pub async fn serve(
             observability: None,
             context_budget: Some(Default::default()),
             model: model.clone(),
-            task: format!("{ask}\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}"),
+            task: compose_task(&ask, &history),
             max_model_calls: 8,
             permissions: PermissionPolicy::read_only(),
         };
@@ -283,6 +350,74 @@ mod tests {
         let (text, brief) = split_brief("Plain answer.\n```brief\n{not json}\n```");
         assert!(brief.is_none() && text.contains("Plain answer."));
         assert_eq!(split_brief("No block").0, "No block");
+    }
+
+    #[test]
+    fn history_keeps_recent_bounded_turns_and_skips_bad_entries() {
+        let history = history_from(&json!([
+            {"role": "user", "text": "  draw a pump  "},
+            {"role": "system", "text": "ignored"},
+            {"role": "astrid", "text": ""},
+            {"role": "astrid", "text": "I drew a pump."},
+            {"text": "no role"},
+            7
+        ]));
+        assert_eq!(
+            history,
+            vec![
+                Turn {
+                    user: true,
+                    text: "draw a pump".into()
+                },
+                Turn {
+                    user: false,
+                    text: "I drew a pump.".into()
+                },
+            ]
+        );
+        assert!(history_from(&Value::Null).is_empty());
+
+        let many: Vec<Value> = (0..40)
+            .map(|n| json!({"role": "user", "text": format!("turn {n}")}))
+            .collect();
+        let kept = history_from(&Value::Array(many));
+        assert_eq!(kept.len(), MAX_HISTORY_TURNS);
+        assert_eq!(kept.last().unwrap().text, "turn 39");
+
+        let long: Vec<Value> = (0..12)
+            .map(|_| json!({"role": "astrid", "text": "x".repeat(5000)}))
+            .collect();
+        let kept = history_from(&Value::Array(long));
+        assert!(
+            kept.iter()
+                .all(|t| t.text.chars().count() == MAX_HISTORY_TURN)
+        );
+        assert!(kept.iter().map(|t| t.text.len()).sum::<usize>() <= MAX_HISTORY);
+    }
+
+    #[test]
+    fn tasks_without_history_are_unchanged_and_history_comes_first() {
+        let plain = compose_task("hi", &[]);
+        assert_eq!(
+            plain,
+            format!("hi\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}")
+        );
+        let task = compose_task(
+            "make it bigger",
+            &[
+                Turn {
+                    user: true,
+                    text: "draw a pump".into(),
+                },
+                Turn {
+                    user: false,
+                    text: "Here is a pump.".into(),
+                },
+            ],
+        );
+        assert!(task.starts_with(
+            "Earlier in this conversation (context only):\nUser: draw a pump\nAstrid: Here is a pump.\n\nThe user now asks:\nmake it bigger\n\n"
+        ));
     }
 
     #[test]

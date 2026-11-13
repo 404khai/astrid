@@ -75,6 +75,18 @@ created ... weaving, composing and sketching". [ADR 0036](docs/adr/0036-live-can
 a streamed, runtime-validated `canvas` shape block drawn by trusted templates in a presence canvas panel; no
 model-written code, no new tool or permission. Branch `feat/live-canvas` from main. PR, no merge.
 
+**Native desktop app test run 2026-11-13.** Maintainer: "let's work on a native appkit / swift app,
+liquid glass. the main app should be able to be closed, and removed from dock without disturbing the
+presence, this is a test run ... a sidebar for now with chats, and the main content to the right". This
+accepts a native SwiftUI/AppKit desktop app as the desktop direction for this test run instead of GPUI
+(GPUI paused, not superseded; M02/Tauri stays paused). [ADR 0037](docs/adr/0037-native-desktop-app.md):
+`apps/astrid-desktop` (`Astrid.app`, `dev.astrid.desktop`, macOS 26 Liquid Glass), separate from presence,
+chats in `~/Library/Application Support/Astrid/Chats`, titles from the first message, inline diagrams via
+the canvas page, additive bounded `history` on `presence-ask`. Branch `feat/astrid-desktop` from main
+`d7627233`. No voice, look or multi-window. PR, no merge. Same day, the maintainer asked for a
+Radian-browser sidebar, themes for sidebar and content, and a Rex-style settings modal
+(`references/radian`, `references/rex`); recorded as an ADR 0037 amendment on the same branch.
+
 **Presence intro wave 2026-11-13.** Maintainer: "when the presence mascot first comes on my screen, use
 this https://libraries.dev/waves design to come around the edges of my mac. it should appear from the
 bottom middle to the top, and go". ADR 0026 amendment: vendored MIT Distortion Waves band and sparks,
