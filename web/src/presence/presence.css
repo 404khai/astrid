@@ -50,7 +50,13 @@ button {
   width: 64px;
   height: 56px;
   animation: pr-bob 2.4s ease-in-out infinite;
-  filter: drop-shadow(0 6px 14px #000a);
+  filter: drop-shadow(0 2px 4px #0006);
+}
+.pr-mark,
+.pr-input-mark,
+.pr-handle {
+  cursor: grab;
+  touch-action: none;
 }
 .pr-mark .astrid-logo {
   width: 52px;
@@ -71,7 +77,8 @@ button {
 .pr-input-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  /* Wide enough that the goo bridge snaps once the send button settles. */
+  gap: 24px;
   width: 100%;
   margin-top: 10px;
 }

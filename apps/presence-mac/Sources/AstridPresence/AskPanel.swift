@@ -25,6 +25,12 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var childInput: FileHandle?
     private var buffer = Data()
     private var contentSize = NSSize(width: 84, height: 76)
+    /// Bottom-centre of the panel in screen points. Starts at the centre of the
+    /// main screen; dragging moves it. The panel grows upward around it.
+    private var anchor: NSPoint = {
+        let visible = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        return NSPoint(x: visible.midX, y: visible.midY - 38)
+    }()
     private static let margin: CGFloat = 20
 
     init(config: AskConfig) {
@@ -53,12 +59,15 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         panel.orderFrontRegardless()
     }
 
-    /// Anchored to the bottom-right of the main screen's visible area.
+    /// Places the panel around its anchor, kept fully on the anchor's screen.
     private func place() {
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let visible = screen.visibleFrame
+        let screen = NSScreen.screens.first { $0.frame.contains(anchor) } ?? NSScreen.main ?? NSScreen.screens.first
+        guard let visible = screen?.visibleFrame else { return }
         let size = NSSize(width: min(contentSize.width, 520), height: min(contentSize.height, visible.height - 2 * Self.margin))
-        panel.setFrame(NSRect(x: visible.maxX - size.width - Self.margin, y: visible.minY + Self.margin, width: size.width, height: size.height), display: true)
+        var frame = NSRect(x: anchor.x - size.width / 2, y: anchor.y, width: size.width, height: size.height)
+        frame.origin.x = min(max(frame.minX, visible.minX), visible.maxX - frame.width)
+        frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+        panel.setFrame(frame, display: true)
     }
 
     // MARK: Web → native
@@ -70,6 +79,15 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             if let w = body["width"] as? Double, let h = body["height"] as? Double, w > 0, h > 0 {
                 contentSize = NSSize(width: w, height: h)
                 place()
+            }
+        case "drag":
+            // Web y grows downward; screen y grows upward.
+            if let dx = body["dx"] as? Double, let dy = body["dy"] as? Double, dx.isFinite, dy.isFinite {
+                anchor.x += dx
+                anchor.y -= dy
+                place()
+                let frame = panel.frame
+                anchor = NSPoint(x: frame.midX, y: frame.minY)
             }
         case "expanded":
             if body["expanded"] as? Bool == true {

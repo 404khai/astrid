@@ -22,6 +22,7 @@ export type Outgoing =
   | { type: "cancel" }
   | { type: "open"; url: string }
   | { type: "size"; width: number; height: number }
+  | { type: "drag"; dx: number; dy: number }
   | { type: "expanded"; expanded: boolean };
 
 declare global {
@@ -55,6 +56,9 @@ function mock(text: string) {
   (async () => {
     await say({ type: "state", state: "working", label: "Thinking" }, 300);
     await say({ type: "approval", id: 1, title: `Search Gmail for “newer_than:2d”?`, detail: {} }, 900);
+    // Real runtimes deliver these after the approval; the card must survive them.
+    await say({ type: "state", state: "searching", label: "Searching mail" }, 30);
+    await say({ type: "state", state: "listening", label: "Waiting for you" }, 30);
     const ok = await new Promise<boolean>((r) => (pendingMock = r));
     if (!ok) return say({ type: "error", message: "mail access was not approved" }, 200);
     await say({ type: "state", state: "searching", label: "Searching mail" }, 200);

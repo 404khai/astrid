@@ -36,7 +36,37 @@ function useReducedMotion() {
   return reduced;
 }
 
+/** Drag the native panel by a handle; a press without movement stays a click. */
+function useDrag() {
+  const moved = useRef(false);
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    moved.current = false;
+    let last = { x: e.screenX, y: e.screenY };
+    const start = { ...last };
+    const move = (ev: PointerEvent) => {
+      if (!moved.current && Math.hypot(ev.screenX - start.x, ev.screenY - start.y) < 4) return;
+      moved.current = true;
+      send({ type: "drag", dx: ev.screenX - last.x, dy: ev.screenY - last.y });
+      last = { x: ev.screenX, y: ev.screenY };
+    };
+    const up = () => {
+      removeEventListener("pointermove", move);
+      removeEventListener("pointerup", up);
+    };
+    addEventListener("pointermove", move);
+    addEventListener("pointerup", up);
+  };
+  /** Wraps a click handler so it doesn't fire at the end of a drag. */
+  const click = (handler: () => void) => () => {
+    if (!moved.current) handler();
+    moved.current = false;
+  };
+  return { onPointerDown, click };
+}
+
 function App() {
+  const drag = useDrag();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -54,7 +84,6 @@ function App() {
       switch (m.type) {
         case "state":
           setState({ state: m.state, label: m.label });
-          if (m.state !== "listening") setApproval(null);
           break;
         case "approval":
           setApproval({ id: m.id, title: m.title, detail: m.detail });
@@ -66,6 +95,7 @@ function App() {
           setError(m.message);
           break;
         case "done":
+          setApproval(null);
           setAsking(null);
           askRef.current = null;
           break;
@@ -120,13 +150,22 @@ function App() {
     setApproval(null);
   };
 
-  const look = looks[state.state] ?? looks.idle;
+  // While an approval is open, Astrid is visibly waiting on you, whatever
+  // late runtime states arrive.
+  const look = approval ? looks.listening : looks[state.state] ?? looks.idle;
+  const label = approval ? "Waiting for you" : state.label;
   const busy = asking !== null;
 
   if (!open) {
     return (
       <div className="pr-root pr-collapsed" ref={root}>
-        <button type="button" className="pr-mark" aria-label="Ask Astrid" onClick={() => setOpen(true)}>
+        <button
+          type="button"
+          className="pr-mark"
+          aria-label="Ask Astrid (drag to move)"
+          onPointerDown={drag.onPointerDown}
+          onClick={drag.click(() => setOpen(true))}
+        >
           <AstridLogo animated tracking />
         </button>
       </div>
@@ -135,15 +174,15 @@ function App() {
 
   return (
     <div className="pr-root" ref={root}>
-      <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a, 0 18px 40px #0009">
+      <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
         {(busy || answer || error) && (
           <Liquid.Item transition="smooth">
             <div className="pr-card" aria-live="polite">
               {busy && (
-                <div className="pr-status">
+                <div className="pr-status pr-handle" onPointerDown={drag.onPointerDown}>
                   <AstridLogo expression={look.eyes} />
                   <ThinkingOrb state={look.orb} size={20} theme="dark" paused={reduced} />
-                  <span>{state.label}</span>
+                  <span>{label}</span>
                 </div>
               )}
               {busy && <p className="pr-ask">“{asking}”</p>}
@@ -162,7 +201,13 @@ function App() {
                 submit();
               }}
             >
-              <button type="button" className="pr-input-mark" aria-label="Close" onClick={() => setOpen(false)}>
+              <button
+                type="button"
+                className="pr-input-mark"
+                aria-label="Close (drag to move)"
+                onPointerDown={drag.onPointerDown}
+                onClick={drag.click(() => setOpen(false))}
+              >
                 <AstridLogo expression={busy ? look.eyes : "idle"} />
               </button>
               <input
@@ -179,8 +224,8 @@ function App() {
               through the goo as soon as there is something to send. */}
           <Liquid.Item
             transition="bouncy"
-            x={text.trim() && !busy ? 0 : -46}
-            scale={text.trim() && !busy ? 1 : 0.35}
+            x={text.trim() && !busy ? 0 : -(44 + 24)}
+            scale={text.trim() && !busy ? 1 : 0.3}
           >
             <button
               type="button"

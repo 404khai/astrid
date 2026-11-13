@@ -242,7 +242,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         scenes.forEach { $0.close() }
         let screens = NSScreen.screens
         layout = DisplayLayout.fromCocoa(frames: screens.map(\.frame), scales: screens.map { Double($0.backingScaleFactor) })
-        scenes = zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
+        // The ask surface is Astrid's only window in --ask mode: no full-screen overlay.
+        scenes = askConfig != nil ? [] : zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
         for scene in scenes { scene.addInk(ink, reduceMotion: true, now: CACurrentMediaTime()) }
     }
 
