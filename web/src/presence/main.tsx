@@ -108,6 +108,8 @@ function App() {
   const [approval, setApproval] = useState<Approval | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // While Astrid's canvas is up it is the answer: no text card here.
+  const [canvasOpen, setCanvasOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const askRef = useRef<string | null>(null);
@@ -143,10 +145,16 @@ function App() {
           break;
         case "answer": {
           const next = { ask: askRef.current ?? "", text: m.text, brief: m.brief };
-          setAnswer(next);
+          // A drawing is its own answer: the canvas shows it, the panel stays
+          // out of the way and only speaks the short reply.
+          if (!m.canvas) setAnswer(next);
+          else setAnswer(null);
           if (askedByVoice.current) speak(spoken(next));
           break;
         }
+        case "canvas-open":
+          setCanvasOpen(m.on);
+          break;
         case "speaking":
           setSpeaking(m.on);
           if (!m.on) speakerAnalyser.current.clear();
@@ -309,13 +317,13 @@ function App() {
           : voice.error ?? "";
     return (
       <div className="pr-root pr-voice" ref={root}>
-        {(approval || answer || error) && (
+        {(approval || error || (answer && !canvasOpen)) && (
           <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
             <Liquid.Item transition="smooth">
               <div className="pr-card" aria-live="polite">
                 {approval && <ApprovalCard approval={approval} onDecide={decide} />}
                 {error && !busy && !approval && <p className="pr-error">{error}</p>}
-                {answer && !busy && !approval && (
+                {answer && !busy && !approval && !canvasOpen && (
                   <AnswerView
                     answer={answer}
                     speaking={speaking}
@@ -358,7 +366,7 @@ function App() {
             </div>
           </Liquid.Item>
         )}
-        {(busy || answer || error) && !voice.listening && (
+        {(busy || answer || error) && !voice.listening && (!canvasOpen || approval || error) && (
           <Liquid.Item transition="smooth">
             <div className="pr-card" aria-live="polite">
               {busy && (
@@ -371,7 +379,7 @@ function App() {
               {busy && <p className="pr-ask">“{asking}”</p>}
               {approval && <ApprovalCard approval={approval} onDecide={decide} />}
               {error && !busy && <p className="pr-error">{error}</p>}
-              {answer && !busy && (
+              {answer && !busy && !canvasOpen && (
                 <AnswerView
                   answer={answer}
                   speaking={speaking}

@@ -35,3 +35,4 @@ See the [development process](../development.md) for the lifecycle and template.
 | [0027](0027-local-look-and-presence-tools.md) | Local Mac look (one combined capture+disclosure approval), host-side capture and presentation tools | Proposed 2026-11-11 | Not started; V2-02 blocked on decision |
 | [0028](0028-read-only-mail.md) | Read-only mail: Apple Mail (Spotlight) and Gmail (gmail.readonly OAuth, Keychain) | Accepted 2026-11-11 | Implemented with fixtures/mocks; live sign-in pending maintainer |
 | [0029](0029-resident-presence-timers.md) | Resident presence host owns timers and alarms (D5 a) | Accepted 2026-11-11 | Timers/alarms implemented; EventKit reminders/calendar next |
+| [0036](0036-live-canvas.md) | Live canvas: streamed, validated shape block drawn by the presence app (D3 b, general vocabulary) | Accepted 2026-11-13 | V2-04 first slice; parser tests and browser render checked; live voice→canvas pending maintainer |

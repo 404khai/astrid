@@ -41,6 +41,12 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var hotkey: Hotkey?
     private var dragTimer: Timer?
     private let speaker: Speaker
+    /// ADR 0036: the live canvas, created on the first drawing.
+    private lazy var canvas: CanvasController = {
+        let canvas = CanvasController(page: config.ui.deletingLastPathComponent().appendingPathComponent("canvas.html"))
+        canvas.onVisible = { [weak self] on in self?.deliver(["type": "canvas-open", "on": on]) }
+        return canvas
+    }()
 
     init(config: AskConfig) {
         self.config = config
@@ -136,6 +142,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             }
         case "listen":
             // Talking over Astrid interrupts her (barge-in).
+            if canvas.isVisible { canvas.deliver(["type": "listening", "on": body["on"] as? Bool == true], near: anchor) }
             if body["on"] as? Bool == true {
                 speaker.stop()
                 speaker.prepare()
@@ -231,9 +238,21 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             let line = buffer[buffer.startIndex..<newline]
             buffer.removeSubrange(buffer.startIndex...newline)
             // Only well-formed JSON objects reach the page.
-            guard let object = try? JSONSerialization.jsonObject(with: line), object is [String: Any] else { continue }
-            deliver(object)
+            guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            route(object)
         }
+    }
+
+    /// Canvas events go to the canvas; answers go to both once it has drawn.
+    private func route(_ object: [String: Any]) {
+        let type = object["type"] as? String
+        if type == "canvas" {
+            canvas.deliver(object, near: anchor)
+            return
+        }
+        // A follow-up asked while the canvas is up shows its state there too.
+        if ["state", "done"].contains(type ?? ""), canvas.isVisible { canvas.deliver(object, near: anchor) }
+        deliver(object)
     }
 
     private func deliver(_ object: Any) {

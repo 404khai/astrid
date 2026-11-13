@@ -12,14 +12,15 @@ export type Incoming =
   | { type: "state"; state: string; label: string }
   | { type: "delta"; text: string }
   | { type: "approval"; id: number; title: string; detail: Record<string, unknown> }
-  | { type: "answer"; text: string; brief: Brief | null }
+  | { type: "answer"; text: string; brief: Brief | null; canvas?: boolean }
   | { type: "error"; message: string }
   | { type: "done"; outcome: string }
   | { type: "voice"; sampleRate: number; time: string; freq: string; source?: "speaker" }
   | { type: "speaking"; on: boolean }
   | { type: "hotkey"; down: boolean }
   | { type: "transcript"; text: string; final: boolean }
-  | { type: "voice-error"; message: string };
+  | { type: "voice-error"; message: string }
+  | { type: "canvas-open"; on: boolean };
 
 export type Outgoing =
   | { type: "ask"; text: string }

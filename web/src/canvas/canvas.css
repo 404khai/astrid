@@ -1,0 +1,312 @@
+/* Astrid's live canvas (ADR 0036): a dark sheet the presence app floats on
+   screen. Shapes draw in with their stroke, then their fill; Astrid's cursor
+   travels to each one. Same language as the ask surface. */
+:root {
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --ink: #f4f4f4;
+  --muted: #9a9a9a;
+  --line: #2a2a2a;
+  --sheet: #141415;
+  --accent: #5756f5;
+  color-scheme: dark;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--ink);
+  font: 400 15px/22px var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+#root {
+  height: 100%;
+  box-sizing: border-box;
+  /* Room for the card's shadow: the panel clips anything past its edge. */
+  padding: 20px 32px 56px;
+}
+/* The canvas is the whole card; title and close float over it. */
+.cv-card {
+  position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--sheet);
+  background-image: radial-gradient(#2a2a2c 1px, transparent 1px);
+  background-size: 24px 24px;
+  box-shadow:
+    inset 0 0 0 1px #2a2a2c,
+    0 14px 34px #0009;
+  animation: cv-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+@keyframes cv-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+.cv-stage {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.cv-moving .cv-stage {
+  cursor: grabbing;
+}
+.cv-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  font-family: var(--sans);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cv-view {
+  transform-origin: 0 0;
+  transition: transform 0.6s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.cv-moving .cv-view {
+  transition: none;
+}
+.cv-float {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.cv-float > * {
+  pointer-events: auto;
+}
+.cv-title {
+  max-width: 60%;
+  margin: 0;
+  padding: 7px 16px;
+  border-radius: 99px;
+  background: #1f1f2199;
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: inset 0 0 0 1px #ffffff14;
+  font: 500 14px/18px var(--sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: move;
+  animation: cv-fade 0.4s ease-out backwards;
+}
+.cv-close {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 99px;
+  background: #1f1f2199;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: inset 0 0 0 1px #ffffff14;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cv-close:hover {
+  color: var(--ink);
+}
+.cv-close path {
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+/* The state orb sits beside Astrid's mark, as in the docs' agent states,
+   and goes away once she is done. */
+.cv-follow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cv-orb {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 0.3s,
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.cv-orb.on {
+  opacity: 1;
+  transform: none;
+}
+.cv-say.cv-say-left {
+  left: auto;
+  right: 6px;
+  border-radius: 12px 12px 4px 12px;
+}
+.cv-shape path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  fill-opacity: 0;
+  animation:
+    cv-stroke 0.55s cubic-bezier(0.6, 0, 0.3, 1) forwards,
+    cv-fill 0.35s 0.4s ease-out forwards;
+}
+.cv-shape.cv-dashed path {
+  stroke-dasharray: 7 7;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  animation: cv-fade 0.5s ease-out forwards;
+}
+.cv-shape .cv-arrowhead {
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  animation: cv-fade 0.2s 0.45s forwards;
+}
+.cv-box path {
+  stroke-width: 1;
+}
+.cv-shape text {
+  opacity: 0;
+  animation: cv-fade 0.4s 0.15s ease-out forwards;
+}
+.cv-label {
+  fill: var(--muted);
+  font: 400 13px var(--mono);
+  letter-spacing: 0.04em;
+  animation-delay: 0.5s !important;
+}
+@keyframes cv-stroke {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes cv-fill {
+  to {
+    fill-opacity: 1;
+  }
+}
+@keyframes cv-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Astrid's cursor: the Arrow click tip with the mark trailing it. */
+.cv-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  pointer-events: none;
+  transform: translate(var(--x), var(--y));
+  transition: transform 0.45s cubic-bezier(0.65, 0, 0.25, 1);
+}
+.cv-tip {
+  position: absolute;
+  overflow: visible;
+  filter: drop-shadow(0 3px 6px #0008) drop-shadow(0 0 10px #5756f566);
+}
+.cv-tip path {
+  fill: var(--accent);
+  stroke: none;
+}
+.cv-follow {
+  position: absolute;
+  left: 22px;
+  top: 18px;
+  animation: cv-bob 2.4s ease-in-out infinite;
+}
+.cv-follow .astrid-logo {
+  width: 30px;
+  height: 24px;
+  filter: drop-shadow(0 4px 8px #0008);
+}
+@keyframes cv-bob {
+  50% {
+    transform: translate(3px, 3px) rotate(-4deg);
+  }
+}
+.cv-say {
+  position: absolute;
+  left: 30px;
+  top: 48px;
+  padding: 6px 11px;
+  border-radius: 12px 12px 12px 4px;
+  background: var(--accent);
+  color: #fff;
+  font: 500 13px/18px var(--sans);
+  width: max-content;
+  max-width: 260px;
+  box-shadow: 0 8px 20px #0008;
+  animation: cv-tag 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+@keyframes cv-tag {
+  from {
+    opacity: 0;
+    transform: rotate(-2deg) scale(0.6);
+  }
+}
+.cv-moving .cv-cursor {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-shape path,
+  .cv-shape text,
+  .cv-shape .cv-arrowhead,
+  .cv-card,
+  .cv-say {
+    animation: none;
+    stroke-dashoffset: 0;
+    fill-opacity: 1;
+    opacity: 1;
+  }
+  .cv-shape:not(.cv-dashed) path {
+    stroke-dasharray: none;
+  }
+  .cv-cursor {
+    transition: none;
+  }
+  .cv-follow {
+    animation: none;
+  }
+}
+
+/* 3D solids built with the Anatomy kit: they rise into place. */
+.cv-solids {
+  --anatomy-paper: #101011;
+  --anatomy-weight: 1px;
+}
+.cv-solid3.cv-new {
+  animation: cv-rise 0.5s cubic-bezier(0.32, 0.72, 0, 1) backwards;
+}
+
+@keyframes cv-rise {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cv-solid3,
+  .cv-solid3 > text {
+    animation: none;
+  }
+}
+
+.cv-wire {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}

@@ -9,6 +9,6 @@ export default defineConfig({
   build: {
     outDir: "dist-presence",
     emptyOutDir: true,
-    rollupOptions: { input: { presence: "presence.html" } },
+    rollupOptions: { input: { presence: "presence.html", canvas: "canvas.html" } },
   },
 });
