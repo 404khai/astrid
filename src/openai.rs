@@ -19,6 +19,26 @@ use crate::{
 pub(crate) struct ResponseContinuation(Vec<Value>);
 
 impl ResponseContinuation {
+    /// Provider-neutral form for other adapters: visible text and tool calls as
+    /// completed items, plus an optional opaque provider block that only its own
+    /// adapter replays (e.g. Anthropic thinking blocks). Persisted format unchanged.
+    pub(crate) fn from_parts(text: &str, tool_calls: &[ToolCall], opaque: Option<Value>) -> Self {
+        let mut items = Vec::new();
+        if !text.is_empty() {
+            items.push(json!({"type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":text}]}));
+        }
+        for call in tool_calls {
+            items.push(json!({"type":"function_call","call_id":call.call_id,"name":call.name,"namespace":"astrid","arguments":call.arguments,"status":"completed"}));
+        }
+        if let Some(opaque) = opaque {
+            items.push(opaque);
+        }
+        Self(items)
+    }
+    /// The opaque item of a given provider type, if this response came from it.
+    pub(crate) fn opaque(&self, kind: &str) -> Option<&Value> {
+        self.0.iter().find(|item| item["type"] == kind)
+    }
     pub(crate) fn validate_response(&self, response: &ModelResponse) -> Result<(), String> {
         let parsed = completed_response(serde_json::json!({"status":"completed", "output":self.0}))
             .map_err(|error| format!("invalid stored provider continuation: {error}"))?;
@@ -127,7 +147,14 @@ impl OpenAiProvider {
                             input.push(json!({"type":"function_call","call_id":call.call_id,"name":call.name,"namespace":"astrid","arguments":call.arguments}));
                         }
                     } else {
-                        input.extend(response.continuation.0.iter().cloned());
+                        input.extend(
+                            response
+                                .continuation
+                                .0
+                                .iter()
+                                .filter(|item| !matches!(item["type"].as_str(), Some("anthropic_content" | "opencode_chat")))
+                                .cloned(),
+                        );
                     }
                 },
                 Message::Tool(result) => input.push(json!({"type":"function_call_output","call_id":result.call_id,"output":serde_json::to_string(&result.outcome).expect("JSON tool outcome is serializable")})),
@@ -140,6 +167,16 @@ impl OpenAiProvider {
         }
         if request.options.computer_use {
             definitions.extend(crate::computer::definitions());
+        }
+        let mail: Vec<&str> = [
+            (request.options.mail_apple, "apple"),
+            (request.options.mail_gmail, "gmail"),
+        ]
+        .into_iter()
+        .filter_map(|(on, name)| on.then_some(name))
+        .collect();
+        if !mail.is_empty() {
+            definitions.extend(crate::mail::definitions(&mail));
         }
         let mut body = json!({"model":request.model,"instructions":request.instructions,"input":input,
             "store":false,"stream":true,"include":["reasoning.encrypted_content"],
@@ -640,7 +677,8 @@ pub fn completed_response(response: Value) -> Result<ModelResponse, ModelError> 
                     }
                 }
             }
-            "reasoning" => {} // Preserve opaque reasoning items without interpreting them.
+            // Preserve opaque reasoning and other providers' replay items without interpreting them.
+            "reasoning" | "anthropic_content" | "opencode_chat" => {}
             kind => {
                 return Err(ModelError::Protocol(format!(
                     "unsupported output item {kind}"

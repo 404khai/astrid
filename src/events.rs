@@ -884,7 +884,11 @@ impl ExecutionState {
                                 && t.permission.is_none()
                                 && matches!(
                                     t.call.name.as_str(),
-                                    "instabox_exec" | "instabox_observe" | "instabox_action"
+                                    "instabox_exec"
+                                        | "instabox_observe"
+                                        | "instabox_action"
+                                        | "mail_search"
+                                        | "mail_read"
                                 )
                                 && !self.cancellation_acknowledged,
                         )?;

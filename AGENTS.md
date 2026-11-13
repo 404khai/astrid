@@ -20,6 +20,33 @@ script file or stdin). Branch `feat/presence-overlay` from main `b2879784`, same
 checkout, no worktree. No model, screen capture, input injection, network
 listener, Rust sidecar IPC, daemon or resident timers. D2–D5 stay open. PR, no merge.
 
+**V2-03a started 2026-11-11.** Maintainer: "let's start v2-03a ... apple mail ... also
+gmail" then "make all the decisions, yes for both". Accepted
+[ADR 0028](docs/adr/0028-read-only-mail.md) (read-only Apple Mail via Spotlight, and
+Gmail API `gmail.readonly` via OAuth PKCE with the token in Keychain) and
+[ADR 0029](docs/adr/0029-resident-presence-timers.md) (D5 a: resident menu-bar host owns
+timers/alarms). Branch `feat/everyday-mail-timers` from main. No sending/modifying
+mail; reminders/calendar EventKit is the next slice. Live mail access needs the
+maintainer's own sign-in; development used fixtures and mocks only. PR, no merge.
+
+**Claude provider 2026-11-12.** Maintainer: "add a claude adapter to astrid, cuz that is
+the subscription I have right now". [ADR 0030](docs/adr/0030-claude-provider.md):
+Anthropic Messages API adapter for exact `claude-*` model IDs with a Console API key
+(env or Keychain). Consumer Claude subscriptions cannot back third-party apps.
+Branch `feat/claude-provider` stacked on `feat/everyday-mail-timers`. PR, no merge.
+
+**OpenCode Go provider 2026-11-12.** Maintainer: "you can merge the claude provider, add an
+opencode v2 provider and merge as well". PR #32 merged into the stack;
+[ADR 0031](docs/adr/0031-opencode-go-provider.md) adds `opencode/<id>` Chat Completions
+models with the required user agent and session header. Branch `feat/opencode-provider`
+stacked on `feat/everyday-mail-timers`, merged into that stack; main still needs #31.
+
+**Claude Agent SDK provider 2026-11-13.** Maintainer: "build and integrate the sdk, I don't
+mind" after being told Anthropic restricts subscription use in third-party apps.
+[ADR 0032](docs/adr/0032-claude-agent-sdk-provider.md): `claude-code/<model>` runs one
+bounded Claude Code turn per model call via `apps/claude-agent-bridge`; built-in tools
+off, every Astrid tool call returned to Astrid's runtime. Branch `feat/claude-agent-sdk`.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

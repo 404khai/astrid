@@ -56,6 +56,11 @@ public enum PresenceEvent: Equatable, Sendable {
     /// Script pacing: hold later events for a number of milliseconds.
     case wait(ms: Int)
     case quit
+    /// ADR 0029 (resident host only): timers and alarms.
+    case timerStart(id: String, seconds: Int, label: String)
+    case timerCancel(id: String)
+    case alarmSet(id: String, at: Date, label: String)
+    case timersList
 }
 
 public struct PresenceProtocolError: Error, Equatable, CustomStringConvertible {
@@ -130,6 +135,20 @@ extension PresenceProtocol {
             return .wait(ms: ms)
         case "quit":
             return .quit
+        case "timer_start":
+            let id = try requestId(reader)
+            guard let seconds = try reader.int("seconds") else { throw PresenceProtocolError("missing \"seconds\"") }
+            return .timerStart(id: id, seconds: seconds, label: try reader.string("label") ?? "")
+        case "timer_cancel":
+            return .timerCancel(id: try requestId(reader))
+        case "alarm_set":
+            let id = try requestId(reader)
+            guard let text = try reader.string("at"), let at = isoDate(text) else {
+                throw PresenceProtocolError("\"at\" must be an ISO-8601 time with a zone, e.g. 2026-11-12T07:30:00Z")
+            }
+            return .alarmSet(id: id, at: at, label: try reader.string("label") ?? "")
+        case "timers_list":
+            return .timersList
         default:
             throw PresenceProtocolError("unknown type \"\(type)\"")
         }
@@ -149,6 +168,25 @@ extension PresenceProtocol {
         case let kind:
             throw PresenceProtocolError("shape \(index): unknown kind \"\(kind)\"")
         }
+    }
+
+    public static func isRequestId(_ id: String) -> Bool {
+        (1...64).contains(id.count) && id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
+    }
+
+    private static func requestId(_ reader: FieldReader) throws -> String {
+        guard let id = try reader.string("id"), isRequestId(id) else {
+            throw PresenceProtocolError("\"id\" must be 1...64 characters of [A-Za-z0-9-]")
+        }
+        return id
+    }
+
+    public static func isoDate(_ text: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: text) { return date }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: text)
     }
 
     private static func checkMilliseconds(_ value: Int, _ name: String) throws {
@@ -301,6 +339,21 @@ extension PresenceProtocol {
             fields["ms"] = ms
         case .quit:
             fields["type"] = "quit"
+        case let .timerStart(id, seconds, label):
+            fields["type"] = "timer_start"
+            fields["id"] = id
+            fields["seconds"] = seconds
+            fields["label"] = label
+        case let .timerCancel(id):
+            fields["type"] = "timer_cancel"
+            fields["id"] = id
+        case let .alarmSet(id, at, label):
+            fields["type"] = "alarm_set"
+            fields["id"] = id
+            fields["at"] = ISO8601DateFormatter().string(from: at)
+            fields["label"] = label
+        case .timersList:
+            fields["type"] = "timers_list"
         }
         let data = try! JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys, .withoutEscapingSlashes])
         return String(decoding: data, as: UTF8.self)
