@@ -138,6 +138,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             }
         case "listen":
             // Talking over Astrid interrupts her (barge-in).
+            if canvas.isVisible { canvas.deliver(["type": "listening", "on": body["on"] as? Bool == true], near: anchor) }
             if body["on"] as? Bool == true {
                 speaker.stop()
                 speaker.prepare()
@@ -245,7 +246,8 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             canvas.deliver(object, near: anchor)
             return
         }
-        if type == "answer", canvas.isVisible { canvas.deliver(object, near: anchor) }
+        // A follow-up asked while the canvas is up shows its state there too.
+        if ["state", "done"].contains(type ?? ""), canvas.isVisible { canvas.deliver(object, near: anchor) }
         deliver(object)
     }
 

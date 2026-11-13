@@ -143,7 +143,10 @@ function App() {
           break;
         case "answer": {
           const next = { ask: askRef.current ?? "", text: m.text, brief: m.brief };
-          setAnswer(next);
+          // A drawing is its own answer: the canvas shows it, the panel stays
+          // out of the way and only speaks the short reply.
+          if (!m.canvas) setAnswer(next);
+          else setAnswer(null);
           if (askedByVoice.current) speak(spoken(next));
           break;
         }

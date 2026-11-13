@@ -26,7 +26,6 @@ final class CanvasController: NSObject, WKScriptMessageHandler {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.becomesKeyOnlyIfNeeded = true
-        panel.isMovableByWindowBackground = true
         web.setValue(false, forKey: "drawsBackground")
         panel.contentView = web
         web.load(URLRequest(url: URL(string: "astrid-ui://app/\(page.lastPathComponent)")!))
@@ -55,6 +54,19 @@ final class CanvasController: NSObject, WKScriptMessageHandler {
         if loaded { web.evaluateJavaScript(script) } else { queued.append(script) }
     }
 
+    /// Drags with the title pill: drags elsewhere turn or pan the drawing.
+    private func startDrag() {
+        let start = NSEvent.mouseLocation
+        let origin = panel.frame.origin
+        let timer = Timer(timeInterval: 1.0 / 120, repeats: true) { [weak self] timer in
+            guard let self else { return timer.invalidate() }
+            let mouse = NSEvent.mouseLocation
+            self.panel.setFrameOrigin(NSPoint(x: origin.x + mouse.x - start.x, y: origin.y + mouse.y - start.y))
+            if NSEvent.pressedMouseButtons & 1 == 0 { timer.invalidate() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
         switch type {
@@ -64,6 +76,8 @@ final class CanvasController: NSObject, WKScriptMessageHandler {
             queued.removeAll()
         case "canvas-close":
             panel.orderOut(nil)
+        case "drag-start":
+            startDrag()
         default:
             break
         }

@@ -57,6 +57,20 @@ templates, but it doesn't need model-written code.
     started), **Sketching** (shapes are drawing), **Weaving** (waiting for the
     next shapes) and **Done**.
   - **Reduced Motion.** Shapes appear without animation.
+- **Moving the figure (amended 2026-11-13).** The canvas fills the card. The
+  title floats in a translucent pill; drag the pill to move the panel. On the
+  drawing itself:
+  - **Drag** turns a 3D figure, re-projecting every solid and world-anchored
+    label (shift-drag pans).
+  - **Two-finger scroll** pans, and **pinch** zooms.
+  - **Double-click** resets the view.
+  - **Framing.** Each drawing is fitted to the view as it grows, so nothing is
+    cut off.
+- **Follow-ups (amended 2026-11-13).** While the canvas is up, the ask
+  surface's listening, runtime states and finish are also sent to the canvas.
+  A state orb sits beside Astrid's mark, as in the docs' agent states, and
+  goes away when she is idle. Answers that drew are flagged `canvas`, so the
+  ask panel speaks them without showing a text box.
 - **Authority.** No new tool, permission or capability. Drawing is
   presentation only: it reads nothing and changes nothing. Asks stay read-only
   runs with mail approvals (ADR 0033). Voice and spoken replies are unchanged

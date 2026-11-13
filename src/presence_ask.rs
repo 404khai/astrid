@@ -231,7 +231,9 @@ pub async fn serve(
                         canvas.finish().into_iter().for_each(emit);
                         let (text, brief) =
                             split_brief(&crate::presence_canvas::strip(&result.final_text));
-                        emit(json!({"type":"answer","text":text,"brief":brief}));
+                        emit(
+                            json!({"type":"answer","text":text,"brief":brief,"canvas":canvas.started()}),
+                        );
                         "completed".to_string()
                     }
                     RunOutcome::Cancelled => {
