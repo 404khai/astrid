@@ -93,6 +93,15 @@ bottom middle to the top, and go". ADR 0026 amendment: vendored MIT Distortion W
 runtime-compiled Metal in a click-through panel, once per launch, skipped under Reduce Motion or
 `--no-intro`; no lens/blur over the screen. Branch `feat/presence-intro-wave` from main. PR, no merge.
 
+**V2-05 operator started 2026-11-13.** Maintainer: "let's work on v2-05, /operator new thread, new branch
+should be able to have screen context of what's on my screen, and use the different cursor styles from the
+docs to do stuff. if it is working, the distortion wave should be visible". Branch `feat/operator` from main
+`5e661fa7`, same checkout. First, independent of the open decisions: additive presence protocol fields
+(`point_at.cursor` from a fixed set of the docs' cursor styles; a `wave` event), recorded as an ADR 0026
+amendment. **Pending maintainer answers before dependent code:** D2 look grants for re-looks (ADR 0027 caps
+two looks per run), guide versus act ("to do stuff"), and which vision model path operator uses (ADR 0024
+allows only gpt-5.6). No live capture or model trial without exact trial approval. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

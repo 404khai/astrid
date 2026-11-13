@@ -941,13 +941,21 @@ fn presentation_event(tool: &str, args: &Value, look: Option<LookFrame>) -> Resu
         "point_at" => {
             if object
                 .keys()
-                .any(|k| !matches!(k.as_str(), "frame_id" | "x" | "y"))
+                .any(|k| !matches!(k.as_str(), "frame_id" | "x" | "y" | "cursor"))
             {
-                return Err("point_at takes frame_id, x and y".into());
+                return Err("point_at takes frame_id, x, y and an optional cursor".into());
             }
             frame_matches(object)?;
             let (x, y) = point(args)?;
-            Ok(json!({"v":1,"type":"point_at","x":x,"y":y,"display":look.display}))
+            let mut event = json!({"v":1,"type":"point_at","x":x,"y":y,"display":look.display});
+            if let Some(cursor) = object.get("cursor") {
+                let cursor = cursor
+                    .as_str()
+                    .filter(|c| CURSOR_STYLES.contains(c))
+                    .ok_or_else(|| format!("cursor must be one of {}", CURSOR_STYLES.join(", ")))?;
+                event["cursor"] = json!(cursor);
+            }
+            Ok(event)
         }
         "sketch" => {
             if object
@@ -987,12 +995,32 @@ fn presentation_event(tool: &str, args: &Value, look: Option<LookFrame>) -> Resu
     }
 }
 
+/// The presence host's fixed cursor styles (`CursorStyle` in PresenceCore),
+/// from the docs' Cursors page. Each says what to do at the target; none acts.
+pub const CURSOR_STYLES: [&str; 15] = [
+    "arrow_click",
+    "arrow",
+    "click",
+    "pointer",
+    "press",
+    "tap",
+    "text",
+    "grab",
+    "select",
+    "crosshair",
+    "focus",
+    "zoom_in",
+    "zoom_out",
+    "pen",
+    "not_allowed",
+];
+
 /// ADR 0027 local tools: one approved look, then presentation only.
 pub fn look_definitions() -> Vec<Value> {
     let point = json!({"type":"array","items":{"type":"integer","minimum":0,"maximum":2559},"minItems":2,"maxItems":2,"description":"[x, y] in display points of the current look frame"});
     vec![
         json!({"type":"function","name":"look","description":"Capture one frame of the user's configured Mac display and see it in your next request. The user approves each look (capture plus disclosure to you); at most 2 per run. Astrid's own overlay is not in the frame.","parameters":{"type":"object","properties":{},"additionalProperties":false}}),
-        json!({"type":"function","name":"point_at","description":"Glide Astrid's on-screen cursor to a point in the current look frame (display points, origin top-left). Presentation only: never clicks.","parameters":{"type":"object","properties":{"frame_id":{"type":"string","format":"uuid"},"x":{"type":"integer","minimum":0,"maximum":2559},"y":{"type":"integer","minimum":0,"maximum":2559}},"required":["frame_id","x","y"],"additionalProperties":false}}),
+        json!({"type":"function","name":"point_at","description":"Glide Astrid's on-screen cursor to a point in the current look frame (display points, origin top-left). Presentation only: never clicks. cursor shows the user what to do there: click, press (a button), tap, pointer (a link), text (type or select text), grab (drag), select (a region), crosshair (this exact spot), focus or zoom_in (look closer), zoom_out, pen (draw or write), not_allowed (don't), arrow; default arrow_click (just pointing).","parameters":{"type":"object","properties":{"frame_id":{"type":"string","format":"uuid"},"x":{"type":"integer","minimum":0,"maximum":2559},"y":{"type":"integer","minimum":0,"maximum":2559},"cursor":{"type":"string","enum":CURSOR_STYLES}},"required":["frame_id","x","y"],"additionalProperties":false}}),
         json!({"type":"function","name":"sketch","description":"Draw ink over the screen to highlight things in the current look frame: circle around a target, arrow toward it, or line under it. Presentation only.","parameters":{"type":"object","properties":{"frame_id":{"type":"string","format":"uuid"},"shapes":{"type":"array","minItems":1,"maxItems":8,"items":{"anyOf":[
             {"type":"object","properties":{"kind":{"const":"circle"},"x":{"type":"integer","minimum":0,"maximum":2559},"y":{"type":"integer","minimum":0,"maximum":2559},"r":{"type":"integer","minimum":4,"maximum":2560}},"required":["kind","x","y","r"],"additionalProperties":false},
             {"type":"object","properties":{"kind":{"enum":["arrow","line"]},"from":point,"to":point},"required":["kind","from","to"],"additionalProperties":false}

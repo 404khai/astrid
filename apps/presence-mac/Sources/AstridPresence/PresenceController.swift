@@ -66,8 +66,17 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     /// The Distortion Waves intro on the main display, once per launch; never
     /// under Reduce Motion or with --no-intro.
     private func playIntro() {
-        guard intro, !introPlayed, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        guard !introPlayed else { return }
         introPlayed = true
+        playWave()
+    }
+
+    /// The same wave on demand (`wave`, e.g. an operator session going live).
+    /// Skipped under Reduce Motion or with --no-intro; a running wave is not
+    /// restarted. The wave's panel is this process's window, so captures
+    /// exclude it like the rest of the overlay.
+    func playWave() {
+        guard intro, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         IntroWave.play(on: screen)
     }
 
@@ -173,8 +182,11 @@ final class PresenceController: NSObject, NSApplicationDelegate {
                 motion.show(now: now, reduceMotion: reduceMotion)
             case .hide:
                 motion.hide(reduceMotion: reduceMotion)
-            case let .pointAt(point):
-                motion.point(at: try layout.resolve(point), now: now, reduceMotion: reduceMotion)
+                for scene in scenes { scene.setCursor(.default) }
+            case let .pointAt(point, cursor):
+                let target = try layout.resolve(point)
+                for scene in scenes { scene.setCursor(cursor ?? .default) }
+                motion.point(at: target, now: now, reduceMotion: reduceMotion)
             case let .say(text, final, durationMs):
                 subtitle = text.isEmpty ? nil : text
                 if text.isEmpty || !final {
@@ -195,6 +207,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
                 break
             case .quit:
                 NSApp.terminate(nil)
+            case .wave:
+                playWave()
             case let .capture(requestId, display):
                 capture(requestId: requestId, display: display)
             case .timerStart, .timerCancel, .alarmSet, .timersList:

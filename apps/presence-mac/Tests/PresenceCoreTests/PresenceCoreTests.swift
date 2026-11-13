@@ -320,7 +320,7 @@ final class ArtTests: XCTestCase {
 
     func testRejectsUnsupportedPathData() {
         XCTAssertThrowsError(try SVGPath.parse("10 10"))
-        XCTAssertThrowsError(try SVGPath.parse("M0 0 A1 1 0 0 0 2 2"))
+        XCTAssertThrowsError(try SVGPath.parse("M0 0 Q1 1 2 2"))
         XCTAssertThrowsError(try SVGPath.parse("M0 0L"))
     }
 
@@ -359,13 +359,13 @@ final class DemoTests: XCTestCase {
         let events = DemoScript.events(for: layout)
         for event in events {
             XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(event)), event)
-            if case let .pointAt(point) = event {
+            if case let .pointAt(point, _) = event {
                 let global = try layout.resolve(point)
                 XCTAssertNotNil(layout.displays.first { $0.frame.contains(global) }, "\(point) is off screen")
             }
         }
         let displays = Set(events.compactMap { event -> Int? in
-            if case let .pointAt(point) = event { return point.display }
+            if case let .pointAt(point, _) = event { return point.display }
             return nil
         })
         XCTAssertEqual(displays, [0, 1])
@@ -474,5 +474,69 @@ final class TimerTests: XCTestCase {
         XCTAssertEqual(timerFiredText(fired[0], now: late), "Timer done: Tea (late 10 min)")
         try Data("garbage".utf8).write(to: url)
         XCTAssertEqual(TimerStore.load(from: url), TimerStore())
+    }
+}
+
+final class CursorStyleTests: XCTestCase {
+    func testPointAtCarriesAValidatedCursorStyle() throws {
+        XCTAssertEqual(
+            try PresenceProtocol.parse(line: #"{"v":1,"type":"point_at","x":1,"y":2,"display":0,"cursor":"text"}"#),
+            .pointAt(PresencePoint(x: 1, y: 2, display: 0), cursor: .text))
+        XCTAssertEqual(
+            try PresenceProtocol.parse(line: #"{"v":1,"type":"point_at","x":1,"y":2}"#),
+            .pointAt(PresencePoint(x: 1, y: 2), cursor: nil))
+        for line in [
+            #"{"v":1,"type":"point_at","x":1,"y":2,"cursor":"lasso"}"#,
+            #"{"v":1,"type":"point_at","x":1,"y":2,"cursor":"Text select"}"#,
+            #"{"v":1,"type":"point_at","x":1,"y":2,"cursor":3}"#,
+        ] {
+            XCTAssertThrowsError(try PresenceProtocol.parse(line: line), line)
+        }
+        for style in CursorStyle.allCases {
+            let event = PresenceEvent.pointAt(PresencePoint(x: 5, y: 6, display: 1), cursor: style)
+            XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(event)), event)
+        }
+        // No cursor encodes exactly as before, so v1 readers see no change.
+        XCTAssertFalse(PresenceProtocol.encode(.pointAt(PresencePoint(x: 5, y: 6))).contains("cursor"))
+    }
+
+    func testWaveIsAnEvent() throws {
+        XCTAssertEqual(try PresenceProtocol.parse(line: #"{"v":1,"type":"wave"}"#), .wave)
+        XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(.wave)), .wave)
+    }
+
+    func testEveryStyleHasDrawableArtOnTheGrid() throws {
+        let grid = CGRect(x: 0, y: 0, width: AstridArt.cursorGrid, height: AstridArt.cursorGrid)
+        XCTAssertEqual(CursorStyle.default, .arrowClick)
+        XCTAssertEqual(Set(CursorStyle.allCases.map(\.docsName)).count, CursorStyle.allCases.count)
+        for style in CursorStyle.allCases {
+            let art = AstridArt.cursor(style)
+            XCTAssertTrue(grid.contains(art.hotspot), "\(style) hotspot")
+            XCTAssertFalse(art.parts.isEmpty, "\(style)")
+            for part in art.parts {
+                XCTAssertTrue(part.fill != nil || part.stroke != nil, "\(style) part paints nothing")
+                var scale = CGAffineTransform(scaleX: part.scale, y: part.scale)
+                let path = try XCTUnwrap(try SVGPath.parse(part.path).copy(using: &scale), "\(style)")
+                XCTAssertFalse(path.isEmpty, "\(style)")
+                XCTAssertTrue(grid.insetBy(dx: -1, dy: -1).contains(path.boundingBoxOfPath), "\(style) leaves the grid: \(path.boundingBoxOfPath)")
+            }
+        }
+    }
+
+    func testArcsMatchTheirCircles() throws {
+        // A full circle as two half arcs, and a half arc, as the art uses them.
+        let circle = try SVGPath.parse("M3 13a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z").boundingBoxOfPath
+        XCTAssertEqual(circle.minX, 3, accuracy: 0.01)
+        XCTAssertEqual(circle.maxX, 23, accuracy: 0.01)
+        XCTAssertEqual(circle.minY, 3, accuracy: 0.01)
+        XCTAssertEqual(circle.maxY, 23, accuracy: 0.01)
+        // "a2 2 0 0 1 4 0" from (10, 7.5) bulges up to y = 5.5 (sweep 1, y down).
+        let knuckle = try SVGPath.parse("M10 7.5a2 2 0 0 1 4 0").boundingBoxOfPath
+        XCTAssertEqual(knuckle.minY, 5.5, accuracy: 0.01)
+        XCTAssertEqual(knuckle.maxY, 7.5, accuracy: 0.01)
+        // Radii too small for the endpoints scale up instead of failing.
+        let scaled = try SVGPath.parse("M0 0a1 1 0 0 1 10 0").boundingBoxOfPath
+        XCTAssertEqual(scaled.width, 10, accuracy: 0.01)
+        XCTAssertThrowsError(try SVGPath.parse("M0 0a1 1 0 0 1 10"))
     }
 }

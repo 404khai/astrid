@@ -961,7 +961,7 @@ async fn look_case(
                 assert!(body.to_string().contains("display points"));
                 let frame = frame_id_from(body).unwrap();
                 completed(vec![
-                    call("p", "point_at", json!({"frame_id":frame,"x":300,"y":20})),
+                    call("p", "point_at", json!({"frame_id":frame,"x":300,"y":20,"cursor":"click"})),
                     call("bad", "point_at", json!({"frame_id":frame,"x":320,"y":20})),
                     call("s", "sketch", json!({"frame_id":frame,"shapes":[{"kind":"circle","x":300,"y":20,"r":18},{"kind":"arrow","from":[200,120],"to":[290,30]}]})),
                     call("t", "say", json!({"text":"Export is top right."})),
@@ -1030,7 +1030,7 @@ async fn local_look_asks_once_then_points_sketches_and_says() {
     assert_eq!(
         events,
         vec![
-            json!({"v":1,"type":"point_at","x":300,"y":20,"display":0}),
+            json!({"v":1,"type":"point_at","x":300,"y":20,"display":0,"cursor":"click"}),
             json!({"v":1,"type":"sketch","display":0,"shapes":[{"kind":"circle","x":300,"y":20,"r":18},{"kind":"arrow","from":[200,120],"to":[290,30]}]}),
             json!({"v":1,"type":"say","text":"Export is top right."}),
         ]
@@ -1166,6 +1166,11 @@ async fn presentation_needs_the_current_look_frame_and_stays_in_bounds() {
     assert!(ok(json!({"frame_id":frame,"x":1.5,"y":0})).is_err());
     assert!(ok(json!({"frame_id":uuid::Uuid::new_v4(),"x":1,"y":1})).is_err());
     assert!(ok(json!({"frame_id":frame,"x":1,"y":1,"click":true})).is_err());
+    for cursor in CURSOR_STYLES {
+        assert!(ok(json!({"frame_id":frame,"x":1,"y":1,"cursor":cursor})).is_ok());
+    }
+    assert!(ok(json!({"frame_id":frame,"x":1,"y":1,"cursor":"lasso"})).is_err());
+    assert!(ok(json!({"frame_id":frame,"x":1,"y":1,"cursor":3})).is_err());
     let mut sketch = |shapes: Value| {
         run_ok(
             &mut run,

@@ -67,6 +67,10 @@ final class OverlayScene {
         panel.close()
     }
 
+    func setCursor(_ style: CursorStyle) {
+        tip.setStyle(style)
+    }
+
     private func local(_ p: CGPoint) -> CGPoint {
         CGPoint(x: p.x - display.frame.minX, y: p.y - display.frame.minY)
     }
@@ -158,41 +162,54 @@ final class OverlayScene {
 
 /// Astrid's "Arrow click" cursor, anchored at its hotspot.
 final class CursorLayer: CALayer {
+    private(set) var cursorStyle: CursorStyle?
+
     init(scale: CGFloat) {
         super.init()
         let size = AstridArt.cursorSize
-        let unit = size / AstridArt.cursorGrid
         bounds = CGRect(x: 0, y: 0, width: size, height: size)
-        anchorPoint = CGPoint(x: AstridArt.cursorHotspot.x / AstridArt.cursorGrid, y: AstridArt.cursorHotspot.y / AstridArt.cursorGrid)
         contentsScale = scale
         shadowColor = NSColor.black.cgColor
         shadowOpacity = 0.44
         shadowRadius = 2
         shadowOffset = CGSize(width: 0, height: 2)
-        let color = NSColor(hex: AstridArt.cursorColor)
-        var transform = CGAffineTransform(scaleX: unit, y: unit)
-        let arrow = CAShapeLayer()
-        arrow.path = (try? SVGPath.parse(AstridArt.cursorArrow))?.copy(using: &transform)
-        arrow.fillColor = color.withAlphaComponent(AstridArt.cursorFillAlpha).cgColor
-        arrow.strokeColor = color.cgColor
-        arrow.lineWidth = AstridArt.arrowStrokeWidth * unit
-        arrow.lineJoin = .round
-        arrow.lineCap = .round
-        let lines = CAShapeLayer()
-        lines.path = (try? SVGPath.parse(AstridArt.cursorClickLines))?.copy(using: &transform)
-        lines.fillColor = nil
-        lines.strokeColor = color.cgColor
-        lines.lineWidth = AstridArt.clickLineWidth * unit
-        lines.lineCap = .round
-        for layer in [arrow, lines] {
-            layer.frame = bounds
-            layer.contentsScale = scale
-            addSublayer(layer)
-        }
+        setStyle(.default)
     }
 
     override init(layer: Any) { super.init(layer: layer) }
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Redraws the cursor in one of the docs' styles, with its own hotspot on
+    /// the tip position. A no-op when the style is unchanged.
+    func setStyle(_ style: CursorStyle) {
+        guard style != cursorStyle else { return }
+        cursorStyle = style
+        let art = AstridArt.cursor(style)
+        let unit = AstridArt.cursorSize / AstridArt.cursorGrid
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let position = self.position
+        anchorPoint = CGPoint(x: art.hotspot.x / AstridArt.cursorGrid, y: art.hotspot.y / AstridArt.cursorGrid)
+        self.position = position
+        sublayers?.forEach { $0.removeFromSuperlayer() }
+        let ink = NSColor(hex: AstridArt.cursorColor).cgColor
+        let white = NSColor.white.cgColor
+        for part in art.parts {
+            var transform = CGAffineTransform(scaleX: unit * part.scale, y: unit * part.scale)
+            let layer = CAShapeLayer()
+            layer.path = (try? SVGPath.parse(part.path))?.copy(using: &transform)
+            layer.fillColor = part.fill.map { $0 == .ink ? ink : white }
+            layer.strokeColor = part.stroke.map { $0 == .ink ? ink : white }
+            layer.lineWidth = part.lineWidth * unit
+            layer.lineDashPattern = part.dash.isEmpty ? nil : part.dash.map { NSNumber(value: Double($0 * unit)) }
+            layer.lineJoin = .round
+            layer.lineCap = .round
+            layer.frame = bounds
+            layer.contentsScale = contentsScale
+            addSublayer(layer)
+        }
+        CATransaction.commit()
+    }
 }
 
 /// The Astrid mark: two gradient arches and the eyes, no plate.

@@ -33,7 +33,8 @@ The first time Astrid comes on screen, a colour wave (Libraries.dev
 `Sources/AstridPresence/Waves`) rises from the bottom middle of the main display
 to the top, lingers on the screen's edges and goes. `--no-intro` skips it, as
 does Reduce Motion; `ASTRID_WAVE_FRAMES=/tmp/wave .build/debug/astrid-presence`
-renders a few of its frames offscreen to PNGs.
+renders a few of its frames offscreen to PNGs. A `{"v":1,"type":"wave"}` event
+plays it again on demand (an operator session going live), with the same opt-outs.
 
 `--snapshot DIR` writes PNGs of Astrid's own layers (never the screen beneath)
 once a second; it is how the host is checked without Screen Recording access.
@@ -61,6 +62,7 @@ the displays.
 ```jsonl
 {"v":1,"type":"show","x":700,"y":400}
 {"v":1,"type":"point_at","x":300,"y":250}
+{"v":1,"type":"point_at","x":420,"y":180,"cursor":"text"}
 {"v":1,"type":"sketch","shapes":[{"kind":"circle","x":300,"y":250,"r":60}]}
 {"v":1,"type":"say","text":"This is the button you want."}
 {"v":1,"type":"wait","ms":2500}
@@ -70,6 +72,11 @@ the displays.
 {"v":1,"type":"hide"}
 {"v":1,"type":"quit"}
 ```
+
+`cursor` is one of `arrow_click` (default), `arrow`, `click`, `pointer`,
+`press`, `tap`, `text`, `grab`, `select`, `crosshair`, `focus`, `zoom_in`,
+`zoom_out`, `pen` or `not_allowed`: the docs' cursors, saying what to do at the
+point. The bundled demo shows `click` and `text`.
 
 ## Layout
 
