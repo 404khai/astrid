@@ -113,6 +113,38 @@ Astrid) do it, look again, verify, move on. Three things were open:
 - Only buttons the card offered count. Anything else, a cancel or 10 minutes
   without a press counts as Stop.
 
+## Amendment 2026-11-14: Claude, plain asks and voice
+
+The maintainer: "why is it using gpt sol, it should use claude i don't have a
+codex sub rn", then "I don't think I always need to say operator, i should be
+able to talk normally and it will infer what I mean. build both (Claude as
+operator's model, and voice operator)".
+
+- **Model.** Operator now defaults to `claude-code/sonnet` (`claude-code/opus`
+  also allowed; gpt-5.6-sol/terra/luna stay available). This extends ADR 0024's
+  image path to a second destination for **local looks only**
+  (`computer::vision_destination`): the approved frame goes to Anthropic
+  through the Claude Agent SDK on this Mac's Claude Code login (ADR 0032, with
+  its subscription-terms caveat, which the maintainer accepted). The bridge
+  sends it as one base64 PNG image block in a single streaming user message.
+  The frame never enters the replayed prompt or history, the grant is consumed
+  against the live frame immediately before the bridge starts, the local frame
+  is released before the turn runs, and the visual turn has the same 60 s
+  deadline. The approval card names "Claude (sonnet)"; retention follows
+  Anthropic's Claude Code data policy (there is no `store:false` there).
+  InstaBox computer use stays OpenAI-only; `astrid run --look` is unchanged.
+- **Plain asks.** When operator is configured, every presence ask carries a hint:
+  for a screen task the ask model replies only with an ```` ```operator-start ````
+  block `{"goal": ...}`, and the session hands off to operator with that goal.
+  Nothing is captured until the user presses (or says) Look on the start card.
+  `/operator` remains as an explicit shortcut.
+- **Voice.** While a step card waits, the page keeps a copy, voice mode keeps
+  listening, and a final transcript is sent as an `utterance`. The runtime maps
+  it to one of the card's offered buttons (`choice_from_speech`): stop words win
+  ("don't do it" stops), unclear speech presses nothing and Astrid says what to
+  say. Spoken asks get spoken cards. A spoken "do it" counts as the same press
+  as clicking it: it approves exactly that card's action and the following look.
+
 ## Alternatives considered
 
 - **(b) A time-boxed "watching" grant.** Fewer presses, but it is a standing

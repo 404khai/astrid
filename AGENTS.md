@@ -104,7 +104,10 @@ decisions" with a "Step 3 of 4 ... [Do it] [Show me]" card. [ADR 0038](docs/adr/
 with the step's cursor, "Do it" performs one bounded, freshness-checked action on this Mac (click, short
 type, plain key, scroll) after the press that names it; operator uses gpt-5.6-sol (ADR 0024 path, no
 provider change); the wave plays when the first look is granted. No live capture, model call or input trial
-without exact trial approval. PR, no merge.
+without exact trial approval. PR, no merge. Same day (2026-11-14) the maintainer asked for Claude instead
+("i don't have a codex sub rn") and to "talk normally and it will infer": ADR 0038 amendment, operator defaults
+to `claude-code/sonnet` (local-look image path via the Claude Agent SDK), plain asks hand screen tasks to operator
+via an `operator-start` block, and voice answers step cards ("do it", "show me", "done", "stop").
 
 # Visual upload/response deadline amendment — 2026-10-23
 
