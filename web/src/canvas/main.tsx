@@ -19,6 +19,7 @@ type Incoming =
   | { type: "canvas"; event: "begin"; width: number; height: number }
   | { type: "canvas"; event: "shape"; shape: Shape }
   | { type: "canvas"; event: "end" | "cancel" }
+  | { type: "canvas"; event: "replay"; shapes: Shape[] }
   | { type: "state"; state: string }
   | { type: "listening"; on: boolean }
   | { type: "done" };
@@ -43,6 +44,11 @@ const native = () =>
     ?.astrid;
 let listener: (m: Incoming) => void = () => {};
 (window as { astrid?: unknown }).astrid = { receive: (m: Incoming) => listener(m) };
+
+/** The desktop app's thread embeds this page per diagram (ADR 0037): no close
+ * button or window drag, and a saved drawing can be replayed at once. */
+const embed = new URLSearchParams(location.search).has("embed");
+if (embed) document.documentElement.classList.add("cv-embedded");
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -200,6 +206,23 @@ function App() {
           ended.current = true;
           setDrawing(null);
           break;
+        case "replay": {
+          // A saved drawing: everything at once, framed, with no cursor tour.
+          window.clearTimeout(timer.current);
+          timer.current = undefined;
+          queue.current = [];
+          ended.current = true;
+          touched.current = false;
+          const titled = m.shapes.find((s) => s.shape === "title");
+          setTitle(titled?.text ?? null);
+          setDrawn(m.shapes.filter((s) => s.shape !== "title" && s.shape !== "point"));
+          setSay(null);
+          setDrawing(null);
+          setCam(defaultCamera);
+          setView(home);
+          requestAnimationFrame(() => requestAnimationFrame(() => fit(false)));
+          break;
+        }
       }
     };
     native()?.postMessage({ type: "ready" });
@@ -251,6 +274,8 @@ function App() {
     addEventListener("pointerup", up);
   };
   const onWheel = (e: React.WheelEvent) => {
+    // Embedded in a scrolling thread, plain scrolling belongs to the thread.
+    if (embed && !e.ctrlKey) return;
     touched.current = true;
     if (e.ctrlKey) {
       // Pinch: zoom around the pointer.
@@ -275,7 +300,7 @@ function App() {
   const [hx, hy] = astridCursor.hot;
   const flip = cursor[0] > size.w - 300;
   return (
-    <main className={`cv-card${moving ? " cv-moving" : ""}`}>
+    <main className={`cv-card${moving ? " cv-moving" : ""}${embed && !drawing ? " cv-at-rest" : ""}`}>
       <style>{ISO_CSS}</style>
       <div className="cv-stage" ref={stage} onPointerDown={onPointerDown} onWheel={onWheel} onDoubleClick={reset}>
         <svg viewBox={`0 0 ${W} ${H}`} className="cv-svg" role="img" aria-label={title ?? "Astrid's drawing"}>
@@ -314,15 +339,17 @@ function App() {
       </div>
       <header className="cv-float">
         {title && (
-          <h1 className="cv-title" onPointerDown={() => native()?.postMessage({ type: "drag-start" })}>
+          <h1 className="cv-title" onPointerDown={() => !embed && native()?.postMessage({ type: "drag-start" })}>
             {title}
           </h1>
         )}
-        <button type="button" className="cv-close" aria-label="Close canvas" onClick={() => native()?.postMessage({ type: "canvas-close" })}>
-          <svg viewBox="0 0 16 16" width="14" height="14">
-            <path d="m4 4 8 8m0-8-8 8" />
-          </svg>
-        </button>
+        {!embed && (
+          <button type="button" className="cv-close" aria-label="Close canvas" onClick={() => native()?.postMessage({ type: "canvas-close" })}>
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path d="m4 4 8 8m0-8-8 8" />
+            </svg>
+          </button>
+        )}
       </header>
     </main>
   );

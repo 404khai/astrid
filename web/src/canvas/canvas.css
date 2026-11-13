@@ -310,3 +310,19 @@ body {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+/* Embedded in the desktop app's thread (ADR 0037): the card fills the view,
+   no window shadow, and the cursor rests out of the way once drawn. */
+.cv-embedded #root {
+  padding: 0;
+}
+.cv-embedded .cv-card {
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px #2a2a2c;
+  animation: none;
+}
+.cv-embedded .cv-title {
+  cursor: default;
+}
+.cv-at-rest .cv-cursor {
+  opacity: 0;
+}
