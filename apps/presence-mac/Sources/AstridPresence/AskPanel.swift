@@ -244,6 +244,11 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     /// Debug: with ASTRID_ASK_SNAPSHOT=/path.png, save the panel's own web
     /// content (never the screen) once the page has loaded.
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // Debug: ASTRID_SAY="text" speaks once the page is up, to check playback.
+        if let text = ProcessInfo.processInfo.environment["ASTRID_SAY"] {
+            speaker.prepare()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in self?.speaker.say(text) }
+        }
         guard let path = ProcessInfo.processInfo.environment["ASTRID_ASK_SNAPSHOT"] else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             webView.takeSnapshot(with: nil) { image, _ in

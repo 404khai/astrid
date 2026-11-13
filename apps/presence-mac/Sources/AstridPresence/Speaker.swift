@@ -42,7 +42,7 @@ final class Speaker {
 
     func say(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else { return onSpeaking(false) }
         stop()
         current += 1
         finishedInput = false
@@ -50,8 +50,11 @@ final class Speaker {
         do {
             if !engine.isRunning { try engine.start() }
         } catch {
-            return
+            Speaker.note("playback engine failed to start: \(error.localizedDescription)")
+            finishedInput = true
+            return onSpeaking(false)
         }
+        Speaker.note("say #\(current), \(text.count) chars")
         player.play()
         onSpeaking(true)
         if let input = sidecar() {
@@ -74,6 +77,7 @@ final class Speaker {
     /// Barge-in: silence now and drop anything still arriving.
     func stop() {
         guard !finishedInput || pending > 0 else { return }
+        Speaker.note("stop #\(current) with \(pending) buffers queued")
         if let input = childInput, let data = try? JSONSerialization.data(withJSONObject: ["type": "stop"]) {
             try? input.write(contentsOf: data + Data("\n".utf8))
         }
@@ -93,7 +97,13 @@ final class Speaker {
 
     private func play(_ samples: [Float], id: Int) {
         guard id == current, !samples.isEmpty,
-              let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else { return }
+              let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(samples.count)) else {
+            return Speaker.note("dropped audio for #\(id) (current #\(current), \(samples.count) samples)")
+        }
+        // The output device can change under a running engine (headphones, the
+        // mic engine starting); restart it rather than scheduling into silence.
+        if !engine.isRunning { try? engine.start() }
+        if !player.isPlaying { player.play() }
         pcm.frameLength = pcm.frameCapacity
         samples.withUnsafeBufferPointer { pcm.floatChannelData![0].update(from: $0.baseAddress!, count: samples.count) }
         metrics.firstAudio()
@@ -109,6 +119,7 @@ final class Speaker {
 
     private func inputDone(id: Int) {
         guard id == current else { return }
+        Speaker.note("synthesis done #\(id), \(pending) buffers queued")
         finishedInput = true
         metrics.synthesized()
         if pending == 0 { finish() }
@@ -166,12 +177,14 @@ final class Speaker {
         let input = Pipe(), output = Pipe()
         process.standardInput = input
         process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
+        // The process's own diagnostics (model loading, warnings), never reply text.
+        process.standardError = Speaker.diagnostics() ?? FileHandle.nullDevice
         output.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let chunk = handle.availableData
             DispatchQueue.main.async { self?.receive(chunk) }
         }
-        process.terminationHandler = { [weak self] _ in
+        process.terminationHandler = { [weak self] process in
+            Speaker.note("astrid-voice exited with status \(process.terminationStatus)")
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.child = nil
@@ -187,6 +200,22 @@ final class Speaker {
         child = process
         childInput = input.fileHandleForWriting
         return childInput
+    }
+
+    private static let logURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/Astrid/astrid-voice.log")
+
+    private static func diagnostics() -> FileHandle? {
+        try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Append-only, so the process's output and the host's notes interleave.
+        let fd = open(logURL.path, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0o644)
+        return fd < 0 ? nil : FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+    }
+
+    static func note(_ text: String) {
+        guard let handle = try? FileHandle(forWritingTo: logURL) else { return }
+        defer { try? handle.close() }
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: Data("[presence] \(text)\n".utf8))
     }
 
     private func receive(_ chunk: Data) {

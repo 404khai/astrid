@@ -7,7 +7,7 @@ import { Liquid } from "liquid-gooey";
 import { ThinkingOrb } from "thinking-orbs";
 import type { OrbState } from "thinking-orbs";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowUp02Icon, Mail01Icon, Mic01Icon, StopIcon, VolumeHighIcon } from "@hugeicons/core-free-icons";
+import { ArrowUp02Icon, AudioWave01Icon, Mail01Icon, StopIcon, VolumeHighIcon } from "@hugeicons/core-free-icons";
 import { VoiceRing, useMicrophone } from "voice-ring";
 import { AstridLogo, type EyeExpression } from "../components/AstridLogo";
 import { listen, native, send, type Brief, type Incoming } from "./bridge";
@@ -22,6 +22,14 @@ const looks: Record<string, { orb: OrbState; eyes: EyeExpression }> = {
   listening: { orb: "listening", eyes: "listening" },
   idle: { orb: "breathing", eyes: "idle" },
 };
+
+/** Asks the host to read text aloud, showing Astrid as speaking straight
+ * away so voice mode doesn't reopen the mic before her voice starts. */
+let speakingHint: (on: boolean) => void = () => {};
+function speak(text: string) {
+  speakingHint(true);
+  send({ type: "speak", text });
+}
 
 type Approval = { id: number; title: string; detail: Record<string, unknown> };
 type Answer = { ask: string; text: string; brief: Brief | null };
@@ -90,6 +98,10 @@ function App() {
   const drag = useDrag();
   const reduced = useReducedMotion();
   const [open, setOpen] = useState(false);
+  // Voice mode: a hands-free conversation on the ring, no input box.
+  const [mode, setMode] = useState<"text" | "voice">("text");
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   const [text, setText] = useState("");
   const [asking, setAsking] = useState<string | null>(null);
   const [state, setState] = useState({ state: "idle", label: "Ready" });
@@ -106,6 +118,11 @@ function App() {
   const dictated = useRef(false);
   const askedByVoice = useRef(false);
   const voice = useVoice((heard, final) => {
+    if (modeRef.current === "voice") {
+      // Hands-free: what you said is sent as soon as you finish.
+      if (final && heard.trim()) submitRef.current(heard);
+      return;
+    }
     setText(heard);
     if (final) {
       dictated.current = heard.trim().length > 0;
@@ -127,7 +144,7 @@ function App() {
         case "answer": {
           const next = { ask: askRef.current ?? "", text: m.text, brief: m.brief };
           setAnswer(next);
-          if (askedByVoice.current) send({ type: "speak", text: spoken(next) });
+          if (askedByVoice.current) speak(spoken(next));
           break;
         }
         case "speaking":
@@ -136,8 +153,19 @@ function App() {
           break;
         case "error":
           setError(m.message);
+          if (modeRef.current === "voice") speak(m.message);
           break;
         case "hotkey":
+          if (modeRef.current === "voice") {
+            // In voice mode ⌥Space interrupts Astrid, or sends what you've said.
+            if (!m.down) break;
+            if (speakingRef.current) {
+              send({ type: "speak-stop" });
+              voiceRef.current.start();
+            } else if (voiceRef.current.listening) voiceRef.current.stop();
+            else voiceRef.current.start();
+            break;
+          }
           // Hold-to-talk from anywhere: open the panel and listen until release.
           if (m.down) {
             setOpen(true);
@@ -178,6 +206,35 @@ function App() {
     return () => observer.disconnect();
   }, []);
 
+  speakingHint = setSpeaking;
+  const speakingRef = useRef(speaking);
+  speakingRef.current = speaking;
+
+  // Voice mode turn-taking: send after a pause in what you're saying, and
+  // listen again once Astrid has finished answering.
+  useEffect(() => {
+    if (mode !== "voice" || !voice.listening || !voice.heard?.trim()) return;
+    const pause = setTimeout(() => voice.stop(), 1300);
+    return () => clearTimeout(pause);
+  }, [mode, voice.listening, voice.heard]);
+  const busyNow = asking !== null;
+  useEffect(() => {
+    if (mode !== "voice" || busyNow || speaking || voice.listening || approval || voice.error) return;
+    const resume = setTimeout(() => voiceRef.current.start(), 350);
+    return () => clearTimeout(resume);
+  }, [mode, busyNow, speaking, voice.listening, approval, voice.error]);
+
+  const enterVoice = () => {
+    setMode("voice");
+    setText("");
+    voice.start();
+  };
+  const leaveVoice = () => {
+    setMode("text");
+    if (voice.listening) voice.cancel();
+    if (speaking) send({ type: "speak-stop" });
+  };
+
   useEffect(() => {
     send({ type: "expanded", expanded: open });
     if (open) setTimeout(() => input.current?.focus(), 60);
@@ -186,20 +243,21 @@ function App() {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (voice.listening) voice.cancel();
+      if (mode === "voice" && !asking) leaveVoice();
+      else if (voice.listening) voice.cancel();
       else if (speaking) send({ type: "speak-stop" });
       else if (asking) send({ type: "cancel" });
       else setOpen(false);
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
-  }, [asking, voice.listening, speaking]);
+  }, [asking, voice.listening, speaking, mode]);
 
   const submit = (said?: string) => {
     const ask = (said ?? text).trim();
     if (!ask || asking) return;
     askRef.current = ask;
-    askedByVoice.current = said !== undefined || dictated.current;
+    askedByVoice.current = modeRef.current === "voice" || said !== undefined || dictated.current;
     dictated.current = false;
     if (speaking) send({ type: "speak-stop" });
     setAsking(ask);
@@ -209,6 +267,8 @@ function App() {
     setState({ state: "working", label: "Thinking" });
     send({ type: "ask", text: ask });
   };
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
 
   const decide = (approve: boolean) => {
     if (!approval) return;
@@ -234,6 +294,51 @@ function App() {
         >
           <AstridLogo animated tracking />
         </button>
+      </div>
+    );
+  }
+
+  if (mode === "voice") {
+    const ring = voice.listening ? "listening" : speaking ? "speaking" : busy ? "processing" : "idle";
+    const caption = voice.listening
+      ? voice.heard?.trim() || "Listening…"
+      : speaking
+        ? "Speaking · ⌥Space to interrupt"
+        : busy
+          ? label
+          : voice.error ?? "";
+    return (
+      <div className="pr-root pr-voice" ref={root}>
+        {(approval || answer || error) && (
+          <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
+            <Liquid.Item transition="smooth">
+              <div className="pr-card" aria-live="polite">
+                {approval && <ApprovalCard approval={approval} onDecide={decide} />}
+                {error && !busy && !approval && <p className="pr-error">{error}</p>}
+                {answer && !busy && !approval && (
+                  <AnswerView
+                    answer={answer}
+                    speaking={speaking}
+                    onSpeak={() => (speaking ? send({ type: "speak-stop" }) : speak(spoken(answer)))}
+                  />
+                )}
+              </div>
+            </Liquid.Item>
+          </Liquid>
+        )}
+        <div className="pr-voice-stage" onPointerDown={drag.onPointerDown}>
+          <VoiceHalo
+            state={ring}
+            stream={ring === "listening" ? voice.stream : null}
+            analyser={ring === "speaking" ? speakerAnalyser.current : voice.analyser.current}
+            reduced={reduced}
+            eyes={ring === "processing" ? look.eyes : undefined}
+            onMark={drag.click(leaveVoice)}
+          />
+          <p className="pr-voice-caption" aria-live="polite">
+            {caption}
+          </p>
+        </div>
       </div>
     );
   }
@@ -270,7 +375,7 @@ function App() {
                 <AnswerView
                   answer={answer}
                   speaking={speaking}
-                  onSpeak={() => send(speaking ? { type: "speak-stop" } : { type: "speak", text: spoken(answer) })}
+                  onSpeak={() => (speaking ? send({ type: "speak-stop" }) : speak(spoken(answer)))}
                 />
               )}
             </div>
@@ -309,12 +414,11 @@ function App() {
                 <button
                   type="button"
                   className={`pr-mic${voice.listening ? " pr-mic-on" : ""}`}
-                  aria-label={voice.listening ? "Stop listening and send" : "Hold to talk (or hold ⌥Space anywhere)"}
-                  title="Hold to talk · ⌥Space"
-                  aria-pressed={voice.listening}
-                  {...voice.handlers}
+                  aria-label="Talk with Astrid (voice mode)"
+                  title="Voice mode · hold ⌥Space for a quick question"
+                  onClick={enterVoice}
                 >
-                  <HugeiconsIcon icon={Mic01Icon} size={18} strokeWidth={2} />
+                  <HugeiconsIcon icon={AudioWave01Icon} size={18} strokeWidth={2} />
                 </button>
               )}
             </form>
@@ -470,14 +574,19 @@ function VoiceHalo({
   stream,
   analyser,
   reduced,
+  eyes,
+  onMark,
 }: {
-  state: "listening" | "speaking";
+  state: "listening" | "speaking" | "processing" | "idle";
   stream: MediaStream | null;
   analyser: HostAnalyser;
   reduced: boolean;
+  eyes?: EyeExpression;
+  onMark?: () => void;
 }) {
+  const expression = eyes ?? (state === "speaking" ? "composing" : state === "idle" ? "idle" : "listening");
   return (
-    <div className="pr-listen-ring" aria-hidden>
+    <div className="pr-listen-ring" aria-hidden={!onMark}>
       <VoiceRing
         size={200}
         theme="dark"
@@ -486,9 +595,15 @@ function VoiceHalo({
         analyser={stream ? undefined : (analyser as unknown as AnalyserNode)}
         paused={reduced}
       />
-      <span className="pr-listen-mark">
-        <AstridLogo expression={state === "listening" ? "listening" : "composing"} />
-      </span>
+      {onMark ? (
+        <button type="button" className="pr-listen-mark pr-listen-exit" aria-label="Leave voice mode" title="Back to typing" onClick={onMark}>
+          <AstridLogo expression={expression} />
+        </button>
+      ) : (
+        <span className="pr-listen-mark">
+          <AstridLogo expression={expression} />
+        </span>
+      )}
     </div>
   );
 }

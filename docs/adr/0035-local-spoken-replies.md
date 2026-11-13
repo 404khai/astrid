@@ -42,6 +42,17 @@ development Mac is an Apple M3 with 16 GB of RAM.
    text or audio. Speech happens after the runtime's run has ended, so it is a
    host log, not a run trace span.
 
+7. Voice mode (maintainer, 2026-11-13: "it should just stay on that voice ring
+   mode and talk back"): the waveform button in the input starts a hands-free
+   conversation. Only the ring is shown, no input box. It listens, sends after
+   ~1.3 s without new words, shows thinking, speaks the answer, then listens
+   again. ⌥Space interrupts Astrid or sends early. Clicking the mark in the
+   ring, or Esc, returns to typing. Approvals still need a click. Holding
+   ⌥Space stays push-to-talk in text mode.
+8. Diagnostics: the voice process's stderr and host playback notes (reply ids,
+   character counts, buffer counts, never text) go to
+   `~/Library/Logs/Astrid/astrid-voice.log`, which is truncated at each start.
+
 ## Alternatives
 
 - macOS voice only: no dependencies, but noticeably robotic. It is kept as the
