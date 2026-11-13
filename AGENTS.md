@@ -98,9 +98,13 @@ should be able to have screen context of what's on my screen, and use the differ
 docs to do stuff. if it is working, the distortion wave should be visible". Branch `feat/operator` from main
 `5e661fa7`, same checkout. First, independent of the open decisions: additive presence protocol fields
 (`point_at.cursor` from a fixed set of the docs' cursor styles; a `wave` event), recorded as an ADR 0026
-amendment. **Pending maintainer answers before dependent code:** D2 look grants for re-looks (ADR 0027 caps
-two looks per run), guide versus act ("to do stuff"), and which vision model path operator uses (ADR 0024
-allows only gpt-5.6). No live capture or model trial without exact trial approval. PR, no merge.
+amendment. Asked about D2, guide versus act and the model, the maintainer answered "make the calls, the
+decisions" with a "Step 3 of 4 ... [Do it] [Show me]" card. [ADR 0038](docs/adr/0038-operator-walkthroughs.md)
+(agent's calls on that instruction): D2 (a) one look per card press, at most 12 per session; "Show me" points
+with the step's cursor, "Do it" performs one bounded, freshness-checked action on this Mac (click, short
+type, plain key, scroll) after the press that names it; operator uses gpt-5.6-sol (ADR 0024 path, no
+provider change); the wave plays when the first look is granted. No live capture, model call or input trial
+without exact trial approval. PR, no merge.
 
 # Visual upload/response deadline amendment — 2026-10-23
 

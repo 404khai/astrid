@@ -52,6 +52,27 @@ bundle's usage strings, so test it from the bundle:
   && open "apps/presence-mac/.build/Astrid Presence.app" --args --ask
 ```
 
+## Operator (ADR 0038)
+
+Type `/operator <goal>` in the ask input, e.g. `/operator export this page as a
+PDF`. Astrid asks once to look (the **Look** card names the display and the
+model, `gpt-5.6-sol` by default, `--operator-model` to change it), the wave
+plays, and each step arrives as a card beside its target: **Show me** points
+with the step's cursor (click, text, grab, ...) and waits for **Done**; **Do it**
+performs only the action the card names, then looks again. Every look is one
+press; a step is never skipped until a new look verifies it.
+
+"Do it" posts real input, so the bundle needs Accessibility access (System
+Settings → Privacy & Security → Accessibility). With `--capture-source
+synthetic` no input is ever posted. `ASTRID_STEP_CARD=/tmp/card.png
+.build/debug/astrid-presence` renders a sample card offscreen.
+
+```sh
+(cd web && npx vite build -c vite.presence.config.ts) && cargo build \
+  && apps/presence-mac/scripts/bundle.sh \
+  && open "apps/presence-mac/.build/Astrid Presence.app" --args --ask
+```
+
 ## Protocol v1 in one screen
 
 One JSON object per line, `#` lines are comments in scripts. Coordinates are
