@@ -45,6 +45,11 @@ final class PresenceController: NSObject, NSApplicationDelegate {
 
     private let askConfig: AskConfig?
     private var ask: AskController?
+    /// ADR 0038: in --ask mode the overlay exists only while operator runs.
+    private var operatorOverlay = false
+    private let stepCard = StepCard()
+    /// The latest look's fingerprint, for "Do it" freshness. Memory only.
+    private var lastLook: (id: String, display: Int, at: Date, fingerprint: Fingerprint)?
     /// The intro wave plays once, the first time Astrid comes on screen.
     private let intro: Bool
     private var introPlayed = false
@@ -92,6 +97,10 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         installStatusItem()
         if let askConfig {
             ask = AskController(config: askConfig)
+            ask?.host = self
+            stepCard.onChoice = { [weak self] id, choice in
+                self?.ask?.send(["type": "choice", "id": id, "choice": choice])
+            }
             // In --ask mode the mark is on screen from launch.
             playIntro()
         }
@@ -240,29 +249,36 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     /// One frame for the runtime, answered on stdout. The overlay keeps
     /// drawing; ScreenCaptureKit excludes this process's windows.
     private func capture(requestId: String, display index: Int) {
-        let screens = NSScreen.screens
-        guard layout.displays.indices.contains(index), screens.indices.contains(index) else {
-            Output.emit(["type": "capture_failed", "request_id": requestId, "reason": "display_unavailable"])
-            return
-        }
-        let display = layout.displays[index], screen = screens[index], source = captureSource
         capturesInFlight += 1
-        Task { @MainActor in
-            let result = await FrameCapture.capture(display: display, screen: screen, source: source)
-            let reply: [String: Any]
-            switch result {
-            case let .success(frame):
-                reply = ["type": "frame", "request_id": requestId, "display": index,
-                         "width": frame.width, "height": frame.height,
-                         "png_base64": frame.png.base64EncodedString()]
-            case let .failure(failure):
-                reply = ["type": "capture_failed", "request_id": requestId, "reason": failure.reason]
-            }
+        captureFrame(requestId: requestId, display: index) { reply in
             // A frame line can be over a megabyte; never block drawing on the
             // reader draining the pipe.
             Output.queue.async {
                 Output.emit(reply)
                 DispatchQueue.main.async { self.capturesInFlight -= 1 }
+            }
+        }
+    }
+
+    /// Captures one display and hands back the `frame` or `capture_failed`
+    /// reply, on the main thread.
+    private func captureFrame(requestId: String, display index: Int, reply: @escaping ([String: Any]) -> Void) {
+        let screens = NSScreen.screens
+        guard layout.displays.indices.contains(index), screens.indices.contains(index) else {
+            reply(["type": "capture_failed", "request_id": requestId, "reason": "display_unavailable"])
+            return
+        }
+        let display = layout.displays[index], screen = screens[index], source = captureSource
+        Task { @MainActor in
+            let result = await FrameCapture.capture(display: display, screen: screen, source: source)
+            switch result {
+            case let .success(frame):
+                self.lastLook = (requestId, index, Date(), frame.fingerprint)
+                reply(["type": "frame", "request_id": requestId, "display": index,
+                       "width": frame.width, "height": frame.height,
+                       "png_base64": frame.png.base64EncodedString()])
+            case let .failure(failure):
+                reply(["type": "capture_failed", "request_id": requestId, "reason": failure.reason])
             }
         }
     }
@@ -274,7 +290,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         let screens = NSScreen.screens
         layout = DisplayLayout.fromCocoa(frames: screens.map(\.frame), scales: screens.map { Double($0.backingScaleFactor) })
         // The ask surface is Astrid's only window in --ask mode: no full-screen overlay.
-        scenes = askConfig != nil ? [] : zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
+        scenes = askConfig != nil && !operatorOverlay ? [] : zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
         for scene in scenes { scene.addInk(ink, reduceMotion: true, now: CACurrentMediaTime()) }
     }
 
@@ -530,5 +546,83 @@ enum StdinReader {
         }
         thread.name = "astrid-presence-stdin"
         thread.start()
+    }
+}
+
+// MARK: - Operator (ADR 0038)
+
+extension PresenceController: OperatorHost {
+    func operatorPresent(_ fields: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: fields),
+              let line = String(data: data, encoding: .utf8) else { return }
+        do {
+            let event = try PresenceProtocol.parse(line: line)
+            // Only presentation reaches the overlay from the ask child.
+            switch event {
+            case .pointAt, .sketch, .clearInk, .say, .wave: break
+            default: throw PresenceProtocolError("operator may only present")
+            }
+            if !operatorOverlay {
+                operatorOverlay = true
+                rebuildScenes()
+                player.enqueue(.show(at: nil))
+            }
+            player.enqueue(event)
+        } catch let error as PresenceProtocolError {
+            Output.error("operator: \(error.message)", line: nil)
+        } catch {}
+    }
+
+    func operatorCapture(requestId: String, display: Int, reply: @escaping ([String: Any]) -> Void) {
+        guard PresenceProtocol.isRequestId(requestId) else { return }
+        captureFrame(requestId: requestId, display: display, reply: reply)
+    }
+
+    func operatorStep(_ fields: [String: Any]) {
+        stepCard.show(fields, layout: layout)
+    }
+
+    func operatorStepClear(id: Int?) {
+        stepCard.hide(id: id)
+    }
+
+    /// "Do it": refuses unless the screen around the target still matches the
+    /// look the step was planned on, then posts exactly one action.
+    func operatorAct(_ fields: [String: Any], reply: @escaping (String) -> Void) {
+        guard let frame = fields["frame"] as? String, let index = (fields["display"] as? NSNumber)?.intValue,
+              let x = (fields["x"] as? NSNumber)?.doubleValue, let y = (fields["y"] as? NSNumber)?.doubleValue,
+              let raw = fields["action"] as? [String: Any], let action = try? OperatorAction.parse(raw),
+              layout.displays.indices.contains(index) else { return reply("invalid_action") }
+        let display = layout.displays[index]
+        let target = CGPoint(x: x, y: y)
+        guard target.x >= 0, target.y >= 0, target.x < display.frame.width, target.y < display.frame.height else {
+            return reply("invalid_action")
+        }
+        guard let look = lastLook, look.id == frame, look.display == index, Date().timeIntervalSince(look.at) < 120 else {
+            return reply("stale")
+        }
+        // Synthetic frames are not the real screen: never post input against them.
+        guard captureSource == .screen else { return reply("synthetic_capture_no_input") }
+        guard Injector.trusted() else { return reply("accessibility_permission_required") }
+        let check = "act-\(UUID().uuidString.prefix(8))"
+        captureFrame(requestId: check, display: index) { [weak self] result in
+            guard let self else { return }
+            guard result["type"] as? String == "frame", let fresh = self.lastLook, fresh.id == check,
+                  look.fingerprint.matches(fresh.fingerprint, around: target) else {
+                return reply("stale")
+            }
+            // The planning look stays the reference for this step.
+            self.lastLook = look
+            let global = CGPoint(x: display.frame.minX + target.x, y: display.frame.minY + target.y)
+            Injector.perform(action, at: global)
+            reply("done")
+        }
+    }
+
+    func operatorEnded() {
+        guard operatorOverlay else { return }
+        stepCard.hide()
+        player.enqueue(contentsOf: [.clearInk, .hide])
+        lastLook = nil
     }
 }

@@ -24,6 +24,8 @@ enum FrameCapture {
         var png: Data
         var width: Int
         var height: Int
+        /// ADR 0038: a coarse in-memory copy for "Do it" freshness checks only.
+        var fingerprint: Fingerprint
     }
 
     static func capture(display: DisplayInfo, screen: NSScreen, source: CaptureSource) async -> Result<Frame, CaptureFailure> {
@@ -40,9 +42,9 @@ enum FrameCapture {
             case let .failure(failure): return .failure(failure)
             }
         }
-        guard let png = encode(image, width: width, height: height) else { return .failure(CaptureFailure(reason: "encode_failed")) }
+        guard let (png, fingerprint) = encode(image, width: width, height: height) else { return .failure(CaptureFailure(reason: "encode_failed")) }
         if let problem = FrameLimits.check(width: width, height: height, bytes: png.count) { return .failure(CaptureFailure(reason: problem)) }
-        return .success(Frame(png: png, width: width, height: height))
+        return .success(Frame(png: png, width: width, height: height, fingerprint: fingerprint))
     }
 
     private static func screenImage(screen: NSScreen, width: Int, height: Int) async -> Result<CGImage, CaptureFailure> {
@@ -75,18 +77,22 @@ enum FrameCapture {
 
     /// Redraws into an exact-size 8-bit RGBA sRGB bitmap so the runtime's strict
     /// PNG validation (8-bit RGB/RGBA, non-interlaced) always applies.
-    static func encode(_ image: CGImage, width: Int, height: Int) -> Data? {
+    static func encode(_ image: CGImage, width: Int, height: Int) -> (Data, Fingerprint)? {
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
                 data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                 space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         context.interpolationQuality = .high
         context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        guard let flattened = context.makeImage() else { return nil }
+        guard let flattened = context.makeImage(), let pixels = context.data else { return nil }
+        let bytes = [UInt8](UnsafeBufferPointer(start: pixels.assumingMemoryBound(to: UInt8.self), count: context.bytesPerRow * height))
+        // A bitmap context's first row in memory is the image's top row, so
+        // cells line up with display points (y down).
+        let fingerprint = Fingerprint(rgba: bytes, width: width, height: height, bytesPerRow: context.bytesPerRow)
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
         CGImageDestinationAddImage(destination, flattened, nil)
-        return CGImageDestinationFinalize(destination) ? data as Data : nil
+        return CGImageDestinationFinalize(destination) ? (data as Data, fingerprint) : nil
     }
 }
 

@@ -19,10 +19,25 @@ struct AskConfig {
     /// The `astrid-voice` executable (ADR 0035); nil uses macOS's built-in voice.
     var voiceCommand: URL?
     var voiceName = "af_heart"
+    /// ADR 0038: the `/operator` image model (nil: the runtime's default).
+    var operatorModel: String?
+}
+
+/// What the operator (ADR 0038) needs from the presence app.
+protocol OperatorHost: AnyObject {
+    func operatorPresent(_ fields: [String: Any])
+    func operatorCapture(requestId: String, display: Int, reply: @escaping ([String: Any]) -> Void)
+    func operatorAct(_ fields: [String: Any], reply: @escaping (String) -> Void)
+    func operatorStep(_ fields: [String: Any])
+    func operatorStepClear(id: Int?)
+    func operatorEnded()
 }
 
 final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     private let config: AskConfig
+    weak var host: OperatorHost?
+    /// Writes to the runtime child, off the main thread (frames are large).
+    private let childWrites = DispatchQueue(label: "dev.astrid.presence.ask-writes")
     private let panel: AskPanel
     private let web: WKWebView
     private var child: Process?
@@ -201,10 +216,18 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         try? input.write(contentsOf: data + Data("\n".utf8))
     }
 
+    /// Replies to the running child only; never starts one.
+    func send(_ message: [String: Any]) {
+        guard child?.isRunning == true, let input = childInput,
+              let data = try? JSONSerialization.data(withJSONObject: message) else { return }
+        childWrites.async { try? input.write(contentsOf: data + Data("\n".utf8)) }
+    }
+
     private func startChild() {
         let process = Process()
         process.executableURL = config.astrid
         var arguments = ["presence-ask", "--model", config.model]
+        if let operatorModel = config.operatorModel { arguments += ["--operator-model", operatorModel] }
         if let mail = config.mail { arguments += ["--mail-source", mail] }
         process.arguments = arguments
         let input = Pipe(), output = Pipe()
@@ -247,6 +270,33 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     /// Canvas events go to the canvas; answers go to both once it has drawn.
     private func route(_ object: [String: Any]) {
         let type = object["type"] as? String
+        // ADR 0038: operator traffic goes to the presence app, not the page.
+        switch type {
+        case "present":
+            if let event = object["event"] as? [String: Any] { host?.operatorPresent(event) }
+            return
+        case "capture":
+            if let id = object["request_id"] as? String, let display = (object["display"] as? NSNumber)?.intValue {
+                host?.operatorCapture(requestId: id, display: display) { [weak self] reply in self?.send(reply) }
+            }
+            return
+        case "act":
+            let id = object["request_id"] as? String ?? ""
+            host?.operatorAct(object) { [weak self] outcome in
+                self?.send(["type": "acted", "request_id": id, "outcome": outcome])
+            }
+            return
+        case "step":
+            host?.operatorStep(object)
+            return
+        case "step_clear":
+            host?.operatorStepClear(id: (object["id"] as? NSNumber)?.intValue)
+            return
+        case "done":
+            host?.operatorEnded()
+        default:
+            break
+        }
         if type == "canvas" {
             canvas.deliver(object, near: anchor)
             return

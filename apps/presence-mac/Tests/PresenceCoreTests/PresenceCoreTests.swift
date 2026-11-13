@@ -540,3 +540,71 @@ final class CursorStyleTests: XCTestCase {
         XCTAssertThrowsError(try SVGPath.parse("M0 0a1 1 0 0 1 10"))
     }
 }
+
+final class OperatorTests: XCTestCase {
+    func testActionsAreBoundedLikeTheRuntime() throws {
+        XCTAssertEqual(try OperatorAction.parse(["kind": "click"]), .click)
+        XCTAssertEqual(try OperatorAction.parse(["kind": "type", "text": "Q3 report"]), .type("Q3 report"))
+        XCTAssertEqual(try OperatorAction.parse(["kind": "key", "key": "enter"]), .key("enter"))
+        XCTAssertEqual(try OperatorAction.parse(["kind": "scroll", "direction": "down", "notches": 3]), .scroll(down: true, notches: 3))
+        for bad: [String: Any] in [
+            ["kind": "drag"],
+            ["kind": "type", "text": ""],
+            ["kind": "type", "text": "a\nb"],
+            ["kind": "type", "text": String(repeating: "x", count: 201)],
+            ["kind": "key", "key": "cmd+q"],
+            ["kind": "scroll", "direction": "left", "notches": 1],
+            ["kind": "scroll", "direction": "up", "notches": 11],
+        ] {
+            XCTAssertThrowsError(try OperatorAction.parse(bad), "\(bad)")
+        }
+        // Same key set as the runtime's operator::KEYS.
+        XCTAssertEqual(Set(OperatorAction.keyCodes.keys), ["enter", "tab", "escape", "space", "up", "down", "left", "right"])
+    }
+
+    private func rgba(width: Int, height: Int, square: CGRect? = nil) -> [UInt8] {
+        var bytes = [UInt8](repeating: 40, count: width * height * 4)
+        if let square {
+            for y in Int(square.minY)..<Int(square.maxY) {
+                for x in Int(square.minX)..<Int(square.maxX) {
+                    let i = (y * width + x) * 4
+                    bytes[i] = 250; bytes[i + 1] = 250; bytes[i + 2] = 250
+                }
+            }
+        }
+        return bytes
+    }
+
+    func testFreshnessComparesOnlyTheAreaAroundTheTarget() {
+        let (w, h) = (320, 200)
+        let before = Fingerprint(rgba: rgba(width: w, height: h), width: w, height: h, bytesPerRow: w * 4)
+        XCTAssertEqual(before.width, 80)
+        XCTAssertEqual(before.height, 50)
+        // A change far from the target (a clock ticking in a corner) is fine.
+        let corner = Fingerprint(rgba: rgba(width: w, height: h, square: CGRect(x: 280, y: 0, width: 40, height: 20)), width: w, height: h, bytesPerRow: w * 4)
+        XCTAssertTrue(before.matches(corner, around: CGPoint(x: 60, y: 150)))
+        // A dialog appearing over the target is not.
+        let dialog = Fingerprint(rgba: rgba(width: w, height: h, square: CGRect(x: 30, y: 120, width: 80, height: 60)), width: w, height: h, bytesPerRow: w * 4)
+        XCTAssertFalse(before.matches(dialog, around: CGPoint(x: 60, y: 150)))
+        // Another display size never matches.
+        let other = Fingerprint(rgba: rgba(width: 160, height: 100), width: 160, height: 100, bytesPerRow: 640)
+        XCTAssertFalse(before.matches(other, around: CGPoint(x: 10, y: 10)))
+    }
+
+    func testCardsSitBesideTheTargetInsideTheDisplay() {
+        let display = CGSize(width: 1512, height: 982), card = CGSize(width: 340, height: 180)
+        let below = StepCardLayout.origin(card: card, target: CGPoint(x: 300, y: 200), display: display)
+        XCTAssertEqual(below, CGPoint(x: 328, y: 228))
+        // Near the bottom-right corner the card flips above and to the left.
+        let flipped = StepCardLayout.origin(card: card, target: CGPoint(x: 1450, y: 900), display: display)
+        XCTAssertEqual(flipped, CGPoint(x: 1450 - 28 - 340, y: 900 - 28 - 180))
+        // Never covering the target point.
+        for target in [CGPoint(x: 0, y: 0), CGPoint(x: 1511, y: 981), CGPoint(x: 756, y: 491), CGPoint(x: 5, y: 970)] {
+            let origin = StepCardLayout.origin(card: card, target: target, display: display)
+            XCTAssertFalse(CGRect(origin: origin, size: card).contains(target), "\(target)")
+            XCTAssertTrue(CGRect(origin: .zero, size: display).contains(CGRect(origin: origin, size: card)))
+        }
+        let centred = StepCardLayout.origin(card: card, target: nil, display: display)
+        XCTAssertEqual(centred.x, (1512 - 340) / 2)
+    }
+}
