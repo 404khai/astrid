@@ -15,9 +15,12 @@
     "@fontsource/space-grotesk": "^5.2.10",
     "@hugeicons/core-free-icons": "^4.4.0",
     "@hugeicons/react": "^1.1.10",
+    "liquid-gooey": "^0.2.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "runeicons-react": "file:vendor/runeicons-react"
+    "runeicons-react": "file:vendor/runeicons-react",
+    "thinking-orbs": "^0.3.2",
+    "voice-ring": "^0.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",

@@ -1,12 +1,39 @@
 import { useEffect, useId, useRef } from "react";
 
 /** The original Astrid mark, with independently animated eyes. */
+/** Eye expressions for agent states; omit for the original mark. */
+export type EyeExpression =
+  | "working"
+  | "searching"
+  | "solving"
+  | "listening"
+  | "connecting"
+  | "weaving"
+  | "composing"
+  | "sketching"
+  | "idle";
+
+/** Per-eye corner radius in mark units: rounder eyes read softer. */
+const eyeRadius: Record<EyeExpression, number> = {
+  working: 0.2,
+  searching: 0.3,
+  solving: 0.2,
+  listening: 1.4,
+  connecting: 0.6,
+  weaving: 0.5,
+  composing: 0.4,
+  sketching: 0.8,
+  idle: 1,
+};
+
 export function AstridLogo({
   animated = false,
   tracking = false,
+  expression,
 }: {
   animated?: boolean;
   tracking?: boolean;
+  expression?: EyeExpression;
 }) {
   const id = useId();
   const logo = useRef<SVGSVGElement>(null);
@@ -67,16 +94,23 @@ export function AstridLogo({
         fill={`url(#${id}-bottom)`}
       />
       <g ref={gaze} className={animated ? "logo-gaze animated" : "logo-gaze"}>
-        <g className={animated ? "logo-eyes animated" : "logo-eyes"}>
-          <path
-            d="M8.94511 5.49634H6.04997C6.02493 5.49634 6.00928 5.51201 6.00928 5.53081V10.391C6.00928 10.4129 6.02493 10.4317 6.04997 10.4317H8.94511C8.97015 10.4317 8.98893 10.4129 8.98893 10.391V5.53081C8.98893 5.51201 8.97015 5.49634 8.94511 5.49634Z"
-            fill="#00F7D5"
-          />
-          <path
-            d="M13.9811 5.49634H11.0578C11.0359 5.49634 11.0203 5.51201 11.0203 5.53081V10.391C11.0203 10.4129 11.0359 10.4317 11.0578 10.4317H13.9811C14.0124 10.4317 14.0375 10.4098 14.0375 10.3816V5.54961C14.0375 5.51827 14.0124 5.49634 13.9811 5.49634Z"
-            fill="#00F7D5"
-          />
-        </g>
+        {expression ? (
+          <g className="logo-eyes logo-expression" data-expression={expression}>
+            <rect className="eye eye-l" x="6.01" y="5.5" width="2.98" height="4.93" rx={eyeRadius[expression]} fill="#00F7D5" />
+            <rect className="eye eye-r" x="11.02" y="5.5" width="3.02" height="4.93" rx={eyeRadius[expression]} fill="#00F7D5" />
+          </g>
+        ) : (
+          <g className={animated ? "logo-eyes animated" : "logo-eyes"}>
+            <path
+              d="M8.94511 5.49634H6.04997C6.02493 5.49634 6.00928 5.51201 6.00928 5.53081V10.391C6.00928 10.4129 6.02493 10.4317 6.04997 10.4317H8.94511C8.97015 10.4317 8.98893 10.4129 8.98893 10.391V5.53081C8.98893 5.51201 8.97015 5.49634 8.94511 5.49634Z"
+              fill="#00F7D5"
+            />
+            <path
+              d="M13.9811 5.49634H11.0578C11.0359 5.49634 11.0203 5.51201 11.0203 5.53081V10.391C11.0203 10.4129 11.0359 10.4317 11.0578 10.4317H13.9811C14.0124 10.4317 14.0375 10.4098 14.0375 10.3816V5.54961C14.0375 5.51827 14.0124 5.49634 13.9811 5.49634Z"
+              fill="#00F7D5"
+            />
+          </g>
+        )}
       </g>
       <defs>
         <linearGradient

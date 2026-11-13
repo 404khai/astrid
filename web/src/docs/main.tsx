@@ -12,8 +12,10 @@ import { NavigationCompass } from "../components/nexvyn/NavigationCompass";
 import { ScrollIndicator } from "../components/nexvyn/ScrollIndicator";
 import { VerseText } from "../components/VerseText";
 import { CursorGrid } from "./Cursors";
+import { ListeningCard, OrbGrid, OutputBox } from "./AgentStates";
 import "../styles.css";
 import "./cursors.css";
+import "./agent-states.css";
 import "./docs.css";
 
 const repo = "https://github.com/404khai/astrid";
@@ -191,7 +193,20 @@ function Components() {
         </p>
         <CursorGrid />
       </Section>
-      <Section index={1} eyebrow="02 / FROM NEXVYN" title="Navigation pieces">
+      <Section index={1} eyebrow="02 / AGENT STATES" title="What Astrid is doing">
+        <p className="doc-text">
+          The mark carries a thinking orb beside it, the way it trails each cursor, so you can
+          always tell whether Astrid is looking, solving or writing. Orbs from{" "}
+          <code>thinking-orbs</code>, listening from <code>voice-ring</code>, and the answer
+          surface from <code>liquid-gooey</code>.
+        </p>
+        <OrbGrid />
+        <div className="as-demo">
+          <ListeningCard />
+          <OutputBox />
+        </div>
+      </Section>
+      <Section index={2} eyebrow="03 / FROM NEXVYN" title="Navigation pieces">
         <p className="doc-text">
           Adapted from Nexvyn UI to Astrid’s scoped CSS, without extra animation libraries: the
           bounce sidebar on the left, the scroll indicator on the right, and the navigation
@@ -206,7 +221,7 @@ function Components() {
 const sectionTitles: Record<PageId, string[]> = {
   overview: ["Compass", "Start here"],
   brand: ["Mark", "Colour", "Backgrounds", "Type"],
-  components: ["Cursors", "Navigation"],
+  components: ["Cursors", "Agent states", "Navigation"],
 };
 
 function Docs() {
