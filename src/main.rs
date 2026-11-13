@@ -24,6 +24,7 @@ mod console;
 #[path = "instabox_cli.rs"]
 mod instabox;
 mod logo;
+mod operator_bridge;
 mod presence_ask;
 mod presence_canvas;
 mod remote_cli;
@@ -319,6 +320,12 @@ enum Commands {
         /// Read-only mail sources: apple, gmail or all.
         #[arg(long, value_parser = ["apple", "gmail", "all"])]
         mail_source: Option<String>,
+        /// Image model for `/operator` walkthroughs (ADR 0038; gpt-5.6 only).
+        #[arg(long, default_value = "gpt-5.6-sol")]
+        operator_model: String,
+        /// Display operator looks at (0 = the display with the menu bar).
+        #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=15))]
+        operator_display: u32,
     },
     /// Gmail sign-in for read-only mail search (ADR 0028).
     Mail {
@@ -1028,7 +1035,12 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     });
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
-        Some(Commands::PresenceAsk { model, mail_source }) => {
+        Some(Commands::PresenceAsk {
+            model,
+            mail_source,
+            operator_model,
+            operator_display,
+        }) => {
             let workspace = presence_ask::workspace()?;
             let mut tools = Tools::new(workspace, Duration::from_secs(1))?;
             if let Some(choice) = mail_source.as_deref() {
@@ -1036,7 +1048,23 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             let provider =
                 provider_for(&model, auth::default_directory()?, tools.workspace().root()).await?;
-            return presence_ask::serve(provider, tools, model).await;
+            if !astrid::computer::supported_model(&operator_model) {
+                return Err(format!(
+                    "--operator-model must be gpt-5.6-sol, gpt-5.6-terra or gpt-5.6-luna (ADR 0024), not {operator_model:?}"
+                )
+                .into());
+            }
+            let operator = presence_ask::OperatorSetup {
+                provider: provider_for(
+                    &operator_model,
+                    auth::default_directory()?,
+                    tools.workspace().root(),
+                )
+                .await?,
+                model: operator_model,
+                display: operator_display,
+            };
+            return presence_ask::serve(provider, tools, model, Some(operator)).await;
         }
         Some(Commands::Mail { command }) => return mail_command(command).await,
         Some(Commands::Claude { command }) => return claude_command(command),

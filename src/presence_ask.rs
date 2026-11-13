@@ -7,6 +7,9 @@
 //!         | {"type":"approval","id":n,"title":..,"detail":..} | {"type":"answer","text":..,"brief":{..}|null}
 //!         | {"type":"canvas","event":"begin"|"shape"|"end",..} (ADR 0036)
 //!         | {"type":"error","message":..} | {"type":"done","outcome":..}
+//!
+//! An ask starting with `/operator` runs a guided walkthrough instead (ADR
+//! 0038); its extra messages are listed in `operator_bridge`.
 use crate::presence_canvas::{CANVAS_INSTRUCTIONS, CanvasStream};
 use astrid::{
     cancellation::Cancellation,
@@ -179,28 +182,125 @@ fn state_for(kind: &EventKind) -> Option<(&'static str, String)> {
     }
 }
 
+/// The operator's model and display (ADR 0038). The provider is the ADR 0024
+/// image path, so only the exact gpt-5.6 models are accepted.
+pub struct OperatorSetup {
+    pub provider: Box<dyn ModelProvider>,
+    pub model: String,
+    pub display: u32,
+}
+
+/// `/operator <goal>`: the goal, if this ask starts an operator session.
+pub fn operator_goal(ask: &str) -> Option<&str> {
+    let rest = ask.strip_prefix("/operator")?;
+    (rest.is_empty() || rest.starts_with(char::is_whitespace)).then(|| rest.trim())
+}
+
+async fn operate(
+    goal: &str,
+    setup: Option<&OperatorSetup>,
+    bridge: &Arc<crate::operator_bridge::Bridge>,
+    cancel: &Cancellation,
+) -> &'static str {
+    use astrid::operator::{Outcome, RuntimeEyes, walk};
+    let Some(setup) = setup else {
+        emit(
+            json!({"type":"error","message":"Operator isn't available: start presence-ask with --operator-model."}),
+        );
+        return "failed";
+    };
+    if goal.is_empty() {
+        emit(
+            json!({"type":"error","message":"Tell me what to do, e.g. /operator export this page as a PDF."}),
+        );
+        return "failed";
+    }
+    let tools = match workspace().map_err(|e| e.to_string()).and_then(|w| {
+        let computer = astrid::computer::Computer::local(
+            format!("local-euid:{}", unsafe { libc::geteuid() }),
+            setup.display,
+            bridge.clone(),
+            Arc::new(astrid::computer_png::DecodeWorker::new(
+                std::env::current_exe().map_err(|e| e.to_string())?,
+            )),
+        )?;
+        Ok(Tools::new(w, Duration::from_secs(1))
+            .map_err(|e| e.to_string())?
+            .with_computer(computer))
+    }) {
+        Ok(tools) => tools,
+        Err(error) => {
+            emit(json!({"type":"error","message":error}));
+            return "failed";
+        }
+    };
+    let mut eyes = RuntimeEyes {
+        provider: setup.provider.as_ref(),
+        tools: &tools,
+        model: setup.model.clone(),
+    };
+    let session = crate::operator_bridge::Session {
+        bridge: bridge.clone(),
+        display: setup.display,
+        cancel: cancel.clone(),
+    };
+    emit(json!({"type":"state","state":"listening","label":"Operator"}));
+    match walk(
+        goal,
+        &setup.model,
+        setup.display,
+        &mut eyes,
+        &session,
+        cancel,
+    )
+    .await
+    {
+        Outcome::Completed(summary) => {
+            emit(json!({"type":"answer","text":summary,"brief":null,"canvas":false}));
+            "completed"
+        }
+        Outcome::Stopped(reason) => {
+            emit(json!({"type":"answer","text":reason,"brief":null,"canvas":false}));
+            "cancelled"
+        }
+        Outcome::Failed(error) => {
+            emit(json!({"type":"error","message":error}));
+            "failed"
+        }
+    }
+}
+
 pub async fn serve(
     provider: Box<dyn ModelProvider>,
     tools: Tools,
     model: String,
+    operator: Option<OperatorSetup>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let pending: Pending = Arc::default();
+    let bridge = Arc::new(crate::operator_bridge::Bridge::new(emit));
     let (asks_tx, mut asks_rx) = tokio::sync::mpsc::channel::<(String, Vec<Turn>)>(4);
     let cancel_slot: Arc<Mutex<Option<Cancellation>>> = Arc::default();
     {
         let pending = pending.clone();
         let cancel_slot = cancel_slot.clone();
+        let bridge = bridge.clone();
         // Plain thread: blocking stdin reads never stall the runtime.
         std::thread::spawn(move || {
             use std::io::BufRead;
             for line in io::stdin().lock().lines() {
                 let Ok(line) = line else { break };
-                if line.len() > 64 * 1024 {
+                // Only operator frames may be large (a 1 MiB PNG as base64).
+                if line.len() > astrid::presence::MAX_LINE
+                    || line.len() > 64 * 1024 && !line.contains("\"frame\"")
+                {
                     continue;
                 }
                 let Ok(message) = serde_json::from_str::<Value>(&line) else {
                     continue;
                 };
+                if bridge.receive(&message) {
+                    continue;
+                }
                 match message["type"].as_str() {
                     Some("ask") => {
                         let text = message["text"]
@@ -251,6 +351,13 @@ pub async fn serve(
     while let Some((ask, history)) = asks_rx.recv().await {
         let cancel = Cancellation::default();
         *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(cancel.clone());
+        if let Some(goal) = operator_goal(&ask) {
+            let outcome = operate(goal, operator.as_ref(), &bridge, &cancel).await;
+            emit(json!({"type":"done","outcome":outcome}));
+            emit(json!({"type":"state","state":"idle","label":"Ready"}));
+            *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = None;
+            continue;
+        }
         let (events_tx, mut events_rx) =
             tokio::sync::mpsc::channel::<astrid::events::ExecutionEvent>(256);
         let mut approvals = UiApprovals {
@@ -418,6 +525,17 @@ mod tests {
         assert!(task.starts_with(
             "Earlier in this conversation (context only):\nUser: draw a pump\nAstrid: Here is a pump.\n\nThe user now asks:\nmake it bigger\n\n"
         ));
+    }
+
+    #[test]
+    fn operator_asks_are_recognised_by_their_command() {
+        assert_eq!(
+            operator_goal("/operator export as PDF"),
+            Some("export as PDF")
+        );
+        assert_eq!(operator_goal("/operator"), Some(""));
+        assert_eq!(operator_goal("/operatorx go"), None);
+        assert_eq!(operator_goal("what is /operator"), None);
     }
 
     #[test]
