@@ -2,7 +2,11 @@ import type { CSSProperties, ReactNode } from "react";
 
 /** A shape exactly as the runtime validated it (ADR 0036). */
 export type Shape = {
-  shape: "title" | "rect" | "ellipse" | "line" | "polygon" | "path" | "arrow" | "text" | "box" | "point";
+  shape: "title" | "rect" | "ellipse" | "line" | "polygon" | "path" | "arrow" | "text" | "box" | "point" | "slab" | "cylinder";
+  z?: number;
+  radius?: number;
+  r2?: number;
+  axis?: "x" | "y" | "z";
   id?: string;
   x?: number;
   y?: number;
@@ -15,8 +19,8 @@ export type Shape = {
   rx?: number;
   ry?: number;
   points?: [number, number][];
-  from?: [number, number];
-  to?: [number, number];
+  from?: [number, number] | [number, number, number];
+  to?: [number, number] | [number, number, number];
   bend?: number;
   text?: string;
   size?: number;
@@ -120,7 +124,7 @@ export function anchor(s: Shape): [number, number] | null {
     case "polygon":
       return s.points![s.points!.length - 1];
     case "arrow":
-      return s.to!;
+      return [s.to![0], s.to![1]];
     case "text":
     case "point":
       return [s.x!, s.y!];

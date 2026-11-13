@@ -8,6 +8,7 @@ import type { OrbState } from "thinking-orbs";
 import { AstridLogo, type EyeExpression } from "../components/AstridLogo";
 import { astridCursor } from "../components/cursors";
 import { anchor, ShapeView, type Shape } from "./shapes";
+import { flatten, ISO_CSS, solid, type Solid } from "./solids";
 import { demo } from "./demo";
 import "./canvas.css";
 
@@ -39,9 +40,32 @@ let listener: (m: Incoming) => void = () => {};
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+const palette: Record<string, string> = {
+  ink: "#e6e6e6", paper: "#1d1d1f", blue: "#6575ff", violet: "#9b7bff", pink: "#ec6a8a", red: "#f94447",
+  orange: "#ff8a3d", yellow: "#f7c600", green: "#30a46c", teal: "#00c2b8", grey: "#8a8a8a",
+};
+/** A highlighted solid: the kit's tone variables, mixed from one colour. */
+function tint(fill?: string): CSSProperties | undefined {
+  const c = fill && fill !== "none" ? palette[fill] ?? fill : null;
+  if (!c) return undefined;
+  const mix = (n: number) => `color-mix(in srgb, ${c} ${n}%, #000)`;
+  return {
+    "--anatomy-paper": mix(55),
+    "--anatomy-top": mix(100),
+    "--anatomy-shade-0": mix(45),
+    "--anatomy-shade-1": mix(58),
+    "--anatomy-shade-2": mix(70),
+    "--anatomy-shade-3": mix(82),
+    "--anatomy-hi": `color-mix(in srgb, ${c} 60%, #fff)`,
+  } as CSSProperties;
+}
+
 function App() {
   const [title, setTitle] = useState<string | null>(null);
   const [drawn, setDrawn] = useState<Shape[]>([]);
+  // 3D solids are kept back to front, so a part streamed late still sits
+  // behind the parts in front of it.
+  const [solids, setSolids] = useState<(Solid & { shape: Shape; n: number })[]>([]);
   const [phase, setPhase] = useState<Phase>("weaving");
   const [cursor, setCursor] = useState<[number, number]>([W / 2, H / 2]);
   const [say, setSay] = useState<string | null>(null);
@@ -67,13 +91,18 @@ function App() {
       timer.current = window.setTimeout(step, 120);
       return;
     }
-    const at = anchor(next);
+    const shape = flatten(next);
+    const built = solid(shape);
+    const at = built?.anchor ?? anchor(shape);
     if (at) setCursor(at);
-    if (next.shape === "point") {
-      setSay(next.say ?? null);
+    if (shape.shape === "point") {
+      setSay(shape.say ?? null);
+    } else if (built) {
+      setSay(null);
+      setSolids((list) => [...list, { ...built, shape, n: list.length }].sort((a, b) => a.depth - b.depth || a.n - b.n));
     } else {
       setSay(null);
-      setDrawn((list) => [...list, next]);
+      setDrawn((list) => [...list, shape]);
     }
     const quick = reducedMotion() || queue.current.length > 40;
     timer.current = window.setTimeout(step, next.shape === "point" ? 1700 : quick ? 140 : 480);
@@ -94,6 +123,7 @@ function App() {
           ended.current = false;
           setTitle(null);
           setDrawn([]);
+          setSolids([]);
           setSay(null);
           setCaption(null);
           setPhase("composing");
@@ -143,6 +173,7 @@ function App() {
           </svg>
         </button>
       </header>
+      <style>{ISO_CSS}</style>
       <div className="cv-stage" ref={stage}>
         <svg viewBox={`0 0 ${W} ${H}`} className="cv-svg" role="img" aria-label={title ?? "Astrid's drawing"}>
           <defs>
@@ -151,6 +182,18 @@ function App() {
             </pattern>
           </defs>
           <rect className="cv-grid" width={W} height={H} fill="url(#cv-dots)" />
+          <g className="iso cv-solids" data-theme="dark">
+            {solids.map((s) => (
+              <g key={s.n} className="cv-solid3" style={tint(s.shape.fill)}>
+                <g dangerouslySetInnerHTML={{ __html: s.svg }} />
+                {s.shape.label && (
+                  <text className="cv-label" x={s.labelAt[0]} y={s.labelAt[1]} textAnchor="middle">
+                    {s.shape.label}
+                  </text>
+                )}
+              </g>
+            ))}
+          </g>
           {drawn.map((shape, index) => (
             <ShapeView key={index} shape={shape} index={index} />
           ))}

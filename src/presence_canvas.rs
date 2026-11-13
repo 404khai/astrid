@@ -7,14 +7,18 @@ use serde_json::{Map, Value, json};
 /// The virtual canvas the model draws on; the UI scales it to the screen.
 pub const WIDTH: f64 = 1000.0;
 pub const HEIGHT: f64 = 640.0;
-const MAX_SHAPES: usize = 160;
+const MAX_SHAPES: usize = 200;
 const MAX_LINE: usize = 8 * 1024;
 const MAX_POINTS: usize = 64;
 const MAX_PATH: usize = 4000;
 const MAX_TEXT: usize = 160;
 const FENCE: &str = "```canvas";
+/// 3D solids live in a world around the canvas centre, projected with the
+/// Anatomy kit's isometric camera: x and y on the ground, z up.
+const WORLD: f64 = 600.0;
+const WORLD_Z: (f64, f64) = (-200.0, 800.0);
 
-pub const CANVAS_INSTRUCTIONS: &str = "When the user asks you to draw, design, sketch, diagram, illustrate, lay out or make anything visual, draw it on Astrid's on-screen canvas: put one fenced code block tagged `canvas` in your reply, with one JSON object per line and nothing else inside. The canvas is 1000 wide and 640 tall, origin top-left. Shapes (all numbers in canvas units): {\"shape\":\"title\",\"text\"}; {\"shape\":\"rect\",\"x\",\"y\",\"w\",\"h\",\"r\"?}; {\"shape\":\"ellipse\",\"cx\",\"cy\",\"rx\",\"ry\"}; {\"shape\":\"line\",\"points\":[[x,y],...]}; {\"shape\":\"polygon\",\"points\":[[x,y],...]}; {\"shape\":\"path\",\"d\": SVG path data using only M L H V C S Q T A Z and numbers}; {\"shape\":\"arrow\",\"from\":[x,y],\"to\":[x,y],\"bend\"?: -1..1}; {\"shape\":\"text\",\"x\",\"y\",\"text\",\"size\"?: 10..64,\"align\"?: \"start\"|\"middle\"|\"end\"}; {\"shape\":\"box\",\"x\",\"y\",\"w\",\"d\",\"h\"} for an isometric block whose front-bottom corner is at x,y; {\"shape\":\"point\",\"x\",\"y\",\"say\"} to move your cursor to something you drew and label it. Optional on any shape: \"id\", \"fill\", \"stroke\" (#hex or one of ink, paper, blue, violet, pink, red, orange, yellow, green, teal, grey, none), \"width\" 0.5..12, \"dashed\", \"sketchy\" (hand-drawn look), \"label\" (a short caption). Draw in a sensible order: big forms first, then details, labels and arrows, then 1–4 `point` lines walking the user through it. Use up to 120 shapes. Outside the block, say in one or two sentences what you drew; skip the brief for drawings.";
+pub const CANVAS_INSTRUCTIONS: &str = "When the user asks you to draw, design, sketch, diagram, illustrate, explain how something works or make anything visual, draw it on Astrid's on-screen canvas: put one fenced code block tagged `canvas` in your reply, with one JSON object per line and nothing else inside.\n\nFor physical things (machines, devices, buildings, rooms, organs, products, layouts) build a 3D isometric Anatomy figure from solids in a world with x and y on the ground, z up, origin at the centre, roughly -300..300 on x and y and 0..400 on z: {\"shape\":\"slab\",\"x\",\"y\",\"z\"?,\"w\",\"d\",\"h\",\"r\"?} is a block whose ground corner is x,y at height z, w along x, d along y, h tall, r rounds its corners; {\"shape\":\"cylinder\",\"x\",\"y\",\"z\"?,\"radius\",\"h\",\"r2\"?,\"axis\"?: \"z\"|\"x\"|\"y\"} has its base centre at x,y,z and runs h along the axis (z, up, by default; x or y lies it down); r2 is the far-end radius for cones and tapers. Compose many small solids (bases, housings, shafts, fins, knobs, stacked discs) the way an exploded engineering figure would, and leave solids unfilled for the classic grey Anatomy look, using a fill only to highlight the parts that matter. Emit solids back to front: farther parts (smaller x + y, lower z) first. To label or point at a 3D part, give text, point or arrow ends a z (or 3-number [x,y,z] arrow ends) so they use world coordinates.\n\nFor flat diagrams, charts, flows and sketches use the 1000 × 640 canvas, origin top-left: {\"shape\":\"rect\",\"x\",\"y\",\"w\",\"h\",\"r\"?}; {\"shape\":\"ellipse\",\"cx\",\"cy\",\"rx\",\"ry\"}; {\"shape\":\"line\",\"points\":[[x,y],...]}; {\"shape\":\"polygon\",\"points\":[[x,y],...]}; {\"shape\":\"path\",\"d\": SVG path data using only M L H V C S Q T A Z and numbers}; {\"shape\":\"arrow\",\"from\":[x,y],\"to\":[x,y],\"bend\"?: -1..1}; {\"shape\":\"text\",\"x\",\"y\",\"text\",\"size\"?: 10..64,\"align\"?: \"start\"|\"middle\"|\"end\"}.\n\nAlways: {\"shape\":\"title\",\"text\"} first, and end with 1–4 {\"shape\":\"point\",\"x\",\"y\",\"z\"?,\"say\"} lines that move your cursor to parts you drew and label them. Optional on any shape: \"id\", \"fill\", \"stroke\" (#hex or one of ink, paper, blue, violet, pink, red, orange, yellow, green, teal, grey, none), \"width\" 0.5..12, \"dashed\", \"sketchy\" (hand-drawn look), \"label\" (a short caption). Use up to 140 shapes. Outside the block, say in one or two sentences what you drew; skip the brief for drawings.";
 
 const COLORS: [&str; 12] = [
     "ink", "paper", "blue", "violet", "pink", "red", "orange", "yellow", "green", "teal", "grey",
@@ -151,15 +155,39 @@ fn y(raw: &Map<String, Value>, key: &str) -> Option<f64> {
 fn size(raw: &Map<String, Value>, key: &str) -> Option<f64> {
     num(raw, key, 0.0, WIDTH * 1.5)
 }
+/// [x, y] on the canvas, or [x, y, z] in the 3D world.
 fn point(value: &Value) -> Option<Value> {
-    let pair = value.as_array()?;
-    let (px, py) = (pair.first()?.as_f64()?, pair.get(1)?.as_f64()?);
-    (pair.len() == 2 && px.is_finite() && py.is_finite()).then(|| {
-        json!([
+    let list = value.as_array()?;
+    let at: Vec<f64> = list.iter().map(Value::as_f64).collect::<Option<_>>()?;
+    if !at.iter().all(|v| v.is_finite()) {
+        return None;
+    }
+    match at[..] {
+        [px, py] => Some(json!([
             px.clamp(-WIDTH * 0.25, WIDTH * 1.25).round(),
             py.clamp(-HEIGHT * 0.25, HEIGHT * 1.25).round()
-        ])
-    })
+        ])),
+        [px, py, pz] => Some(json!([
+            px.clamp(-WORLD, WORLD).round(),
+            py.clamp(-WORLD, WORLD).round(),
+            pz.clamp(WORLD_Z.0, WORLD_Z.1).round()
+        ])),
+        _ => None,
+    }
+}
+fn wx(raw: &Map<String, Value>, key: &str) -> Option<f64> {
+    num(raw, key, -WORLD, WORLD)
+}
+fn wz(raw: &Map<String, Value>) -> f64 {
+    num(raw, "z", WORLD_Z.0, WORLD_Z.1).unwrap_or(0.0)
+}
+/// Canvas x/y, or world x/y when the shape carries a z.
+fn at(raw: &Map<String, Value>) -> Option<(f64, f64, Option<f64>)> {
+    if raw.contains_key("z") {
+        Some((wx(raw, "x")?, wx(raw, "y")?, Some(wz(raw))))
+    } else {
+        Some((x(raw, "x")?, y(raw, "y")?, None))
+    }
 }
 fn points(raw: &Map<String, Value>, min: usize) -> Option<Value> {
     let list = raw.get("points")?.as_array()?;
@@ -235,8 +263,10 @@ pub fn validate(raw: &Map<String, Value>) -> Option<Value> {
             let _ = put("bend", f(num(raw, "bend", -1.0, 1.0)));
         }
         "text" => {
-            put("x", f(x(raw, "x")))?;
-            put("y", f(y(raw, "y")))?;
+            let (px, py, pz) = at(raw)?;
+            put("x", Some(px.into()))?;
+            put("y", Some(py.into()))?;
+            let _ = put("z", f(pz));
             put("text", text(raw, "text").map(Value::from))?;
             let _ = put("size", f(num(raw, "size", 10.0, 64.0)));
             let align = raw.get("align").and_then(Value::as_str);
@@ -254,9 +284,34 @@ pub fn validate(raw: &Map<String, Value>) -> Option<Value> {
             put("d", f(num(raw, "d", 1.0, 600.0)))?;
             put("h", f(num(raw, "h", 0.0, 600.0)))?;
         }
+        "slab" => {
+            put("x", f(wx(raw, "x")))?;
+            put("y", f(wx(raw, "y")))?;
+            put("z", Some(wz(raw).into()))?;
+            put("w", f(num(raw, "w", 1.0, WORLD)))?;
+            put("d", f(num(raw, "d", 1.0, WORLD)))?;
+            put("h", f(num(raw, "h", 0.0, WORLD)))?;
+            let _ = put("r", f(num(raw, "r", 0.0, 100.0)));
+        }
+        "cylinder" => {
+            put("x", f(wx(raw, "x")))?;
+            put("y", f(wx(raw, "y")))?;
+            put("z", Some(wz(raw).into()))?;
+            put("radius", f(num(raw, "radius", 1.0, WORLD / 2.0)))?;
+            put("h", f(num(raw, "h", 0.0, WORLD * 2.0)))?;
+            let _ = put("r2", f(num(raw, "r2", 0.0, WORLD / 2.0)));
+            let axis = raw.get("axis").and_then(Value::as_str);
+            let _ = put(
+                "axis",
+                axis.filter(|a| ["x", "y", "z"].contains(a))
+                    .map(Value::from),
+            );
+        }
         "point" => {
-            put("x", f(x(raw, "x")))?;
-            put("y", f(y(raw, "y")))?;
+            let (px, py, pz) = at(raw)?;
+            put("x", Some(px.into()))?;
+            put("y", Some(py.into()))?;
+            let _ = put("z", f(pz));
             let _ = put("say", text(raw, "say").map(Value::from));
         }
         _ => return None,
@@ -350,6 +405,43 @@ mod tests {
         // Text is rendered as text, never markup; an unknown align is dropped.
         assert_eq!(text["text"], "<b>x</b>");
         assert!(text.get("align").is_none());
+    }
+
+    #[test]
+    fn solids_and_world_labels_use_world_coordinates() {
+        let raw = |s: &str| serde_json::from_str::<Map<String, Value>>(s).unwrap();
+        let slab = validate(&raw(
+            r#"{"shape":"slab","x":-900,"y":10,"w":80,"d":40,"h":20}"#,
+        ))
+        .unwrap();
+        assert_eq!(
+            (slab["x"].as_f64(), slab["z"].as_f64()),
+            (Some(-WORLD), Some(0.0))
+        );
+        let cyl = validate(&raw(
+            r#"{"shape":"cylinder","x":0,"y":0,"z":30,"radius":40,"h":200,"axis":"x","r2":10}"#,
+        ))
+        .unwrap();
+        assert_eq!(cyl["axis"], "x");
+        assert!(
+            validate(&raw(
+                r#"{"shape":"cylinder","x":0,"y":0,"radius":40,"h":9,"axis":"w"}"#
+            ))
+            .unwrap()
+            .get("axis")
+            .is_none()
+        );
+        let label = validate(&raw(
+            r#"{"shape":"point","x":-500,"y":0,"z":120,"say":"Fan"}"#,
+        ))
+        .unwrap();
+        assert_eq!(label["x"], -500.0);
+        let arrow = validate(&raw(
+            r#"{"shape":"arrow","from":[0,0,0],"to":[10,20,9999]}"#,
+        ))
+        .unwrap();
+        assert_eq!(arrow["to"], json!([10.0, 20.0, WORLD_Z.1]));
+        assert!(validate(&raw(r#"{"shape":"arrow","from":[0],"to":[1,2]}"#)).is_none());
     }
 
     #[test]

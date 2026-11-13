@@ -19,8 +19,17 @@ templates, but it doesn't need model-written code.
 
 - **Format.** The model draws by putting one fenced `canvas` block in its reply:
   one JSON shape per line on a 1000 × 640 canvas. The shapes are `title`, `rect`,
-  `ellipse`, `line`, `polygon`, `path`, `arrow`, `text`, `box` (an isometric
-  block, for Anatomy-style figures) and `point`. `point` moves Astrid's cursor
+  `ellipse`, `line`, `polygon`, `path`, `arrow`, `text`, `box` (a flat
+  isometric block) and `point`.
+- **3D solids (amended 2026-11-13).** Physical subjects are built as real 3D
+  Anatomy figures. `slab` is a rounded block and `cylinder` is a cylinder,
+  cone or taper along x, y or z. Both use world coordinates (x and y on the
+  ground, z up, origin at the canvas centre) and render through the vendored
+  Anatomy kit (`web/vendor/anatomy`). They use one fixed isometric camera and
+  the kit's shading, and the page keeps them back to front. `text`, `point`
+  and `arrow` take world coordinates (a `z`, or `[x,y,z]` ends) to label 3D
+  parts. Unfilled solids keep the grey Anatomy look; a `fill` tints one to
+  highlight it. `point` moves Astrid's cursor
   to something it drew and shows a short label there. Shapes can also carry a
   colour, a stroke width, `dashed`, `sketchy` (hand-drawn) and a `label`. The
   instructions go in every presence ask, and the model decides when to draw.
