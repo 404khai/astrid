@@ -20,6 +20,8 @@ script file or stdin). Branch `feat/presence-overlay` from main `b2879784`, same
 checkout, no worktree. No model, screen capture, input injection, network
 listener, Rust sidecar IPC, daemon or resident timers. D2–D5 stay open. PR, no merge.
 
+**V2-02 started 2026-11-11.** PR #29 merged at the maintainer's "merge work on v2-02"; ADR 0027 option 1 accepted ("go for it, open the PR"). Branch `feat/ask-look-point`. Local look with one combined approval, host capture at 1x excluding the overlay, presentation tools. Live screen/model trials still need exact trial approval.
+
 **V2-03a started 2026-11-11.** Maintainer: "let's start v2-03a ... apple mail ... also
 gmail" then "make all the decisions, yes for both". Accepted
 [ADR 0028](docs/adr/0028-read-only-mail.md) (read-only Apple Mail via Spotlight, and
@@ -46,6 +48,10 @@ mind" after being told Anthropic restricts subscription use in third-party apps.
 [ADR 0032](docs/adr/0032-claude-agent-sdk-provider.md): `claude-code/<model>` runs one
 bounded Claude Code turn per model call via `apps/claude-agent-bridge`; built-in tools
 off, every Astrid tool call returned to Astrid's runtime. Branch `feat/claude-agent-sdk`.
+
+**Merges 2026-11-13.** Maintainer: "merge 31, 36 and 30, then pull from main". #36 merged
+into the stack, #31 (mail, timers, Claude, OpenCode, Claude Agent SDK) merged to main, and
+#30 (local look) reconciled with main and merged.
 
 # Visual upload/response deadline amendment — 2026-10-23
 

@@ -373,6 +373,43 @@ final class DemoTests: XCTestCase {
     }
 }
 
+final class CaptureProtocolTests: XCTestCase {
+    func testCaptureEventParsesAndRoundTrips() throws {
+        let event = try PresenceProtocol.parse(line: #"{"v":1,"type":"capture","request_id":"a1-b2","display":0}"#)
+        XCTAssertEqual(event, .capture(requestId: "a1-b2", display: 0))
+        XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(event)), event)
+        for bad in [
+            #"{"v":1,"type":"capture","display":0}"#,
+            #"{"v":1,"type":"capture","request_id":"","display":0}"#,
+            #"{"v":1,"type":"capture","request_id":"a b","display":0}"#,
+            #"{"v":1,"type":"capture","request_id":"x"}"#,
+            #"{"v":1,"type":"capture","request_id":"\#(String(repeating: "a", count: 65))","display":0}"#,
+        ] {
+            XCTAssertThrowsError(try PresenceProtocol.parse(line: bad), bad)
+        }
+    }
+
+    func testFrameLimitsMatchADR0022() {
+        XCTAssertNil(FrameLimits.check(width: 1512, height: 982, bytes: 900_000))
+        XCTAssertEqual(FrameLimits.check(width: 2561, height: 100, bytes: 0), "display_exceeds_frame_limits")
+        XCTAssertEqual(FrameLimits.check(width: 2560, height: 1601, bytes: 0), "display_exceeds_frame_limits")
+        XCTAssertNil(FrameLimits.check(width: 2560, height: 1600, bytes: 0))
+        XCTAssertEqual(FrameLimits.check(width: 1512, height: 982, bytes: 1024 * 1024 + 1), "frame_png_exceeds_1mib")
+        XCTAssertEqual(FrameLimits.check(width: 0, height: 982, bytes: 0), "display_unavailable")
+    }
+
+    func testSyntheticTargetsAreInsideTheFrameAndDisjoint() {
+        let targets = SyntheticTargets.all(width: 1512, height: 982)
+        XCTAssertEqual(targets.map(\.label), ["Open", "Share", "Export", "Settings", "Delete"])
+        let frame = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        for (i, a) in targets.enumerated() {
+            XCTAssertTrue(frame.contains(a.box))
+            for b in targets[(i + 1)...] { XCTAssertFalse(a.box.intersects(b.box)) }
+        }
+        XCTAssertEqual(targets[2].box, CGRect(x: 1150, y: 159, width: 120, height: 36))
+    }
+}
+
 final class TimerTests: XCTestCase {
     let now = Date(timeIntervalSince1970: 1_800_000_000)
 

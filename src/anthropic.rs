@@ -185,7 +185,7 @@ impl ClaudeProvider {
         if request.options.instabox_exec {
             definitions.push(crate::remote::definition());
         }
-        if request.options.computer_use {
+        if request.options.computer_use || request.options.look {
             return Err(ModelError::Provider(
                 "screen tools are not yet supported on the Claude adapter".into(),
             ));

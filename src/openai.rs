@@ -168,6 +168,9 @@ impl OpenAiProvider {
         if request.options.computer_use {
             definitions.extend(crate::computer::definitions());
         }
+        if request.options.look {
+            definitions.extend(crate::computer::look_definitions());
+        }
         let mail: Vec<&str> = [
             (request.options.mail_apple, "apple"),
             (request.options.mail_gmail, "gmail"),

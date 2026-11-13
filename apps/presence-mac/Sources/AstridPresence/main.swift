@@ -17,6 +17,9 @@ OPTIONS
   --print-demo     Print the demo for the current displays as JSON lines and exit.
   --reduce-motion  Behave as if Reduce Motion were on (it is also followed live).
   --exit-at-end    Quit after the input ends and the queue drains.
+  --capture-source screen|synthetic
+                   Where `capture` events read frames (default screen, which needs
+                   Screen Recording permission). synthetic draws a fake desktop.
   --resident       Stay in the menu bar and own timers/alarms (ADR 0029), saved in
                    ~/Library/Application Support/Astrid/timers.json.
   --timers-file PATH  Use another timers file (testing).
@@ -44,6 +47,7 @@ var exitAtEnd = false
 var resident = false
 var timersURL = TimerStore.defaultURL
 var snapshotDirectory: URL?
+var captureSource = CaptureSource.screen
 var arguments = CommandLine.arguments.dropFirst()
 var sourceCount = 0
 
@@ -84,6 +88,11 @@ while let argument = arguments.popFirst() {
         reduceMotion = true
     case "--exit-at-end":
         exitAtEnd = true
+    case "--capture-source":
+        guard let value = arguments.popFirst(), let parsed = CaptureSource(rawValue: value) else {
+            fail("--capture-source needs screen or synthetic")
+        }
+        captureSource = parsed
     case "--resident":
         resident = true
     case "--timers-file":
@@ -102,6 +111,6 @@ if sourceCount > 1 { fail("choose one of --demo, --script or --stdin") }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
-let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, resident: resident, timersURL: timersURL)
+let controller = PresenceController(source: source, forceReduceMotion: reduceMotion, exitAtEnd: exitAtEnd, snapshotDirectory: snapshotDirectory, captureSource: captureSource, resident: resident, timersURL: timersURL)
 app.delegate = controller
 app.run()

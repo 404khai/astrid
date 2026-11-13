@@ -56,6 +56,9 @@ public enum PresenceEvent: Equatable, Sendable {
     /// Script pacing: hold later events for a number of milliseconds.
     case wait(ms: Int)
     case quit
+    /// Capture one display at 1x point resolution, excluding Astrid's own
+    /// overlay (ADR 0027). Answered on stdout with `frame` or `capture_failed`.
+    case capture(requestId: String, display: Int)
     /// ADR 0029 (resident host only): timers and alarms.
     case timerStart(id: String, seconds: Int, label: String)
     case timerCancel(id: String)
@@ -135,6 +138,12 @@ extension PresenceProtocol {
             return .wait(ms: ms)
         case "quit":
             return .quit
+        case "capture":
+            guard let id = try reader.string("request_id"), isRequestId(id) else {
+                throw PresenceProtocolError("\"request_id\" must be 1...64 characters of [A-Za-z0-9-]")
+            }
+            guard let display = try reader.display() else { throw PresenceProtocolError("missing \"display\"") }
+            return .capture(requestId: id, display: display)
         case "timer_start":
             let id = try requestId(reader)
             guard let seconds = try reader.int("seconds") else { throw PresenceProtocolError("missing \"seconds\"") }
@@ -339,6 +348,10 @@ extension PresenceProtocol {
             fields["ms"] = ms
         case .quit:
             fields["type"] = "quit"
+        case let .capture(requestId, display):
+            fields["type"] = "capture"
+            fields["request_id"] = requestId
+            fields["display"] = display
         case let .timerStart(id, seconds, label):
             fields["type"] = "timer_start"
             fields["id"] = id

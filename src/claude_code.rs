@@ -126,7 +126,7 @@ impl ClaudeCodeProvider {
             .ok_or_else(|| {
                 ModelError::Provider(format!("unsupported Claude Code model {:?}", request.model))
             })?;
-        if request.options.computer_use {
+        if request.options.computer_use || request.options.look {
             return Err(ModelError::Provider(
                 "screen tools are not supported through Claude Code".into(),
             ));

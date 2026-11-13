@@ -119,7 +119,8 @@ fn request() -> ModelRequest<'static> {
 async fn image_fixture() -> (ComputerRun, VisionInput, MockHttp) {
     let wire =
         MockHttp::start(|_, _, _| panic!("no real machine calls in visual timing test")).await;
-    let mut run = service(&wire).begin(RunId::default());
+    let mut run =
+        service(&wire).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
     run.install(
         crate::computer_png::canonicalize(&fixture()).unwrap(),
         Instant::now(),
@@ -195,6 +196,8 @@ async fn visual_completion_after_image_expiry_releases_frame_and_keeps_exact_con
     assert!(wire.requests.lock().unwrap().is_empty());
     assert!(
         run.actions
+            .as_ref()
+            .unwrap()
             .request_for(
                 ToolCallId::default(),
                 "stale-call".into(),

@@ -94,6 +94,9 @@ pub enum EventKind {
     },
     /// Authorized request-local image supplement to an unchanged text selection.
     /// Numeric admission metadata only; no image, frame ID, target or hash.
+    /// ADR 0027: this request's image was covered by the run's completed local
+    /// look approval, so no second prompt is shown. No fields, no content.
+    ImageDisclosureCoveredByLook,
     ImageInputAdmitted {
         snapshot: crate::context::ContextSnapshot,
         width: u32,
@@ -122,6 +125,9 @@ pub enum EventKind {
     RemotePermissionRequired {
         available: bool,
     },
+    /// ADR 0027: presentation-only tools (point_at, sketch, say) inject no
+    /// input and need no approval; validated against the current look frame.
+    PresentationAllowed,
     PermissionRequested {
         command: String,
         workspace: String,
@@ -409,6 +415,7 @@ impl ExecutionState {
             | EventKind::ModelRouteSelected { .. }
             | EventKind::ContextPrepared { .. }
             | EventKind::ImageInputAdmitted { .. }
+            | EventKind::ImageDisclosureCoveredByLook
             | EventKind::ModelFirstTextDelta
             | EventKind::ModelTextDelta { .. }
             | EventKind::ModelCallCompleted { .. }
@@ -680,6 +687,25 @@ impl ExecutionState {
                 )?;
                 m.route = Some(decision.clone());
             }
+            EventKind::ImageDisclosureCoveredByLook => {
+                let looked = self
+                    .tools
+                    .values()
+                    .any(|t| t.call.name == "look" && t.status == Status::Completed);
+                let m = self
+                    .models
+                    .get_mut(&model()?)
+                    .ok_or_else(|| TransitionError("unknown model disclosure parent".into()))?;
+                require(
+                    looked
+                        && m.status == Status::Running
+                        && m.context.is_none()
+                        && m.image_admission.is_none()
+                        && !m.first_text
+                        && !self.cancellation_acknowledged,
+                )?;
+                m.status = Status::Granted;
+            }
             EventKind::ImageInputAdmitted {
                 snapshot,
                 width,
@@ -848,6 +874,7 @@ impl ExecutionState {
             }
             EventKind::PermissionPolicyEvaluated { .. }
             | EventKind::RemotePermissionRequired { .. }
+            | EventKind::PresentationAllowed
             | EventKind::ToolOutput { .. }
             | EventKind::NativeMutationRecorded { .. }
             | EventKind::PermissionRequested { .. }
@@ -887,6 +914,7 @@ impl ExecutionState {
                                     "instabox_exec"
                                         | "instabox_observe"
                                         | "instabox_action"
+                                        | "look"
                                         | "mail_search"
                                         | "mail_read"
                                 )
@@ -903,6 +931,16 @@ impl ExecutionState {
                         } else {
                             Status::PermissionDenied
                         }
+                    }
+                    EventKind::PresentationAllowed => {
+                        require(
+                            t.status == Status::Pending
+                                && t.permission.is_none()
+                                && matches!(t.call.name.as_str(), "point_at" | "sketch" | "say")
+                                && !self.cancellation_acknowledged,
+                        )?;
+                        t.permission = Some(PermissionAction::Allow);
+                        Status::Pending
                     }
                     EventKind::PermissionPolicyEvaluated {
                         capability, action, ..

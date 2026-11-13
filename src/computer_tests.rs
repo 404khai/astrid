@@ -439,7 +439,8 @@ async fn idle_expiry_real_receipts_disclosure_binding_and_single_use() {
     // No network in this test. This metadata comes from actual maintained PNG
     // validation, not the public mock ObservationMetadata seam.
     let wire = MockHttp::start(|_, _, _| panic!("unexpected network")).await;
-    let mut run = service(&wire).begin(RunId::default());
+    let mut run =
+        service(&wire).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
     let cancel = Cancellation::default();
     let observed = run
         .install(
@@ -543,7 +544,8 @@ fn observe_call(kind: &str) -> ToolCall {
 #[tokio::test]
 async fn observation_binding_is_single_use_and_pre_cancel_has_zero_http() {
     let wire = MockHttp::start(|_, _, _| panic!("unapproved network")).await;
-    let mut run = service(&wire).begin(RunId::default());
+    let mut run =
+        service(&wire).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
     let cancel = Cancellation::default();
     let prepared = run
         .prepare(ToolCallId::default(), &observe_call("screenshot"), &cancel)
@@ -580,7 +582,8 @@ async fn status_returns_only_booleans_and_running_target_is_exact() {
             if n==0 {(200,"application/json",json!({"id":if state=="wrong-id"{"m_wrong"}else{ID},"state":state,"secret":"never-retain"}).to_string())}
             else {assert!(path.contains("/desktop "));assert_eq!(body,&json!({"action":"status"}));(200,"application/json",json!({"installed":true,"running":true,"url":"secret-viewer","password":"never-retain"}).to_string())}
         }).await;
-        let mut run = service(&wire).begin(RunId::default());
+        let mut run =
+            service(&wire).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
         let cancel = Cancellation::default();
         let prepared = run
             .prepare(ToolCallId::default(), &observe_call("status"), &cancel)
@@ -609,7 +612,8 @@ async fn status_returns_only_booleans_and_running_target_is_exact() {
 #[tokio::test(start_paused = true)]
 async fn stale_real_frame_rejected_without_refresh_and_replacement_revokes_disclosure() {
     let wire = MockHttp::start(|_, _, _| panic!("no automatic refresh/input")).await;
-    let mut run = service(&wire).begin(RunId::default());
+    let mut run =
+        service(&wire).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
     let cancel = Cancellation::default();
     let observed = run
         .install(
@@ -646,7 +650,8 @@ async fn stale_real_frame_rejected_without_refresh_and_replacement_revokes_discl
 async fn disclosure_requires_fixed_destination_exact_model_current_frame_and_atomic_grant() {
     use crate::model::{ModelProvider, ModelRequest};
     let wire = MockHttp::start(|_, _, _| panic!("no provider or machine request")).await;
-    let mut run = service(&wire).begin(RunId::default());
+    let mut run =
+        service(&wire).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
     let cancel = Cancellation::default();
     run.install(
         crate::computer_png::canonicalize(&fixture()).unwrap(),
@@ -796,7 +801,8 @@ async fn capture_failures_keep_distinct_safe_categories_without_stderr_or_retrie
             }
         })
         .await;
-        let mut run = service(&wire).begin(RunId::default());
+        let mut run =
+            service(&wire).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
         let cancel = Cancellation::default();
         let prepared = run
             .prepare(ToolCallId::default(), &observe_call("screenshot"), &cancel)
@@ -884,3 +890,346 @@ async fn disclosure_input_failure_is_not_denial_and_does_not_echo_terminal_error
 
 #[path = "visual_response_tests.rs"]
 mod visual_response;
+
+// ADR 0027 local look: one combined approval, presence host capture and
+// presentation-only tools.
+fn png_of(width: u32, height: u32) -> Vec<u8> {
+    let mut v = Vec::new();
+    {
+        let mut e = png::Encoder::new(&mut v, width, height);
+        e.set_color(png::ColorType::Rgba);
+        e.set_depth(png::BitDepth::Eight);
+        let mut w = e.write_header().unwrap();
+        w.write_image_data(&vec![90; (width * height * 4) as usize])
+            .unwrap();
+    }
+    v
+}
+#[derive(Default)]
+struct FakeHost {
+    captures: Mutex<Vec<u32>>,
+    events: Mutex<Vec<Value>>,
+    fail: bool,
+}
+#[async_trait]
+impl crate::presence::LookHost for FakeHost {
+    async fn capture(&self, display: u32, _: &Cancellation) -> Result<Vec<u8>, String> {
+        self.captures.lock().unwrap().push(display);
+        if self.fail {
+            Err("host capture failed: screen_recording_permission_required".into())
+        } else {
+            Ok(png_of(320, 200))
+        }
+    }
+    async fn present(&self, event: Value) -> Result<(), String> {
+        self.events.lock().unwrap().push(event);
+        Ok(())
+    }
+}
+fn local(host: &Arc<FakeHost>) -> Computer {
+    Computer::local(
+        "test-principal".into(),
+        0,
+        host.clone(),
+        Arc::new(DecodeWorker::inline()),
+    )
+    .unwrap()
+}
+fn frame_id_from(body: &Value) -> Option<String> {
+    body["input"].as_array()?.iter().find_map(|v| {
+        let value: Value = serde_json::from_str(v["output"].as_str()?).ok()?;
+        value["data"]["observed"]["frame_id"]
+            .as_str()
+            .map(str::to_string)
+    })
+}
+async fn look_case(
+    host: Arc<FakeHost>,
+    answers: Vec<bool>,
+) -> (runtime::RunResult, Answers, MockHttp) {
+    let api = MockHttp::start(move |n, _, body| {
+        let tools = body["tools"][0]["tools"].to_string();
+        assert!(tools.contains("\"look\"") && tools.contains("\"point_at\""));
+        assert!(!tools.contains("instabox_observe"), "InstaBox tools must not be advertised");
+        let response = match n {
+            0 => {
+                assert!(!body.to_string().contains("input_image"));
+                completed(vec![call("look-1", "look", json!({}))])
+            }
+            1 => {
+                assert_eq!(body.to_string().matches("input_image").count(), 1);
+                assert!(body.to_string().contains("display points"));
+                let frame = frame_id_from(body).unwrap();
+                completed(vec![
+                    call("p", "point_at", json!({"frame_id":frame,"x":300,"y":20})),
+                    call("bad", "point_at", json!({"frame_id":frame,"x":320,"y":20})),
+                    call("s", "sketch", json!({"frame_id":frame,"shapes":[{"kind":"circle","x":300,"y":20,"r":18},{"kind":"arrow","from":[200,120],"to":[290,30]}]})),
+                    call("t", "say", json!({"text":"Export is top right."})),
+                ])
+            }
+            2 => {
+                // Text-only follow-up: the frame is never replayed.
+                assert!(!body.to_string().contains("input_image"));
+                completed(vec![message("Export is the top-right button.")])
+            }
+            _ => panic!("unexpected provider request"),
+        };
+        (200, "text/event-stream", response)
+    })
+    .await;
+    let workspace = tempfile::tempdir().unwrap();
+    let tools = Tools::new(
+        Workspace::new(workspace.path()).unwrap(),
+        Duration::from_secs(1),
+    )
+    .unwrap()
+    .with_computer(local(&host));
+    let provider =
+        OpenAiProvider::with_endpoint(Arc::new(Auth), format!("{}/v1/responses", api.origin))
+            .unwrap();
+    let mut answers = Answers {
+        disclosure: DisclosureFixture::Normal,
+        values: answers,
+        commands: Vec::new(),
+    };
+    let config = RunConfig {
+        routing: None,
+        observability: None,
+        context_budget: Some(Default::default()),
+        model: "gpt-5.6-sol".into(),
+        task: "Where is Export?".into(),
+        max_model_calls: 3,
+        permissions: Default::default(),
+    };
+    let result = runtime::run(
+        &provider,
+        &tools,
+        &mut answers,
+        config,
+        Cancellation::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    (result, answers, api)
+}
+
+#[tokio::test]
+async fn local_look_asks_once_then_points_sketches_and_says() {
+    let host = Arc::new(FakeHost::default());
+    let (result, answers, api) = look_case(host.clone(), vec![true]).await;
+    assert_eq!(result.outcome, RunOutcome::Completed);
+    assert_eq!(api.requests.lock().unwrap().len(), 3);
+    // Exactly one prompt: capture and disclosure together, naming the model.
+    assert_eq!(answers.commands.len(), 1);
+    let prompt = &answers.commands[0];
+    assert!(prompt.contains("local.look") && prompt.contains("image.disclose"));
+    assert!(prompt.contains("gpt-5.6-sol") && prompt.contains("this_mac_display"));
+    assert_eq!(*host.captures.lock().unwrap(), vec![0]);
+    let events = host.events.lock().unwrap().clone();
+    assert_eq!(
+        events,
+        vec![
+            json!({"v":1,"type":"point_at","x":300,"y":20,"display":0}),
+            json!({"v":1,"type":"sketch","display":0,"shapes":[{"kind":"circle","x":300,"y":20,"r":18},{"kind":"arrow","from":[200,120],"to":[290,30]}]}),
+            json!({"v":1,"type":"say","text":"Export is top right."}),
+        ]
+    );
+    // The out-of-frame point was rejected as a tool error without stopping the run.
+    let rejected = result.session.messages.iter().any(|m| matches!(m, Message::Tool(t)
+        if t.call_id == "bad" && matches!(&t.outcome, ToolOutcome::Error { code, .. } if code == "computer_admission")));
+    assert!(rejected);
+    // No image bytes in the session.
+    let session = serde_json::to_string(&result.session.messages).unwrap();
+    assert!(!session.contains("iVBOR") && !session.contains("data:image"));
+}
+
+#[tokio::test]
+async fn declined_look_captures_nothing_and_sends_no_image() {
+    let api = MockHttp::start(move |n, _, _| {
+        assert_eq!(n, 0, "no request after a declined look");
+        (
+            200,
+            "text/event-stream",
+            completed(vec![call("look-1", "look", json!({}))]),
+        )
+    })
+    .await;
+    let host = Arc::new(FakeHost::default());
+    let workspace = tempfile::tempdir().unwrap();
+    let tools = Tools::new(
+        Workspace::new(workspace.path()).unwrap(),
+        Duration::from_secs(1),
+    )
+    .unwrap()
+    .with_computer(local(&host));
+    let provider =
+        OpenAiProvider::with_endpoint(Arc::new(Auth), format!("{}/v1/responses", api.origin))
+            .unwrap();
+    let mut answers = Answers {
+        disclosure: DisclosureFixture::Normal,
+        values: vec![false],
+        commands: Vec::new(),
+    };
+    let config = RunConfig {
+        routing: None,
+        observability: None,
+        context_budget: Some(Default::default()),
+        model: "gpt-5.6-sol".into(),
+        task: "Where is Export?".into(),
+        max_model_calls: 3,
+        permissions: Default::default(),
+    };
+    let result = runtime::run(
+        &provider,
+        &tools,
+        &mut answers,
+        config,
+        Cancellation::default(),
+        None,
+    )
+    .await
+    .unwrap();
+    assert!(!matches!(result.outcome, RunOutcome::Completed));
+    assert!(host.captures.lock().unwrap().is_empty());
+    assert!(host.events.lock().unwrap().is_empty());
+    assert_eq!(api.requests.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn presentation_needs_the_current_look_frame_and_stays_in_bounds() {
+    let host = Arc::new(FakeHost::default());
+    let mut run = local(&host).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
+    let cancel = Cancellation::default();
+    let tool = |name: &str, args: Value| ToolCall {
+        call_id: "c".into(),
+        name: name.into(),
+        arguments: args.to_string(),
+    };
+    // say needs no frame; pointing does.
+    assert!(
+        run.prepare(
+            ToolCallId::default(),
+            &tool("say", json!({"text":"hi"})),
+            &cancel
+        )
+        .is_ok()
+    );
+    assert!(
+        run.prepare(
+            ToolCallId::default(),
+            &tool("say", json!({"text":"hi","x":1})),
+            &cancel
+        )
+        .is_err()
+    );
+    let no_frame = run.prepare(
+        ToolCallId::default(),
+        &tool(
+            "point_at",
+            json!({"frame_id":uuid::Uuid::new_v4(),"x":1,"y":1}),
+        ),
+        &cancel,
+    );
+    assert!(no_frame.err().unwrap().contains("call look first"));
+    // InstaBox tools do not exist on a local target.
+    assert!(
+        run.prepare(
+            ToolCallId::default(),
+            &tool("instabox_observe", json!({"kind":"screenshot"})),
+            &cancel
+        )
+        .is_err()
+    );
+    // Take one look.
+    let prepared = run
+        .prepare(ToolCallId::default(), &tool("look", json!({})), &cancel)
+        .unwrap();
+    assert!(prepared.needs_approval());
+    let permit = prepared.approve().unwrap();
+    let ToolExecution::Finished(result) = run.execute(prepared, permit, &cancel).await else {
+        panic!()
+    };
+    let ToolOutcome::Success { data } = result.outcome else {
+        panic!("{:?}", result.outcome)
+    };
+    assert_eq!(data["target"], "local_display");
+    assert_eq!(data["observed"]["coordinate_space"], "display_points");
+    let frame = data["observed"]["frame_id"].as_str().unwrap().to_owned();
+    let mut ok = |args: Value| run_ok(&mut run, &tool("point_at", args), &cancel);
+    fn run_ok(run: &mut ComputerRun, call: &ToolCall, cancel: &Cancellation) -> Result<(), String> {
+        run.prepare(ToolCallId::default(), call, cancel).map(|_| ())
+    }
+    assert!(ok(json!({"frame_id":frame,"x":319,"y":199})).is_ok());
+    assert!(ok(json!({"frame_id":frame,"x":320,"y":0})).is_err());
+    assert!(ok(json!({"frame_id":frame,"x":-1,"y":0})).is_err());
+    assert!(ok(json!({"frame_id":frame,"x":1.5,"y":0})).is_err());
+    assert!(ok(json!({"frame_id":uuid::Uuid::new_v4(),"x":1,"y":1})).is_err());
+    assert!(ok(json!({"frame_id":frame,"x":1,"y":1,"click":true})).is_err());
+    let mut sketch = |shapes: Value| {
+        run_ok(
+            &mut run,
+            &tool("sketch", json!({"frame_id":frame,"shapes":shapes})),
+            &cancel,
+        )
+    };
+    assert!(sketch(json!([{"kind":"line","from":[0,0],"to":[319,199]}])).is_ok());
+    assert!(sketch(json!([])).is_err());
+    assert!(sketch(json!([{"kind":"circle","x":10,"y":10,"r":2}])).is_err());
+    assert!(sketch(json!([{"kind":"star","x":10,"y":10}])).is_err());
+    // A rejected presentation does not stop the run.
+    assert!(!run.stopped());
+    // The pre-approved frame is bound to the approved model only.
+    assert!(
+        run.take_vision(
+            ModelCallId::default(),
+            "openai_codex_subscription",
+            "gpt-5.6-terra"
+        )
+        .is_err()
+    );
+}
+
+#[tokio::test]
+async fn local_capture_failure_and_look_limits_stop_without_retry() {
+    let host = Arc::new(FakeHost {
+        fail: true,
+        ..Default::default()
+    });
+    let mut run = local(&host).begin(RunId::default(), "openai_codex_subscription", "gpt-5.6-sol");
+    let cancel = Cancellation::default();
+    let look = ToolCall {
+        call_id: "c".into(),
+        name: "look".into(),
+        arguments: "{}".into(),
+    };
+    assert!(
+        run.prepare(
+            ToolCallId::default(),
+            &ToolCall {
+                arguments: "{\"display\":1}".into(),
+                ..look.clone()
+            },
+            &cancel
+        )
+        .is_err()
+    );
+    let prepared = run.prepare(ToolCallId::default(), &look, &cancel).unwrap();
+    let permit = prepared.approve().unwrap();
+    let ToolExecution::Finished(result) = run.execute(prepared, permit, &cancel).await else {
+        panic!()
+    };
+    let ToolOutcome::Success { data } = result.outcome else {
+        panic!()
+    };
+    assert_eq!(data["successful"], false);
+    assert!(
+        data["failure"]
+            .as_str()
+            .unwrap()
+            .contains("Screen Recording")
+    );
+    assert!(run.stopped());
+    assert_eq!(host.captures.lock().unwrap().len(), 1);
+    assert!(run.prepare(ToolCallId::default(), &look, &cancel).is_err());
+}

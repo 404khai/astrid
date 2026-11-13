@@ -197,7 +197,7 @@ impl OpenCodeProvider {
                 request.model
             )));
         }
-        if request.options.computer_use {
+        if request.options.computer_use || request.options.look {
             return Err(ModelError::Provider(
                 "screen tools are not supported on OpenCode models".into(),
             ));
