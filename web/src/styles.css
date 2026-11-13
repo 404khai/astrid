@@ -3989,7 +3989,7 @@ kbd {
   padding-top: 6px;
   border-top: 1px solid #2c2c2c;
 }
-.brand-menu button {
+.brand-menu [role="menuitem"] {
   width: 100%;
   display: flex;
   align-items: center;
@@ -4004,11 +4004,11 @@ kbd {
   text-align: left;
   outline: none;
 }
-.brand-menu button svg {
+.brand-menu [role="menuitem"] svg {
   flex: none;
 }
-.brand-menu button:hover,
-.brand-menu button:focus-visible {
+.brand-menu [role="menuitem"]:hover,
+.brand-menu [role="menuitem"]:focus-visible {
   background: #242424;
   color: #fff;
 }

@@ -21,6 +21,7 @@ type Item = {
   id: string;
   label: string;
   icon: IconSvgElement;
+  href?: string;
   run: () => void | Promise<void>;
 };
 
@@ -77,9 +78,9 @@ export function BrandLink({
         id: "tab",
         label: "Open link in new tab",
         icon: ArrowUpRight01Icon,
+        href: link.current?.href ?? href,
         run: () => {
-          close(true);
-          window.open(link.current?.href ?? href, "_blank", "noopener");
+          window.setTimeout(() => close(true));
         },
       },
     ],
@@ -170,25 +171,46 @@ export function BrandLink({
           >
             {items.map((group, groupIndex) => (
               <div className="brand-menu-group" role="group" key={groupIndex}>
-                {group.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="menuitem"
-                    tabIndex={-1}
-                    onClick={() => void item.run()}
-                  >
-                    <HugeiconsIcon
-                      icon={item.icon}
-                      size={18}
-                      strokeWidth={1.6}
-                      aria-hidden="true"
-                    />
-                    <span aria-live={item.id === "copy" ? "polite" : undefined}>
-                      {item.label}
-                    </span>
-                  </button>
-                ))}
+                {group.map((item) => {
+                  const content = (
+                    <>
+                      <HugeiconsIcon
+                        icon={item.icon}
+                        size={18}
+                        strokeWidth={1.6}
+                        aria-hidden="true"
+                      />
+                      <span
+                        aria-live={item.id === "copy" ? "polite" : undefined}
+                      >
+                        {item.label}
+                      </span>
+                    </>
+                  );
+                  return item.href ? (
+                    <a
+                      key={item.id}
+                      role="menuitem"
+                      tabIndex={-1}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => void item.run()}
+                    >
+                      {content}
+                    </a>
+                  ) : (
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="menuitem"
+                      tabIndex={-1}
+                      onClick={() => void item.run()}
+                    >
+                      {content}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>,
