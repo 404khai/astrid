@@ -83,7 +83,7 @@ needs it.
 | Scheduler and batch workers (Phase 8) | `scheduler.rs`, `batch_*.rs` | Useful later for "research this while I work". |
 | Remote VM execution | `instabox*.rs`, `remote*.rs` (ADR 0021) | Relevant to the thin-client principle for the phone, later. |
 | Coding-specific inspection | `changes.rs`, `native.rs`, coding prompts | Coding stays a capability, not the identity. |
-| GPUI spatial experiment | `apps/desktop-experiments/spatial` | Visual reference for spatial UI; not the overlay host (see D1). |
+| GPUI spatial experiment | `apps/desktop-experiments/spatial` | Visual reference for spatial UI; not the overlay host (see D1). The desktop app is a native SwiftUI test run for now ([ADR 0037](../adr/0037-native-desktop-app.md)). |
 
 Recommendation: a later cleanup ADR may move frozen areas behind Cargo features
 to shrink the default binary. That is not urgent and is not done here.
