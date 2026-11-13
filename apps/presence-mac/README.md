@@ -9,6 +9,10 @@ needs no permissions. Contract: [ADR 0026](../../docs/adr/0026-presence-host-and
 
 Requires macOS 14+ and Swift 5.9+ (Xcode or Command Line Tools).
 
+The desktop chat app is a separate package, `apps/astrid-desktop`
+(ADR 0037). It shares this package's `AstridWebUI` library and runs as its own
+process, so quitting it never affects presence.
+
 ```sh
 cd apps/presence-mac
 swift build                                   # build

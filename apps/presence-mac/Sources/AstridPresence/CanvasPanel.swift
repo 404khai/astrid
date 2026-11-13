@@ -1,4 +1,5 @@
 import AppKit
+import AstridWebUI
 import WebKit
 
 /// ADR 0036: Astrid's live canvas. A floating panel that shows the web canvas
