@@ -3973,7 +3973,6 @@ kbd {
   fill: currentColor;
 }
 
-/* Logo context menu: copy the mark, brand guidelines, open in new tab. */
 .brand-menu {
   position: fixed;
   z-index: 1000;

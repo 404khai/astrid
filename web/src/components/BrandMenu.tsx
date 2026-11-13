@@ -24,11 +24,6 @@ type Item = {
   run: () => void | Promise<void>;
 };
 
-/**
- * A logo link whose right-click (or context-menu key) opens a small brand menu:
- * copy the mark as SVG, jump to the brand guidelines, or open the link in a new tab.
- * A plain click still follows the link.
- */
 export function BrandLink({
   href,
   className,
@@ -103,7 +98,6 @@ export function BrandLink({
     );
   };
 
-  // Keep the menu inside the viewport and focus its first item once placed.
   useEffect(() => {
     const element = menu.current;
     if (!at || !element) return;
