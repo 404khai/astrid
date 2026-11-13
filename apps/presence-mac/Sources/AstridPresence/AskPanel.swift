@@ -41,6 +41,8 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var hotkey: Hotkey?
     private var dragTimer: Timer?
     private let speaker: Speaker
+    /// ADR 0036: the live canvas, created on the first drawing.
+    private lazy var canvas = CanvasController(page: config.ui.deletingLastPathComponent().appendingPathComponent("canvas.html"))
 
     init(config: AskConfig) {
         self.config = config
@@ -231,9 +233,20 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             let line = buffer[buffer.startIndex..<newline]
             buffer.removeSubrange(buffer.startIndex...newline)
             // Only well-formed JSON objects reach the page.
-            guard let object = try? JSONSerialization.jsonObject(with: line), object is [String: Any] else { continue }
-            deliver(object)
+            guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            route(object)
         }
+    }
+
+    /// Canvas events go to the canvas; answers go to both once it has drawn.
+    private func route(_ object: [String: Any]) {
+        let type = object["type"] as? String
+        if type == "canvas" {
+            canvas.deliver(object, near: anchor)
+            return
+        }
+        if type == "answer", canvas.isVisible { canvas.deliver(object, near: anchor) }
+        deliver(object)
     }
 
     private func deliver(_ object: Any) {

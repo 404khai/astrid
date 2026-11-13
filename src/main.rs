@@ -25,6 +25,7 @@ mod console;
 mod instabox;
 mod logo;
 mod presence_ask;
+mod presence_canvas;
 mod remote_cli;
 mod sessions;
 use console::Console;

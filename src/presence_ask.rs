@@ -4,7 +4,9 @@
 //! stdin:  {"type":"ask","text":...} | {"type":"approve","id":n,"approve":bool} | {"type":"cancel"}
 //! stdout: {"type":"ready"} | {"type":"state","state":..,"label":..} | {"type":"delta","text":..}
 //!         | {"type":"approval","id":n,"title":..,"detail":..} | {"type":"answer","text":..,"brief":{..}|null}
+//!         | {"type":"canvas","event":"begin"|"shape"|"end",..} (ADR 0036)
 //!         | {"type":"error","message":..} | {"type":"done","outcome":..}
+use crate::presence_canvas::{CANVAS_INSTRUCTIONS, CanvasStream};
 use astrid::{
     cancellation::Cancellation,
     events::EventKind,
@@ -26,7 +28,7 @@ use std::{
 const MAX_ASK: usize = 4000;
 
 /// Asks the model to finish with a machine-readable brief the UI renders.
-pub const BRIEF_INSTRUCTIONS: &str = "You are answering inside Astrid's on-screen ask panel. Use the mail tools when the question is about email. Keep it short and concrete. End your reply with exactly one fenced code block tagged `brief` containing JSON: {\"title\": short headline, \"summary\": one sentence, \"todos\": [{\"text\": action the user should take, \"source\": n}], \"updates\": [{\"text\": what happened, \"source\": n}], \"sources\": [{\"id\": n, \"kind\": \"gmail\" or \"apple\", \"from\": sender name, \"subject\": subject, \"date\": short date, \"message_id\": id from mail_search}]}. Number sources from 1; omit empty lists; every todo and update cites a source when one exists. Do not invent emails.";
+pub const BRIEF_INSTRUCTIONS: &str = "You are answering inside Astrid's on-screen ask panel. Use the mail tools when the question is about email. Keep it short and concrete. Unless you are drawing on the canvas, end your reply with exactly one fenced code block tagged `brief` containing JSON: {\"title\": short headline, \"summary\": one sentence, \"todos\": [{\"text\": action the user should take, \"source\": n}], \"updates\": [{\"text\": what happened, \"source\": n}], \"sources\": [{\"id\": n, \"kind\": \"gmail\" or \"apple\", \"from\": sender name, \"subject\": subject, \"date\": short date, \"message_id\": id from mail_search}]}. Number sources from 1; omit empty lists; every todo and update cites a source when one exists. Do not invent emails.";
 
 fn emit(value: Value) {
     let mut out = io::stdout().lock();
@@ -193,10 +195,11 @@ pub async fn serve(
             observability: None,
             context_budget: Some(Default::default()),
             model: model.clone(),
-            task: format!("{ask}\n\n{BRIEF_INSTRUCTIONS}"),
+            task: format!("{ask}\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}"),
             max_model_calls: 8,
             permissions: PermissionPolicy::read_only(),
         };
+        let mut canvas = CanvasStream::default();
         let forward = async {
             while let Some(event) = events_rx.recv().await {
                 if let Some((state, label)) = state_for(&event.kind) {
@@ -204,6 +207,7 @@ pub async fn serve(
                 }
                 if let EventKind::ModelTextDelta { text } = &event.kind {
                     emit(json!({"type":"delta","text":text}));
+                    canvas.feed(text).into_iter().for_each(emit);
                 }
             }
         };
@@ -220,11 +224,20 @@ pub async fn serve(
             Ok(result) => {
                 let outcome = match &result.outcome {
                     RunOutcome::Completed => {
-                        let (text, brief) = split_brief(&result.final_text);
+                        // Providers that don't stream text still get their drawing.
+                        if !canvas.started() {
+                            canvas.feed(&result.final_text).into_iter().for_each(emit);
+                        }
+                        canvas.finish().into_iter().for_each(emit);
+                        let (text, brief) =
+                            split_brief(&crate::presence_canvas::strip(&result.final_text));
                         emit(json!({"type":"answer","text":text,"brief":brief}));
                         "completed".to_string()
                     }
-                    RunOutcome::Cancelled => "cancelled".into(),
+                    RunOutcome::Cancelled => {
+                        emit(json!({"type":"canvas","event":"cancel"}));
+                        "cancelled".into()
+                    }
                     RunOutcome::Failed { code, message } => {
                         emit(json!({"type":"error","message":format!("{code}: {message}")}));
                         "failed".into()

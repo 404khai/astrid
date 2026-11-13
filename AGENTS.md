@@ -69,6 +69,12 @@ local Kokoro TTS. [ADR 0035](docs/adr/0035-local-spoken-replies.md): `apps/astri
 mlx-audio, JSON lines), host playback through the voice ring, macOS voice fallback, barge-in,
 metadata-only speech timings. Branch `feat/voice-speaking` stacked on `feat/voice-listening`. PR, no merge.
 
+**V2-04 live canvas started 2026-11-13.** Maintainer: "let's work on V2-04 ... voice mode, talk to it,
+and it generates ... on a canvas on screen ... astrid can move around with its cursor to point at stuff it
+created ... weaving, composing and sketching". [ADR 0036](docs/adr/0036-live-canvas.md) settles D3 as (b):
+a streamed, runtime-validated `canvas` shape block drawn by trusted templates in a presence canvas panel; no
+model-written code, no new tool or permission. Branch `feat/live-canvas` from main. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
