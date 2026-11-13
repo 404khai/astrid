@@ -98,7 +98,83 @@ pub fn compose_task(ask: &str, history: &[Turn]) -> String {
 
 /// ADR 0038: lets the ask model hand screen tasks to operator, so the user can
 /// just say what they want ("turn on dark mode") without `/operator`.
-pub const OPERATOR_HINT: &str = "If the user wants to get something done on their Mac's screen (change a setting, use an app or a website, find a button or menu) and seeing their screen would help, do not answer in text: reply with only one fenced code block tagged `operator-start` containing JSON {\"goal\": the task as one short imperative sentence}. Astrid then asks to look at their screen and walks them through it step by step. Answer normally anything you can answer without their screen, including email questions and drawings.";
+pub const OPERATOR_HINT: &str = "Decide this first. If the user wants to get something done on their Mac's screen (change a setting, use an app or a website, click, open, subscribe or unsubscribe, find a button or menu), reply with only one fenced code block tagged `operator-start` containing JSON {\"goal\": the task as one short imperative sentence}, and nothing else: no brief, no mail tools. Words like \"this\", \"here\", \"this page\", \"this tab\", \"this channel\" or \"this video\" mean what is on their screen right now. Astrid then asks to look at their screen and walks them through it step by step. Only questions about their email use the mail tools; answer everything else normally.";
+
+/// Clear on-screen requests go straight to operator, with no model call and
+/// no chance of being read as an email question. Conservative: anything about
+/// mail, or without an on-screen reference or a settings verb, is left to the
+/// ask model (which still has `OPERATOR_HINT`).
+pub fn screen_task(ask: &str) -> Option<String> {
+    let goal = strip_wake_word(ask);
+    let lower = format!(
+        " {} ",
+        goal.to_lowercase().replace(['?', '!', '.', ','], " ")
+    );
+    let words = |list: &[&str]| list.iter().any(|w| lower.contains(&format!(" {w} ")));
+    if words(&[
+        "email",
+        "emails",
+        "e-mail",
+        "mail",
+        "inbox",
+        "gmail",
+        "newsletter",
+        "newsletters",
+        "draw",
+        "sketch",
+        "diagram",
+    ]) {
+        return None;
+    }
+    let on_screen = words(&[
+        "this channel",
+        "this page",
+        "this tab",
+        "this video",
+        "this site",
+        "this website",
+        "this window",
+        "this app",
+        "this button",
+        "this menu",
+        "this setting",
+        "this account",
+        "this playlist",
+        "this post",
+        "this repo",
+        "this profile",
+        "this form",
+        "this file",
+        "on my screen",
+        "on screen",
+        "on this page",
+        "here",
+    ]);
+    let settings = ["turn on ", "turn off ", "enable ", "disable ", "switch to "]
+        .iter()
+        .any(|v| lower.trim_start().starts_with(v));
+    (on_screen || settings).then(|| goal.to_owned())
+}
+
+/// Voice asks often start with "Astrid" or "hey Astrid"; the goal doesn't.
+fn strip_wake_word(ask: &str) -> &str {
+    let trimmed = ask.trim();
+    for wake in ["hey astrid", "ok astrid", "okay astrid", "astrid"] {
+        if trimmed.is_char_boundary(wake.len()) && trimmed[..wake.len()].eq_ignore_ascii_case(wake)
+        {
+            let rest = &trimmed[wake.len()..];
+            // Only a whole word: "Astridine" keeps its name.
+            if rest.starts_with(|c: char| c.is_alphanumeric()) {
+                continue;
+            }
+            let rest = rest.trim_start_matches([',', ' ', ':', '-']);
+            if !rest.is_empty() {
+                return rest;
+            }
+        }
+    }
+    trimmed
+}
 
 /// The goal from a reply that hands the ask to operator, if it is one.
 pub fn operator_request(reply: &str) -> Option<String> {
@@ -366,8 +442,11 @@ pub async fn serve(
     while let Some((ask, history)) = asks_rx.recv().await {
         let cancel = Cancellation::default();
         *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(cancel.clone());
-        if let Some(goal) = operator_goal(&ask) {
-            let outcome = operate(goal, operator.as_ref(), &bridge, &cancel).await;
+        let routed = operator_goal(&ask)
+            .map(str::to_owned)
+            .or_else(|| operator.as_ref().and_then(|_| screen_task(&ask)));
+        if let Some(goal) = routed {
+            let outcome = operate(&goal, operator.as_ref(), &bridge, &cancel).await;
             emit(json!({"type":"done","outcome":outcome}));
             emit(json!({"type":"state","state":"idle","label":"Ready"}));
             *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = None;
@@ -385,7 +464,7 @@ pub async fn serve(
             context_budget: Some(Default::default()),
             model: model.clone(),
             task: if operator.is_some() {
-                format!("{}\n\n{OPERATOR_HINT}", compose_task(&ask, &history))
+                format!("{OPERATOR_HINT}\n\n{}", compose_task(&ask, &history))
             } else {
                 compose_task(&ask, &history)
             },
@@ -556,6 +635,41 @@ mod tests {
         assert!(task.starts_with(
             "Earlier in this conversation (context only):\nUser: draw a pump\nAstrid: Here is a pump.\n\nThe user now asks:\nmake it bigger\n\n"
         ));
+    }
+
+    #[test]
+    fn clear_screen_requests_go_straight_to_operator() {
+        for (ask, goal) in [
+            (
+                "astrid unsubscribe from this channel",
+                "unsubscribe from this channel",
+            ),
+            (
+                "Astrid, unsubscribe from this channel.",
+                "unsubscribe from this channel.",
+            ),
+            ("hey Astrid like this video", "like this video"),
+            ("turn on dark mode", "turn on dark mode"),
+            (
+                "where's the export button on this page?",
+                "where's the export button on this page?",
+            ),
+            ("close this tab", "close this tab"),
+        ] {
+            assert_eq!(screen_task(ask).as_deref(), Some(goal), "{ask}");
+        }
+        for ask in [
+            "unsubscribe me from that newsletter email",
+            "any emails from Sam today?",
+            "summarize my inbox",
+            "draw a pump",
+            "what's the capital of France",
+            "astrid",
+            "Astridine is a word",
+        ] {
+            assert_eq!(screen_task(ask), None, "{ask}");
+        }
+        assert_eq!(strip_wake_word("Astridine here"), "Astridine here");
     }
 
     #[test]

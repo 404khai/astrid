@@ -138,6 +138,13 @@ operator's model, and voice operator)".
   block `{"goal": ...}`, and the session hands off to operator with that goal.
   Nothing is captured until the user presses (or says) Look on the start card.
   `/operator` remains as an explicit shortcut.
+  *Follow-up the same day:* "unsubscribe from this channel" on a YouTube tab was
+  read as an email question (mail search plus a brief). Clear on-screen requests
+  (an on-screen reference such as "this channel/page/tab/video", or "turn
+  on/off ...", and no mention of mail) now go straight to operator with no model
+  call, after dropping a leading "Astrid"/"hey Astrid". The hint now leads the
+  task and says plainly that "this" means the screen and that mail tools are for
+  email only.
 - **Voice.** While a step card waits, the page keeps a copy, voice mode keeps
   listening, and a final transcript is sent as an `utterance`. The runtime maps
   it to one of the card's offered buttons (`choice_from_speech`): stop words win
