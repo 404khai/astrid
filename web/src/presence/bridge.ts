@@ -16,6 +16,7 @@ export type Incoming =
   | { type: "error"; message: string }
   | { type: "done"; outcome: string }
   | { type: "voice"; level: number }
+  | { type: "hotkey"; down: boolean }
   | { type: "transcript"; text: string; final: boolean }
   | { type: "voice-error"; message: string };
 
@@ -130,4 +131,20 @@ function mockListen(on: boolean) {
   } else {
     setTimeout(() => listener({ type: "transcript", text: words.join(" "), final: true }), 250);
   }
+}
+
+// Dev: hold ⌥Space in the page to stand in for the native global hotkey.
+if (!native()) {
+  let held = false;
+  addEventListener("keydown", (e) => {
+    if (e.code !== "Space" || !e.altKey || held) return;
+    e.preventDefault();
+    held = true;
+    listener({ type: "hotkey", down: true });
+  });
+  addEventListener("keyup", (e) => {
+    if (e.code !== "Space" || !held) return;
+    held = false;
+    listener({ type: "hotkey", down: false });
+  });
 }

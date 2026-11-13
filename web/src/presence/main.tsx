@@ -80,6 +80,8 @@ function App() {
   const input = useRef<HTMLInputElement>(null);
   const askRef = useRef<string | null>(null);
   const voice = useVoice((heard) => submit(heard));
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
 
   useEffect(() => {
     listen((m: Incoming) => {
@@ -95,6 +97,13 @@ function App() {
           break;
         case "error":
           setError(m.message);
+          break;
+        case "hotkey":
+          // Hold-to-talk from anywhere: open the panel and listen until release.
+          if (m.down) {
+            setOpen(true);
+            voiceRef.current.start();
+          } else voiceRef.current.stop();
           break;
         case "voice":
         case "transcript":
@@ -235,7 +244,8 @@ function App() {
                 <button
                   type="button"
                   className={`pr-mic${voice.listening ? " pr-mic-on" : ""}`}
-                  aria-label={voice.listening ? "Stop listening and send" : "Hold to talk"}
+                  aria-label={voice.listening ? "Stop listening and send" : "Hold to talk (or hold ⌥Space anywhere)"}
+                  title="Hold to talk · ⌥Space"
                   aria-pressed={voice.listening}
                   {...voice.handlers}
                 >
@@ -280,6 +290,7 @@ function useVoice(onHeard: (text: string) => void) {
   const [heard, setHeard] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const level = useRef(0);
+  const on = useRef(false);
   const pressed = useRef(0);
   const cancelled = useRef(false);
   const heardRef = useRef(onHeard);
@@ -287,7 +298,8 @@ function useVoice(onHeard: (text: string) => void) {
   const mic = useMicrophone();
 
   const start = () => {
-    if (listening) return;
+    if (on.current) return;
+    on.current = true;
     cancelled.current = false;
     level.current = 0;
     setHeard("");
@@ -297,7 +309,8 @@ function useVoice(onHeard: (text: string) => void) {
     send({ type: "listen", on: true });
   };
   const stop = () => {
-    if (!listening) return;
+    if (!on.current) return;
+    on.current = false;
     setListening(false);
     if (!native()) mic.stop();
     send({ type: "listen", on: false });
@@ -311,6 +324,7 @@ function useVoice(onHeard: (text: string) => void) {
   const receive = (m: Incoming) => {
     if (m.type === "voice") level.current = m.level;
     else if (m.type === "voice-error") {
+      on.current = false;
       setListening(false);
       setHeard(null);
       setError(m.message);
@@ -318,6 +332,7 @@ function useVoice(onHeard: (text: string) => void) {
       if (cancelled.current) return;
       setHeard(m.text);
       if (m.final) {
+        on.current = false;
         setListening(false);
         setHeard(null);
         if (m.text.trim()) heardRef.current(m.text);

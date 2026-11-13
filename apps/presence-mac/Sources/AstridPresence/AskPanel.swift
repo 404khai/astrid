@@ -35,6 +35,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var pointerTimer: Timer?
     private var lastPointer = NSPoint(x: -1, y: -1)
     private let voice = VoiceInput()
+    private var hotkey: Hotkey?
 
     init(config: AskConfig) {
         self.config = config
@@ -68,6 +69,8 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         voice.onLevel = { [weak self] level in self?.deliver(["type": "voice", "level": level]) }
         voice.onTranscript = { [weak self] text, final in self?.deliver(["type": "transcript", "text": text, "final": final]) }
         voice.onError = { [weak self] message in self?.deliver(["type": "voice-error", "message": message]) }
+        // Hold ⌥Space anywhere to talk; the page opens itself and drives the mic.
+        hotkey = Hotkey { [weak self] down in self?.deliver(["type": "hotkey", "down": down]) }
     }
 
     private func trackPointer() {

@@ -16,7 +16,8 @@ can run in the page (`getUserMedia`, `webkitSpeechRecognition`) or in the host.
   falls back to server recognition.
 - The mic is open only while the user holds the mic button (release sends), or
   between two taps. Esc cancels without sending. Audio and transcripts are not
-  written anywhere. The final transcript is submitted exactly like a typed ask,
+  written anywhere. Holding ⌥Space anywhere (a Carbon hot key, so no
+  Accessibility permission) opens the panel and listens until release. The final transcript is submitted exactly like a typed ask,
   so runtime permissions and approvals are unchanged.
 - Bridge messages: page → host `{type:"listen", on}`; host → page
   `{type:"voice", level}` (0–1, from RMS dBFS), `{type:"transcript", text, final}`
@@ -33,7 +34,7 @@ can run in the page (`getUserMedia`, `webkitSpeechRecognition`) or in the host.
 
 ## Not in this slice
 
-TTS/speaking state, barge-in, a global push-to-talk hotkey, and trace latency
+TTS/speaking state, barge-in, a configurable hotkey, and trace latency
 spans. Voice direction ([VoicePositionKit](https://libraries.dev/voice-position))
 is iOS-only and needs an iPhone's stereo mics. It feeds `VoiceRing`'s `direction`
 prop and belongs with the phone companion (V2-06).
