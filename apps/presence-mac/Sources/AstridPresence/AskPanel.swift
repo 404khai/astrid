@@ -32,6 +32,8 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         return NSPoint(x: visible.midX, y: visible.midY - 38)
     }()
     private static let margin: CGFloat = 20
+    private var pointerTimer: Timer?
+    private var lastPointer = NSPoint(x: -1, y: -1)
 
     init(config: AskConfig) {
         self.config = config
@@ -57,6 +59,20 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         web.load(URLRequest(url: URL(string: "astrid-ui://app/\(config.ui.lastPathComponent)")!))
         place()
         panel.orderFrontRegardless()
+        // The mark's eyes follow the system cursor anywhere on screen. Polling
+        // NSEvent.mouseLocation needs no permission; only movement is sent.
+        let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.trackPointer() }
+        RunLoop.main.add(timer, forMode: .common)
+        pointerTimer = timer
+    }
+
+    private func trackPointer() {
+        let mouse = NSEvent.mouseLocation
+        guard mouse != lastPointer else { return }
+        lastPointer = mouse
+        let frame = panel.frame
+        // Page coordinates: origin top-left of the panel, y downward.
+        deliver(["type": "pointer", "x": mouse.x - frame.minX, "y": frame.maxY - mouse.y])
     }
 
     /// Places the panel around its anchor, kept fully on the anchor's screen.
@@ -178,6 +194,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     }
 
     func stop() {
+        pointerTimer?.invalidate()
         child?.terminate()
     }
 }

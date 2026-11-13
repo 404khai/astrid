@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import "./astrid-logo.css";
 
 /** The original Astrid mark, with independently animated eyes. */
 /** Eye expressions for agent states; omit for the original mark. */

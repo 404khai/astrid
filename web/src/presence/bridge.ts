@@ -35,8 +35,25 @@ declare global {
 const native = () => window.webkit?.messageHandlers?.astrid;
 let listener: (message: Incoming) => void = () => {};
 
-/** The native app calls window.astrid.receive(...) for every runtime event. */
-window.astrid = { receive: (message) => listener(message) };
+/** The native app calls window.astrid.receive(...) for every runtime event,
+ * and with {type:"pointer"} for the global cursor in page coordinates. */
+window.astrid = {
+  receive: (message) => {
+    if ((message as { type: string }).type === "pointer") return followPointer(message as unknown as { x: number; y: number });
+    listener(message);
+  },
+};
+
+/* AstridLogo tracks window pointermove events; replaying the system cursor as
+ * one lets the mark follow the pointer anywhere on screen. After 4 s at rest
+ * the eyes go back to their look-around loop. */
+let restTimer: number | undefined;
+function followPointer({ x, y }: { x: number; y: number }) {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  window.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, pointerType: "mouse" }));
+  window.clearTimeout(restTimer);
+  restTimer = window.setTimeout(() => document.dispatchEvent(new PointerEvent("pointerleave")), 4000);
+}
 
 export function listen(handler: (message: Incoming) => void) {
   listener = handler;

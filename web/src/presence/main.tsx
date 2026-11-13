@@ -208,7 +208,7 @@ function App() {
                 onPointerDown={drag.onPointerDown}
                 onClick={drag.click(() => setOpen(false))}
               >
-                <AstridLogo expression={busy ? look.eyes : "idle"} />
+                {busy ? <AstridLogo expression={look.eyes} /> : <AstridLogo animated tracking />}
               </button>
               <input
                 ref={input}
