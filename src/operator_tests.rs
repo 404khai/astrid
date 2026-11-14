@@ -491,7 +491,7 @@ async fn a_shifted_screen_is_looked_at_again_and_a_refusal_falls_back_to_showing
     assert!(
         cards[0]
             .text
-            .starts_with("I couldn't do that myself (Astrid Presence needs Accessibility")
+            .starts_with("I couldn't do that myself: Astrid Presence needs Accessibility")
     );
     assert_eq!(cards[0].buttons, vec![Choice::Done, Choice::Stop]);
 }
@@ -925,7 +925,7 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
     let sent: Value = serde_json::from_slice(&std::fs::read(log.join("1.json")).unwrap()).unwrap();
     let text = sent["image"]["text"].as_str().unwrap();
     assert!(
-        text.contains("1512x982") && text.contains("scaled to 1330x864"),
+        text.starts_with("This screenshot is 1330x864 pixels") && !text.contains("1512"),
         "{text}"
     );
     use base64::Engine;

@@ -258,9 +258,9 @@ impl OperatorUi for Session {
         match outcome.as_deref() {
             Some("done") => Ok(()),
             Some("stale") => Err("the screen changed since I looked".into()),
-            Some("accessibility_permission_required") => {
-                Err("Astrid Presence needs Accessibility access in System Settings".into())
-            }
+            Some("accessibility_permission_required") => Err(
+                "to click for you I need Accessibility: System Settings → Privacy & Security → Accessibility → Astrid Presence".into(),
+            ),
             Some(other) => Err(format!("the host refused: {other}")),
             None => Err("the host didn't answer".into()),
         }

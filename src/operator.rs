@@ -476,12 +476,33 @@ impl Eyes for RuntimeEyes<'_> {
         } else {
             frame
         };
+        if let Some(dir) = crate::claude_code::debug_dir() {
+            let _ = std::fs::write(
+                dir.join(format!("reply-{}.txt", walkthrough_stamp())),
+                format!(
+                    "view {}x{}, frame {}x{}, elements: {}\n\n{}",
+                    view.width,
+                    view.height,
+                    frame.width,
+                    frame.height,
+                    observed["elements"].as_array().map_or(0, Vec::len),
+                    result.final_text
+                ),
+            );
+        }
         let mut report = parse_report(&result.final_text, view)?;
         if let Next::Step(step) = &mut report.next {
             resolve_target(step, &observed["elements"], frame, view)?;
         }
         Ok(report)
     }
+}
+
+fn walkthrough_stamp() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }
 
 /// Puts a step's point in display points of the look frame: an element's
@@ -818,7 +839,7 @@ pub async fn walk(
                     looked_again = true;
                     continue;
                 }
-                Err(reason) => note = format!("I couldn't do that myself ({reason})."),
+                Err(reason) => note = format!("I couldn't do that myself: {reason}."),
             }
         }
 

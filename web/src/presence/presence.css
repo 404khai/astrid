@@ -505,8 +505,9 @@ button {
   align-items: flex-start;
 }
 .pr-op-box {
-  max-width: 300px;
-  min-width: 150px;
+  /* A fixed width: measured against the panel's own small start size it
+     would wrap a word per line. */
+  width: 300px;
   box-sizing: border-box;
   padding: 10px 14px 12px;
   border-radius: 16px;
