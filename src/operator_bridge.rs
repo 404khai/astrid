@@ -44,6 +44,9 @@ pub struct Bridge {
     current: Mutex<Option<(u64, Vec<Choice>)>>,
     /// Request id of the latest captured frame; "Do it" is checked against it.
     last_frame: Mutex<Option<String>>,
+    /// Elements the app read with each frame, by request id, until taken.
+    elements: Mutex<HashMap<String, Value>>,
+    latest_elements: Mutex<Option<Value>>,
     next_card: AtomicU64,
 }
 
@@ -66,6 +69,8 @@ impl Bridge {
             acts: Mutex::default(),
             current: Mutex::default(),
             last_frame: Mutex::default(),
+            elements: Mutex::default(),
+            latest_elements: Mutex::default(),
             next_card: AtomicU64::new(0),
         }
     }
@@ -82,6 +87,12 @@ impl Bridge {
                     .filter(|png| png.len() <= MAX_PNG)
                     .ok_or_else(|| "host frame was malformed or too large".to_string());
                 if let Some(tx) = take(&self.frames, &id) {
+                    if message["elements"].is_array() {
+                        self.elements
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .insert(id.clone(), message["elements"].clone());
+                    }
                     let _ = tx.send(png);
                 }
             }
@@ -147,6 +158,16 @@ impl LookHost for Bridge {
             reply = rx => reply.unwrap_or_else(|_| Err("presence app went away".into())),
         };
         take(&self.frames, &id);
+        // Only this frame's elements, never an older frame's.
+        let elements = self
+            .elements
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&id);
+        *self
+            .latest_elements
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = elements.filter(|_| result.is_ok());
         if result.is_ok() {
             *self.last_frame.lock().unwrap_or_else(|e| e.into_inner()) = Some(id);
         }
@@ -155,6 +176,12 @@ impl LookHost for Bridge {
     async fn present(&self, event: Value) -> Result<(), String> {
         (self.emit)(json!({"type":"present","event":event}));
         Ok(())
+    }
+    fn elements(&self) -> Option<Value> {
+        self.latest_elements
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
     }
 }
 
@@ -356,6 +383,8 @@ mod tests {
             cursor: "click".into(),
             action: Some(astrid::operator::Action::Click),
             check: "x".into(),
+            element: None,
+            confirm: false,
         };
         assert!(session.act(&step).await.is_err(), "no look yet");
         *bridge.last_frame.lock().unwrap() = Some("frame-1".into());

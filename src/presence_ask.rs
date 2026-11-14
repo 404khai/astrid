@@ -335,17 +335,20 @@ async fn operate(
         display: setup.display,
         cancel: cancel.clone(),
     };
-    emit(json!({"type":"state","state":"listening","label":"Operator"}));
-    match walk(
+    // The presence app hides the ask panel's mark and lets the cursor Astrid,
+    // with its box following it, carry the session (ADR 0038).
+    emit(json!({"type":"operator","on":true}));
+    let outcome = walk(
         goal,
-        &setup.model,
+        astrid::operator::mode_for(goal),
         setup.display,
         &mut eyes,
         &session,
         cancel,
     )
-    .await
-    {
+    .await;
+    emit(json!({"type":"operator","on":false}));
+    match outcome {
         Outcome::Completed(summary) => {
             emit(json!({"type":"answer","text":summary,"brief":null,"canvas":false}));
             "completed"

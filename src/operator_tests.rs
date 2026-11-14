@@ -216,6 +216,7 @@ fn png_of(width: u32, height: u32) -> Vec<u8> {
 #[derive(Default)]
 struct FakeHost {
     captures: Mutex<usize>,
+    elements: Option<Value>,
 }
 #[async_trait]
 impl crate::presence::LookHost for FakeHost {
@@ -225,6 +226,9 @@ impl crate::presence::LookHost for FakeHost {
     }
     async fn present(&self, _: Value) -> Result<(), String> {
         Ok(())
+    }
+    fn elements(&self) -> Option<Value> {
+        self.elements.clone()
     }
 }
 
@@ -287,7 +291,8 @@ struct FakeUi {
     cards: Mutex<Vec<Card>>,
     events: Mutex<Vec<Value>>,
     acts: Mutex<Vec<Step>>,
-    act_fails: bool,
+    /// One entry per act: Some(error) fails it; missing entries succeed.
+    act_errors: Mutex<VecDeque<Option<&'static str>>>,
 }
 #[async_trait]
 impl OperatorUi for FakeUi {
@@ -304,10 +309,9 @@ impl OperatorUi for FakeUi {
     }
     async fn act(&self, step: &Step) -> Result<(), String> {
         self.acts.lock().unwrap().push(step.clone());
-        if self.act_fails {
-            Err("the screen changed".into())
-        } else {
-            Ok(())
+        match self.act_errors.lock().unwrap().pop_front().flatten() {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
         }
     }
     fn state(&self, _: &str, _: &str) {}
@@ -315,11 +319,16 @@ impl OperatorUi for FakeUi {
 
 async fn session(
     reports: Vec<String>,
+    mode: Mode,
     choices: Vec<Choice>,
-    act_fails: bool,
+    act_errors: Vec<Option<&'static str>>,
+    elements: Option<Value>,
 ) -> (Outcome, FakeUi, usize, Vec<Value>) {
     let (origin, seen) = mock_model(reports).await;
-    let host = Arc::new(FakeHost::default());
+    let host = Arc::new(FakeHost {
+        elements,
+        ..FakeHost::default()
+    });
     let dir = tempfile::tempdir().unwrap();
     let tools = Tools::new(Workspace::new(dir.path()).unwrap(), Duration::from_secs(1))
         .unwrap()
@@ -340,12 +349,12 @@ async fn session(
     };
     let ui = FakeUi {
         choices: Mutex::new(choices.into()),
-        act_fails,
+        act_errors: Mutex::new(act_errors.into()),
         ..FakeUi::default()
     };
     let outcome = walk(
         "Export the report",
-        "gpt-5.6-sol",
+        mode,
         0,
         &mut eyes,
         &ui,
@@ -358,38 +367,28 @@ async fn session(
 }
 
 #[tokio::test]
-async fn a_walkthrough_retries_an_unverified_step_then_does_one_for_the_user() {
+async fn astrid_does_the_steps_itself_and_asks_only_before_risky_ones() {
     let reports = vec![
         block(json!({"step":step(1, 2, 300, "click", json!({"kind":"click"}))})),
+        block(json!({"verified":true,"step":{
+            "index":2,"total":2,"instruction":"Type Q3 and send it.","x":100,"y":20,"cursor":"text",
+            "action":{"kind":"type","text":"Q3"},"confirm":true,"check":"Sent."}})),
         block(
-            json!({"verified":false,"reason":"The menu is still closed.","step":step(1, 2, 301, "click", json!({"kind":"click"}))}),
-        ),
-        block(
-            json!({"verified":true,"step":step(2, 2, 100, "text", json!({"kind":"type","text":"Q3"}))}),
+            json!({"verified":false,"reason":"Not sent yet.","step":step(2, 2, 101, "text", json!({"kind":"type","text":"Q3"}))}),
         ),
         block(json!({"verified":true,"finish":"Exported."})),
     ];
-    let choices = vec![
-        Choice::Look,
-        Choice::ShowMe,
-        Choice::Done,
-        Choice::ShowMe,
-        Choice::Done,
-        Choice::DoIt,
-        Choice::Close,
-    ];
-    let (outcome, ui, captures, requests) = session(reports, choices, false).await;
+    let (outcome, ui, captures, requests) =
+        session(reports, Mode::Do, vec![Choice::DoIt], vec![], None).await;
     assert_eq!(outcome, Outcome::Completed("Exported.".into()));
-    // One look per press: start, Done, Done, Do it.
+    // The ask starts it: no card before the first look, then a look after each act.
     assert_eq!(captures, 4);
     assert_eq!(requests.len(), 8);
-    // Every model request after a look carries the pending step's check.
     assert!(requests[2].to_string().contains("Pending step 1 of 2"));
     let events = ui.events.lock().unwrap().clone();
-    // The wave plays once, as soon as the first look is granted.
     assert_eq!(events[0], json!({"v":1,"type":"wave"}));
     assert_eq!(events.iter().filter(|e| e["type"] == "wave").count(), 1);
-    // Show me points with the step's cursor and circles the target.
+    // Astrid points with the step's cursor where it acts.
     assert!(
         events.contains(
             &json!({"v":1,"type":"point_at","x":300,"y":20,"display":0,"cursor":"click"})
@@ -399,62 +398,178 @@ async fn a_walkthrough_retries_an_unverified_step_then_does_one_for_the_user() {
         events
             .contains(&json!({"v":1,"type":"point_at","x":100,"y":20,"display":0,"cursor":"text"}))
     );
-    assert!(events.iter().any(|e| e["type"] == "sketch"));
-    // Do it acted exactly once, on step 2 as the card named it.
     let acts = ui.acts.lock().unwrap().clone();
-    assert_eq!(acts.len(), 1);
-    assert_eq!(acts[0].action, Some(Action::Type("Q3".into())));
+    assert_eq!(acts.len(), 3);
+    assert_eq!(acts[0].action, Some(Action::Click));
+    assert_eq!(acts[1].action, Some(Action::Type("Q3".into())));
+    // Only the risky step asked, once.
     let cards = ui.cards.lock().unwrap().clone();
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].step, Some((2, 2)));
+    assert_eq!(cards[0].buttons, vec![Choice::DoIt, Choice::Stop]);
+    assert!(cards[0].text.ends_with("Shall I?"));
+}
+
+#[tokio::test]
+async fn show_me_points_and_waits_for_done_without_acting() {
+    let reports = vec![
+        block(json!({"step":step(1, 1, 300, "click", json!({"kind":"click"}))})),
+        block(
+            json!({"verified":false,"reason":"The menu is still closed.","step":step(1, 1, 301, "click", json!({"kind":"click"}))}),
+        ),
+        block(json!({"verified":true,"finish":"Exported."})),
+    ];
+    let (outcome, ui, captures, _) = session(
+        reports,
+        Mode::Guide,
+        vec![Choice::Done, Choice::Done],
+        vec![],
+        None,
+    )
+    .await;
+    assert_eq!(outcome, Outcome::Completed("Exported.".into()));
+    assert_eq!(captures, 3);
+    assert!(ui.acts.lock().unwrap().is_empty());
+    let cards = ui.cards.lock().unwrap().clone();
+    assert_eq!(cards[0].buttons, vec![Choice::Done, Choice::Stop]);
     assert!(
-        cards[0].text.contains("gpt-5.6-sol")
-            && cards[0].buttons == vec![Choice::Look, Choice::Stop]
-    );
-    assert_eq!(cards[1].step, Some((1, 2)));
-    assert_eq!(
-        cards[1].buttons,
-        vec![Choice::DoIt, Choice::ShowMe, Choice::Stop]
-    );
-    assert!(cards[1].text.contains("then look again to check"));
-    assert!(
-        cards[3]
+        cards[1]
             .text
             .starts_with("Not yet: The menu is still closed.")
     );
-    assert!(cards[5].text.contains("type “Q3”"));
-    assert_eq!(cards.last().unwrap().text, "Exported.");
-}
-
-#[tokio::test]
-async fn declining_the_first_look_captures_and_sends_nothing() {
-    let (outcome, ui, captures, requests) = session(vec![], vec![Choice::Stop], false).await;
-    assert!(matches!(outcome, Outcome::Stopped(_)));
-    assert_eq!((captures, requests.len()), (0, 0));
     assert!(
-        ui.events.lock().unwrap().is_empty(),
-        "no wave without a granted look"
+        ui.events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|e| e["type"] == "sketch")
     );
+    assert_eq!(mode_for("show me how to export this"), Mode::Guide);
+    assert_eq!(mode_for("Where is the export button?"), Mode::Guide);
+    assert_eq!(mode_for("like this video"), Mode::Do);
 }
 
 #[tokio::test]
-async fn a_refused_action_shows_the_step_and_looks_only_after_done() {
+async fn a_shifted_screen_is_looked_at_again_and_a_refusal_falls_back_to_showing() {
+    // The screen moved under the target: look again, then act.
+    let reports = vec![
+        block(json!({"step":step(1, 1, 300, "click", json!({"kind":"click"}))})),
+        block(
+            json!({"verified":false,"reason":"Not clicked.","step":step(1, 1, 302, "click", json!({"kind":"click"}))}),
+        ),
+        block(json!({"verified":true,"finish":"Liked."})),
+    ];
+    let (outcome, ui, captures, _) = session(
+        reports,
+        Mode::Do,
+        vec![],
+        vec![Some("the screen changed since I looked")],
+        None,
+    )
+    .await;
+    assert_eq!(outcome, Outcome::Completed("Liked.".into()));
+    assert_eq!((captures, ui.acts.lock().unwrap().len()), (3, 2));
+    assert!(ui.cards.lock().unwrap().is_empty());
+
+    // Anything else it can't do itself, it shows instead, and waits.
     let reports = vec![block(
         json!({"step":step(1, 1, 300, "press", json!({"kind":"click"}))}),
     )];
     let (outcome, ui, captures, _) = session(
         reports,
-        vec![Choice::Look, Choice::DoIt, Choice::Stop],
-        true,
+        Mode::Do,
+        vec![Choice::Stop],
+        vec![Some(
+            "Astrid Presence needs Accessibility access in System Settings",
+        )],
+        None,
     )
     .await;
     assert!(matches!(outcome, Outcome::Stopped(_)));
     assert_eq!(captures, 1);
     let cards = ui.cards.lock().unwrap().clone();
     assert!(
-        cards[2]
+        cards[0]
             .text
-            .starts_with("I couldn't do that (the screen changed)")
+            .starts_with("I couldn't do that myself (Astrid Presence needs Accessibility")
     );
-    assert_eq!(cards[2].buttons, vec![Choice::Done, Choice::Stop]);
+    assert_eq!(cards[0].buttons, vec![Choice::Done, Choice::Stop]);
+}
+
+#[tokio::test]
+async fn element_targets_act_on_the_exact_centre_from_accessibility() {
+    let elements = json!([
+        [3, "AXButton", "Share", 10, 10, 40, 20],
+        [7, "AXButton", "like this video", 200, 150, 60, 30]
+    ]);
+    let reports = vec![
+        block(
+            json!({"step":{"index":1,"total":1,"instruction":"Click Like.","element":7,
+            "cursor":"click","action":{"kind":"click"},"check":"Like is on."}}),
+        ),
+        block(json!({"verified":true,"finish":"Liked."})),
+    ];
+    let (outcome, ui, _, requests) =
+        session(reports, Mode::Do, vec![], vec![], Some(elements)).await;
+    assert_eq!(outcome, Outcome::Completed("Liked.".into()));
+    // The model saw the elements with the look...
+    assert!(requests[1].to_string().contains("like this video"));
+    // ...and Astrid acted on element 7's centre, not a guessed point.
+    let acts = ui.acts.lock().unwrap().clone();
+    assert_eq!((acts[0].x, acts[0].y, acts[0].element), (230, 165, Some(7)));
+
+    // An id that isn't on screen is refused, never guessed.
+    let reports = vec![block(
+        json!({"step":{"index":1,"total":1,"instruction":"Click.","element":99,
+        "cursor":"click","action":{"kind":"click"},"check":"x"}}),
+    )];
+    let (outcome, ui, _, _) = session(
+        reports,
+        Mode::Do,
+        vec![],
+        vec![],
+        Some(json!([[7, "AXButton", "Like", 200, 150, 60, 30]])),
+    )
+    .await;
+    assert!(
+        matches!(&outcome, Outcome::Failed(e) if e.contains("element 99")),
+        "{outcome:?}"
+    );
+    assert!(ui.acts.lock().unwrap().is_empty());
+}
+
+#[test]
+fn host_elements_are_sanitized_and_bounded() {
+    use crate::computer::{MAX_ELEMENTS, sanitize_elements};
+    let list = sanitize_elements(
+        &json!([
+            [1, "AXButton", "Like\nnow", 10, 10, 20, 20],
+            [2, "AXButton", "off frame", 310, 10, 20, 20],
+            [3, "", "no role", 10, 10, 5, 5],
+            [1, "AXLink", "duplicate id", 10, 10, 5, 5],
+            "junk",
+            [4, "AXLink", "x".repeat(500), 0, 0, 5, 5]
+        ]),
+        320,
+        200,
+    )
+    .unwrap();
+    let list = list.as_array().unwrap();
+    assert_eq!(list.len(), 2);
+    assert_eq!(list[0], json!([1, "AXButton", "Like now", 10, 10, 20, 20]));
+    assert_eq!(list[1][2].as_str().unwrap().len(), 120);
+    let many: Vec<Value> = (0..400)
+        .map(|i| json!([i, "AXButton", "b", 1, 1, 2, 2]))
+        .collect();
+    assert_eq!(
+        sanitize_elements(&Value::Array(many), 320, 200)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .len(),
+        MAX_ELEMENTS
+    );
+    assert!(sanitize_elements(&json!([]), 320, 200).is_none());
 }
 
 /// Operator on Claude (ADR 0038): a fake Claude agent bridge that asks for a
@@ -502,12 +617,12 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
         model: "claude-code/sonnet".into(),
     };
     let ui = FakeUi {
-        choices: Mutex::new(vec![Choice::Look, Choice::Stop].into()),
+        choices: Mutex::new(vec![Choice::Stop].into()),
         ..FakeUi::default()
     };
     let outcome = walk(
         "Export the report",
-        "claude-code/sonnet",
+        Mode::Guide,
         0,
         &mut eyes,
         &ui,
@@ -517,8 +632,7 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
     assert!(matches!(outcome, Outcome::Stopped(_)), "{outcome:?}");
     assert_eq!(*host.captures.lock().unwrap(), 1);
     let cards = ui.cards.lock().unwrap().clone();
-    assert!(cards[0].text.contains("Claude (sonnet)"));
-    assert_eq!(cards[1].step, Some((1, 1)));
+    assert_eq!(cards[0].step, Some((1, 1)));
     let read = |n: usize| -> Value {
         serde_json::from_slice(&std::fs::read(log.join(format!("{n}.json"))).unwrap()).unwrap()
     };
@@ -635,18 +749,10 @@ async fn a_failed_look_says_why_instead_of_computer_stopped() {
             model: "gpt-5.6-sol".into(),
         };
         let ui = FakeUi {
-            choices: Mutex::new(vec![Choice::Look, Choice::Close].into()),
+            choices: Mutex::new(vec![].into()),
             ..FakeUi::default()
         };
-        let outcome = walk(
-            "x",
-            "gpt-5.6-sol",
-            0,
-            &mut eyes,
-            &ui,
-            &Cancellation::default(),
-        )
-        .await;
+        let outcome = walk("x", Mode::Do, 0, &mut eyes, &ui, &Cancellation::default()).await;
         let Outcome::Failed(message) = outcome else {
             panic!("{outcome:?}")
         };
@@ -732,12 +838,12 @@ async fn a_full_size_real_screen_gets_through_on_both_providers() {
         model: "gpt-5.6-sol".into(),
     };
     let ui = FakeUi {
-        choices: Mutex::new(vec![Choice::Look, Choice::Stop].into()),
+        choices: Mutex::new(vec![Choice::Stop].into()),
         ..FakeUi::default()
     };
     let outcome = walk(
         "Like this video",
-        "gpt-5.6-sol",
+        Mode::Guide,
         0,
         &mut eyes,
         &ui,
@@ -749,7 +855,7 @@ async fn a_full_size_real_screen_gets_through_on_both_providers() {
         "openai: {outcome:?}"
     );
     assert_eq!(
-        ui.cards.lock().unwrap()[1].step,
+        ui.cards.lock().unwrap()[0].step,
         Some((1, 1)),
         "openai reached step 1"
     );
@@ -795,12 +901,12 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
         model: "claude-code/sonnet".into(),
     };
     let ui = FakeUi {
-        choices: Mutex::new(vec![Choice::Look, Choice::Stop].into()),
+        choices: Mutex::new(vec![Choice::Stop].into()),
         ..FakeUi::default()
     };
     let outcome = walk(
         "Like this video",
-        "claude-code/sonnet",
+        Mode::Guide,
         0,
         &mut eyes,
         &ui,
@@ -812,7 +918,7 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
         "claude: {outcome:?}"
     );
     assert_eq!(
-        ui.cards.lock().unwrap()[1].step,
+        ui.cards.lock().unwrap()[0].step,
         Some((1, 1)),
         "claude reached step 1"
     );
@@ -833,7 +939,7 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
     let events = ui.events.lock().unwrap().clone();
     assert!(
         events.contains(
-            &json!({"v":1,"type":"point_at","x":1136,"y":22,"display":0,"cursor":"arrow_click"})
+            &json!({"v":1,"type":"point_at","x":1136,"y":22,"display":0,"cursor":"click"})
         ),
         "{events:?}"
     );

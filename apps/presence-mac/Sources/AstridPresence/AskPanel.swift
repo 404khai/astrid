@@ -28,14 +28,16 @@ protocol OperatorHost: AnyObject {
     func operatorPresent(_ fields: [String: Any])
     func operatorCapture(requestId: String, display: Int, reply: @escaping ([String: Any]) -> Void)
     func operatorAct(_ fields: [String: Any], reply: @escaping (String) -> Void)
-    func operatorStep(_ fields: [String: Any])
-    func operatorStepClear(id: Int?)
+    func operatorBegan(from mark: CGPoint)
     func operatorEnded()
 }
 
 final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     private let config: AskConfig
     weak var host: OperatorHost?
+    /// ADR 0038: while operator runs the panel is a small box beside the
+    /// cursor Astrid (no mark of its own), following it.
+    private(set) var following = false
     /// Writes to the runtime child, off the main thread (frames are large).
     private let childWrites = DispatchQueue(label: "dev.astrid.presence.ask-writes")
     private let panel: AskPanel
@@ -117,6 +119,28 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     }
 
     /// Places the panel around its anchor, kept fully on the anchor's screen.
+    /// Keeps the panel just below-right of the cursor tip (global Quartz
+    /// points), flipping left/up near screen edges.
+    func follow(tip: CGPoint, primaryHeight: CGFloat) {
+        let point = NSPoint(x: tip.x, y: primaryHeight - tip.y)
+        let screen = NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
+        guard let visible = screen?.visibleFrame else { return }
+        let size = panel.frame.size
+        var origin = NSPoint(x: point.x + 30, y: point.y - 34 - size.height)
+        if origin.x + size.width > visible.maxX { origin.x = point.x - 30 - size.width }
+        if origin.y < visible.minY { origin.y = point.y + 34 }
+        origin.x = min(max(origin.x, visible.minX), visible.maxX - size.width)
+        origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
+        if panel.frame.origin != origin { panel.setFrameOrigin(origin) }
+    }
+
+    /// The mark's centre in global Quartz points, where the cursor Astrid starts.
+    private func markPoint() -> CGPoint {
+        let frame = panel.frame
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? frame.maxY
+        return CGPoint(x: frame.minX + 34, y: primaryHeight - frame.maxY + 34)
+    }
+
     private func place() {
         let screen = NSScreen.screens.first { $0.frame.contains(anchor) } ?? NSScreen.main ?? NSScreen.screens.first
         guard let visible = screen?.visibleFrame else { return }
@@ -135,7 +159,11 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         case "size":
             if let w = body["width"] as? Double, let h = body["height"] as? Double, w > 0, h > 0 {
                 contentSize = NSSize(width: w, height: h)
-                place()
+                if following {
+                    panel.setContentSize(NSSize(width: min(w, 520), height: h))
+                } else {
+                    place()
+                }
             }
         case "drag-start":
             startDrag()
@@ -173,6 +201,11 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             speaker.stop()
         case "ask", "approve", "cancel":
             forward(body)
+        case "choice":
+            // ADR 0038: a button on the operator box.
+            if let id = body["id"] as? NSNumber, let choice = body["choice"] as? String {
+                send(["type": "choice", "id": id, "choice": String(choice.prefix(16))])
+            }
         case "utterance":
             // ADR 0038 voice: an answer to the operator card on screen.
             if let text = body["text"] as? String { send(["type": "utterance", "text": String(text.prefix(500))]) }
@@ -289,18 +322,37 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 self?.send(["type": "acted", "request_id": id, "outcome": outcome])
             }
             return
+        case "operator":
+            // The cursor Astrid takes over; the panel becomes its following box.
+            if object["on"] as? Bool == true {
+                following = true
+                panel.resignKey()
+                host?.operatorBegan(from: markPoint())
+            } else {
+                following = false
+                host?.operatorEnded()
+                place()
+            }
+            deliver(object)
+            return
         case "step":
-            host?.operatorStep(object)
-            // The page keeps a copy so voice can answer it and read it aloud.
+            // The box shows the question; voice can answer it too.
             deliver(["type": "operator-card", "id": object["id"] ?? 0, "text": object["text"] ?? "",
-                     "buttons": (object["buttons"] as? [[String: Any]] ?? []).compactMap { $0["label"] as? String }])
+                     "step": object["step"] ?? NSNull(), "total": object["total"] ?? NSNull(),
+                     "buttons": (object["buttons"] as? [[String: Any]] ?? []).compactMap { b -> [String: String]? in
+                         guard let id = b["id"] as? String, let label = b["label"] as? String else { return nil }
+                         return ["id": id, "label": label]
+                     }])
             return
         case "step_clear":
-            host?.operatorStepClear(id: (object["id"] as? NSNumber)?.intValue)
             deliver(["type": "operator-card-clear", "id": object["id"] ?? 0])
             return
         case "done":
-            host?.operatorEnded()
+            if following {
+                following = false
+                host?.operatorEnded()
+                place()
+            }
         default:
             break
         }

@@ -45,9 +45,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
 
     private let askConfig: AskConfig?
     private var ask: AskController?
-    /// ADR 0038: in --ask mode the overlay exists only while operator runs.
-    private var operatorOverlay = false
-    private let stepCard = StepCard()
+    /// ADR 0038: true while an operator session drives the cursor Astrid.
+    private var operating = false
     /// The latest look's fingerprint, for "Do it" freshness. Memory only.
     private var lastLook: (id: String, display: Int, at: Date, fingerprint: Fingerprint)?
     /// The intro wave plays once, the first time Astrid comes on screen.
@@ -98,9 +97,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         if let askConfig {
             ask = AskController(config: askConfig)
             ask?.host = self
-            stepCard.onChoice = { [weak self] id, choice in
-                self?.ask?.send(["type": "choice", "id": id, "choice": choice])
-            }
+            AXElements.startTracking()
             // In --ask mode the mark is on screen from launch.
             playIntro()
         }
@@ -155,6 +152,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         let pointer = DisplayLayout.cocoaToQuartz(point: NSEvent.mouseLocation, primaryHeight: primaryHeight)
         motion.step(now: now, dt: dt, pointer: pointer, reduceMotion: reduceMotion)
+        // ADR 0038: the ask box rides beside the cursor Astrid while it works.
+        if operating { ask?.follow(tip: motion.tip, primaryHeight: primaryHeight) }
 
         let subtitleDisplay = layout.display(nearest: motion.tip)?.index
         CATransaction.begin()
@@ -290,7 +289,9 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         let screens = NSScreen.screens
         layout = DisplayLayout.fromCocoa(frames: screens.map(\.frame), scales: screens.map { Double($0.backingScaleFactor) })
         // The ask surface is Astrid's only window in --ask mode: no full-screen overlay.
-        scenes = askConfig != nil && !operatorOverlay ? [] : zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
+        // In --ask mode the overlay exists from launch but stays hidden until an
+        // operator session shows the cursor Astrid (no panels appear mid-session).
+        scenes = zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
         for scene in scenes { scene.addInk(ink, reduceMotion: true, now: CACurrentMediaTime()) }
     }
 
@@ -552,6 +553,17 @@ enum StdinReader {
 // MARK: - Operator (ADR 0038)
 
 extension PresenceController: OperatorHost {
+    /// The cursor Astrid takes over from the ask panel's mark, from where it was.
+    func operatorBegan(from mark: CGPoint) {
+        operating = true
+        motion.jump(to: mark)
+        player.enqueue(.show(at: nil))
+        // The user's app keeps focus, so clicks and typing land there.
+        AXElements.targetApp()?.activate()
+        // Reading on-screen controls and acting both need Accessibility; asks once.
+        _ = Injector.trusted()
+    }
+
     func operatorPresent(_ fields: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: fields),
               let line = String(data: data, encoding: .utf8) else { return }
@@ -562,30 +574,34 @@ extension PresenceController: OperatorHost {
             case .pointAt, .sketch, .clearInk, .say, .wave: break
             default: throw PresenceProtocolError("operator may only present")
             }
-            if !operatorOverlay {
-                operatorOverlay = true
-                rebuildScenes()
-                player.enqueue(.show(at: nil))
-            }
             player.enqueue(event)
         } catch let error as PresenceProtocolError {
             Output.error("operator: \(error.message)", line: nil)
         } catch {}
     }
 
-    func operatorCapture(requestId: String, display: Int, reply: @escaping ([String: Any]) -> Void) {
-        guard PresenceProtocol.isRequestId(requestId) else { return }
-        captureFrame(requestId: requestId, display: display, reply: reply)
+    /// One frame plus the target app's Accessibility elements, read at the
+    /// same moment on a background queue.
+    func operatorCapture(requestId: String, display index: Int, reply: @escaping ([String: Any]) -> Void) {
+        guard PresenceProtocol.isRequestId(requestId), layout.displays.indices.contains(index) else {
+            return reply(["type": "capture_failed", "request_id": requestId, "reason": "display_unavailable"])
+        }
+        let display = layout.displays[index], app = AXElements.targetApp()
+        var elements: [[Any]]?
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            elements = AXElements.collect(display: display, app: app)
+            group.leave()
+        }
+        captureFrame(requestId: requestId, display: index) { frame in
+            group.notify(queue: .main) {
+                var frame = frame
+                if frame["type"] as? String == "frame", let elements, !elements.isEmpty { frame["elements"] = elements }
+                reply(frame)
+            }
+        }
     }
-
-    func operatorStep(_ fields: [String: Any]) {
-        stepCard.show(fields, layout: layout)
-    }
-
-    func operatorStepClear(id: Int?) {
-        stepCard.hide(id: id)
-    }
-
     /// "Do it": refuses unless the screen around the target still matches the
     /// look the step was planned on, then posts exactly one action.
     func operatorAct(_ fields: [String: Any], reply: @escaping (String) -> Void) {
@@ -620,8 +636,8 @@ extension PresenceController: OperatorHost {
     }
 
     func operatorEnded() {
-        guard operatorOverlay else { return }
-        stepCard.hide()
+        guard operating else { return }
+        operating = false
         player.enqueue(contentsOf: [.clearInk, .hide])
         lastLook = nil
     }

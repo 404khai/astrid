@@ -67,8 +67,7 @@ get spoken steps.
 
 "Do it" posts real input, so the bundle needs Accessibility access (System
 Settings → Privacy & Security → Accessibility). With `--capture-source
-synthetic` no input is ever posted. `ASTRID_STEP_CARD=/tmp/card.png
-.build/debug/astrid-presence` renders a sample card offscreen.
+synthetic` no input is ever posted.
 
 ```sh
 (cd web && npx vite build -c vite.presence.config.ts) && cargo build \

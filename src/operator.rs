@@ -85,6 +85,11 @@ pub struct Step {
     pub action: Option<Action>,
     /// What the screen shows once the step is done; the next look checks it.
     pub check: String,
+    /// The on-screen element (from the look's Accessibility list) the step
+    /// targets. When set, x/y are that element's centre, not the model's guess.
+    pub element: Option<u32>,
+    /// Ask before acting: the step sends, deletes, buys, posts or submits.
+    pub confirm: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -195,13 +200,24 @@ pub fn parse_report(reply: &str, frame: Frame) -> Result<Report, String> {
                     "step index/total must satisfy 1 <= index <= total <= {MAX_STEPS}"
                 ));
             }
+            let element = match &step["element"] {
+                Value::Null => None,
+                id => Some(
+                    id.as_u64()
+                        .filter(|id| *id < 100_000)
+                        .ok_or("element must be an id from the elements list")?
+                        as u32,
+                ),
+            };
             let (x, y) = match (step["x"].as_u64(), step["y"].as_u64()) {
                 (Some(x), Some(y)) if x < u64::from(frame.width) && y < u64::from(frame.height) => {
                     (x as u32, y as u32)
                 }
+                // An element target is resolved to its centre afterwards.
+                _ if element.is_some() => (0, 0),
                 _ => {
                     return Err(format!(
-                        "step x/y must be integers inside the {}x{} frame",
+                        "step needs an element id, or x/y integers inside the {}x{} frame",
                         frame.width, frame.height
                     ));
                 }
@@ -222,6 +238,8 @@ pub fn parse_report(reply: &str, frame: Frame) -> Result<Report, String> {
                 cursor: cursor.to_owned(),
                 action: action(&step["action"])?,
                 check: text(step, "check", MAX_TEXT)?,
+                element,
+                confirm: step["confirm"] == true,
             })
         }
         _ => return Err("give exactly one of step or finish".into()),
@@ -350,7 +368,7 @@ impl Walkthrough {
 }
 
 /// The reply format for each look run.
-pub const OPERATOR_INSTRUCTIONS: &str = "Call `look` exactly once to see the screen now. Do not call point_at, sketch or say: Astrid points for you. Then reply with only one fenced code block tagged `operator` containing JSON: {\"verified\": true|false (only when a step is pending), \"reason\": short reason, and either \"step\": {\"index\": n, \"total\": planned steps (at most 8), \"instruction\": one short imperative sentence for the user, \"x\": int, \"y\": int (display points of this screenshot, the exact target), \"cursor\": one of click, press, tap, pointer, text, grab, select, crosshair, focus, zoom_in, zoom_out, pen, not_allowed, arrow, arrow_click (what the user should do there: click to click, text to type, grab to drag, zoom_in to look closer), \"action\": null or {\"kind\":\"click\"} | {\"kind\":\"type\",\"text\":...} | {\"kind\":\"key\",\"key\":\"enter\"|\"tab\"|\"escape\"|\"space\"|\"up\"|\"down\"|\"left\"|\"right\"} | {\"kind\":\"scroll\",\"direction\":\"up\"|\"down\",\"notches\":1-10} (what Astrid would do if the user says \"Do it\"; null when the user must do it themselves, e.g. passwords, payments, deleting or sending), \"check\": what the screen will show once the step is done} or \"finish\": one sentence saying the goal is done. Never put passwords or other secrets in type actions.";
+pub const OPERATOR_INSTRUCTIONS: &str = "Call `look` exactly once to see the screen now. The look result may include `elements`: the frontmost window's controls as [id, role, label, x, y, w, h] in display points, read from macOS Accessibility. Do not call point_at, sketch or say: Astrid points and acts for you. Then reply with only one fenced code block tagged `operator` containing JSON: {\"verified\": true|false (only when a step is pending), \"reason\": short reason, and either \"step\": {\"index\": n, \"total\": planned steps (at most 8), \"instruction\": one short imperative sentence naming the target, e.g. \"Click Like under the video\", \"element\": the id of the target from `elements` (always prefer this when the target is in the list; it is exact), \"x\": int, \"y\": int (only when the target is not in `elements`: the exact target in this screenshot's pixels), \"cursor\": one of click, press, tap, pointer, text, grab, select, crosshair, focus, zoom_in, zoom_out, pen, not_allowed, arrow, arrow_click (what happens there: click to click, text to type), \"action\": {\"kind\":\"click\"} | {\"kind\":\"type\",\"text\":...} | {\"kind\":\"key\",\"key\":\"enter\"|\"tab\"|\"escape\"|\"space\"|\"up\"|\"down\"|\"left\"|\"right\"} | {\"kind\":\"scroll\",\"direction\":\"up\"|\"down\",\"notches\":1-10} | null (Astrid performs the action itself; null only when the user must do it, e.g. typing a password or code), \"confirm\": true only when the step sends a message, deletes something, buys or pays, posts publicly or submits a form (Astrid asks first), \"check\": what the screen will show once the step is done} or \"finish\": one sentence saying the goal is done. Never put passwords or other secrets in type actions.";
 
 /// A look run's request budget: the default text budget, with room in the
 /// byte ceiling for one full frame (a PNG of at most 1 MiB is about 1.4 MB as
@@ -431,42 +449,67 @@ impl Eyes for RuntimeEyes<'_> {
                 return Err("the model did not answer within its step limit".into());
             }
         }
-        let frame = result
+        let observed = result
             .session
             .messages
             .iter()
             .rev()
             .find_map(|m| match m {
                 Message::Tool(t) if t.name == "look" => match &t.outcome {
-                    ToolOutcome::Success { data } => Some(Frame {
-                        width: data["observed"]["width"].as_u64()? as u32,
-                        height: data["observed"]["height"].as_u64()? as u32,
-                    }),
+                    ToolOutcome::Success { data } if data["observed"].is_object() => {
+                        Some(data["observed"].clone())
+                    }
                     _ => None,
                 },
                 _ => None,
             })
             .ok_or("Astrid didn't get a look at the screen")?;
+        let frame = Frame {
+            width: observed["width"].as_u64().ok_or("look had no size")? as u32,
+            height: observed["height"].as_u64().ok_or("look had no size")? as u32,
+        };
         // Claude sees a scaled frame and answers in its pixels; map back.
-        if self.model.starts_with(crate::claude_code::PREFIX) {
-            let (vw, vh) = crate::claude_code::claude_view(frame.width, frame.height);
-            let mut report = parse_report(
-                &result.final_text,
-                Frame {
-                    width: vw,
-                    height: vh,
-                },
-            )?;
-            if let Next::Step(step) = &mut report.next {
-                step.x = (u64::from(step.x) * u64::from(frame.width) / u64::from(vw))
-                    .min(u64::from(frame.width - 1)) as u32;
-                step.y = (u64::from(step.y) * u64::from(frame.height) / u64::from(vh))
-                    .min(u64::from(frame.height - 1)) as u32;
-            }
-            return Ok(report);
+        let claude = self.model.starts_with(crate::claude_code::PREFIX);
+        let view = if claude {
+            let (width, height) = crate::claude_code::claude_view(frame.width, frame.height);
+            Frame { width, height }
+        } else {
+            frame
+        };
+        let mut report = parse_report(&result.final_text, view)?;
+        if let Next::Step(step) = &mut report.next {
+            resolve_target(step, &observed["elements"], frame, view)?;
         }
-        parse_report(&result.final_text, frame)
+        Ok(report)
     }
+}
+
+/// Puts a step's point in display points of the look frame: an element's
+/// centre when it names one (exact, from Accessibility), else the model's
+/// point mapped from the image it saw.
+pub fn resolve_target(
+    step: &mut Step,
+    elements: &Value,
+    frame: Frame,
+    view: Frame,
+) -> Result<(), String> {
+    if let Some(id) = step.element {
+        let element = elements
+            .as_array()
+            .and_then(|list| list.iter().find(|e| e[0].as_u64() == Some(u64::from(id))))
+            .ok_or_else(|| format!("element {id} is not in this look's elements"))?;
+        let n = |i: usize| element[i].as_u64().unwrap_or(0);
+        step.x = (n(3) + n(5) / 2).min(u64::from(frame.width - 1)) as u32;
+        step.y = (n(4) + n(6) / 2).min(u64::from(frame.height - 1)) as u32;
+        return Ok(());
+    }
+    if view != frame {
+        step.x = (u64::from(step.x) * u64::from(frame.width) / u64::from(view.width))
+            .min(u64::from(frame.width - 1)) as u32;
+        step.y = (u64::from(step.y) * u64::from(frame.height) / u64::from(view.height))
+            .min(u64::from(frame.height - 1)) as u32;
+    }
+    Ok(())
 }
 
 /// Why the run's look failed, in words the user can act on.
@@ -677,32 +720,52 @@ pub fn model_label(model: &str) -> String {
     }
 }
 
-/// Runs one walkthrough to its end.
+/// Whether Astrid does the steps itself or shows the user how.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    /// "Like this video": Astrid acts, then looks again to verify.
+    Do,
+    /// "Show me how to...": Astrid points and the user acts.
+    Guide,
+}
+
+/// "Show me how...", "how do I...", "where is...": guide. Anything else: do it.
+pub fn mode_for(goal: &str) -> Mode {
+    let lower = goal.trim().to_lowercase();
+    let guide = [
+        "show me",
+        "how do i",
+        "how to",
+        "how can i",
+        "where is",
+        "where's",
+        "where do i",
+        "teach me",
+        "walk me through",
+        "help me find",
+        "guide me",
+    ];
+    if guide.iter().any(|p| lower.starts_with(p)) {
+        Mode::Guide
+    } else {
+        Mode::Do
+    }
+}
+
+/// Runs one walkthrough to its end. The user's ask starts it: there is no
+/// card before the first look (the wave and Astrid's cursor show it's live).
 pub async fn walk(
     goal: &str,
-    model: &str,
+    mode: Mode,
     display: u32,
     eyes: &mut dyn Eyes,
     ui: &dyn OperatorUi,
     cancel: &Cancellation,
 ) -> Outcome {
     let mut walkthrough = Walkthrough::new(goal);
-    let start = Card {
-        step: None,
-        text: format!(
-            "I'll look at your screen (display {}) to guide you. Each look sends one screenshot to {}; nothing is saved.",
-            display + 1,
-            model_label(model)
-        ),
-        buttons: vec![Choice::Look, Choice::Stop],
-        at: None,
-    };
-    if ui.card(start).await != Choice::Look {
-        return Outcome::Stopped("Not started.".into());
-    }
-    // Operator is live: the first look is granted.
     ui.present(json!({"v":1,"type":"wave"})).await;
     let mut note = String::new();
+    let mut looked_again = false;
     loop {
         if cancel.is_cancelled() {
             return Outcome::Stopped("Cancelled.".into());
@@ -716,7 +779,6 @@ pub async fn walk(
             Err(error) if cancel.is_cancelled() => return Outcome::Stopped(error),
             Err(error) => return finish(ui, Outcome::Failed(error)).await,
         };
-        ui.state("listening", "Waiting for you");
         let (step, retry) = match walkthrough.accept(report) {
             Advance::Show(step) => (step, None),
             Advance::Retry { step, reason } => (step, Some(reason)),
@@ -724,63 +786,56 @@ pub async fn walk(
             Advance::Stopped(reason) => return finish(ui, Outcome::Stopped(reason)).await,
         };
         let point = |cursor: &str| json!({"v":1,"type":"point_at","x":step.x,"y":step.y,"display":display,"cursor":cursor});
+        let at = Some((step.x, step.y));
+        let counter = Some((step.index, step.total));
         ui.present(json!({"v":1,"type":"clear_ink"})).await;
-        ui.present(point("arrow_click")).await;
-        let lead = match (&retry, note.is_empty()) {
+        ui.state("working", &step.instruction);
+        ui.present(point(&step.cursor)).await;
+
+        if mode == Mode::Do && step.action.is_some() {
+            if step.confirm {
+                ui.state("listening", "Waiting for you");
+                let ok = ui
+                    .card(Card {
+                        step: counter,
+                        text: format!("{} Shall I?", step.instruction),
+                        buttons: vec![Choice::DoIt, Choice::Stop],
+                        at,
+                    })
+                    .await;
+                if ok != Choice::DoIt {
+                    return finish(ui, Outcome::Stopped("Stopped.".into())).await;
+                }
+                ui.state("working", &step.instruction);
+            }
+            match ui.act(&step).await {
+                Ok(()) => {
+                    looked_again = false;
+                    continue;
+                }
+                // The screen moved under the target: look again once.
+                Err(reason) if reason.contains("changed") && !looked_again => {
+                    looked_again = true;
+                    continue;
+                }
+                Err(reason) => note = format!("I couldn't do that myself ({reason})."),
+            }
+        }
+
+        // Show the user: the step's cursor on the target, circled, until Done.
+        ui.present(json!({"v":1,"type":"sketch","display":display,"shapes":[{"kind":"circle","x":step.x,"y":step.y,"r":26}]}))
+            .await;
+        ui.state("listening", "Waiting for you");
+        let lead = match (retry, note.is_empty()) {
             (Some(reason), _) => format!("Not yet: {reason} "),
             (None, false) => format!("{note} "),
             _ => String::new(),
         };
         note.clear();
-        let mut buttons = vec![];
-        let mut text = format!("{lead}{}", step.instruction);
-        if let Some(action) = &step.action {
-            buttons.push(Choice::DoIt);
-            text.push_str(&format!(
-                " “Do it”: I'll {}, then look again to check.",
-                action.describe()
-            ));
-        }
-        buttons.extend([Choice::ShowMe, Choice::Stop]);
-        let at = Some((step.x, step.y));
-        let choice = ui
-            .card(Card {
-                step: Some((step.index, step.total)),
-                text,
-                buttons,
-                at,
-            })
-            .await;
-        match choice {
-            Choice::DoIt if step.action.is_some() => {
-                ui.present(point(&step.cursor)).await;
-                ui.state("working", "Doing it");
-                match ui.act(&step).await {
-                    Ok(()) => continue,
-                    // Not done: show the user instead, and look only after Done.
-                    Err(reason) => note = format!("I couldn't do that ({reason}), so here it is."),
-                }
-            }
-            Choice::ShowMe => {}
-            _ => return finish(ui, Outcome::Stopped("Stopped.".into())).await,
-        }
-        ui.present(point(&step.cursor)).await;
-        ui.present(json!({"v":1,"type":"sketch","display":display,"shapes":[{"kind":"circle","x":step.x,"y":step.y,"r":26}]}))
-            .await;
-        let text = format!(
-            "{}{} Press Done when you have, and I'll look again to check.",
-            if note.is_empty() {
-                String::new()
-            } else {
-                format!("{note} ")
-            },
-            step.instruction
-        );
-        note.clear();
         let done = ui
             .card(Card {
-                step: Some((step.index, step.total)),
-                text,
+                step: counter,
+                text: format!("{lead}{} Tell me when you're done.", step.instruction),
                 buttons: vec![Choice::Done, Choice::Stop],
                 at,
             })
@@ -793,18 +848,6 @@ pub async fn walk(
 
 async fn finish(ui: &dyn OperatorUi, outcome: Outcome) -> Outcome {
     ui.present(json!({"v":1,"type":"clear_ink"})).await;
-    let text = match &outcome {
-        Outcome::Completed(summary) => summary.clone(),
-        Outcome::Stopped(reason) => reason.clone(),
-        Outcome::Failed(error) => format!("Something went wrong: {error}"),
-    };
-    ui.card(Card {
-        step: None,
-        text,
-        buttons: vec![Choice::Close],
-        at: None,
-    })
-    .await;
     outcome
 }
 

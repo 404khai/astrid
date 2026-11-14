@@ -194,6 +194,47 @@ the 1x frame.
 A test now runs a real-size, near-cap 1512×982 frame through both providers;
 it reproduces the `image_admission` failure with the old budget.
 
+## Amendment 2026-11-14: Astrid does it, with exact targets and one Astrid
+
+After the first working session, the maintainer: "if I say do it, where it
+points to is never correct. it should do it by itself ... 2 astrids on my
+screen ... the one with the voice ring should go away ... with its box
+following it ... represent its states, by using the agent states ... it doesn't
+need to always tell me i'll look at your screen". This changes the grant model
+above, on the maintainer's instruction:
+
+- **The ask is the go-ahead.** A screen task ("like this video") starts the
+  session without a card. Its looks (still at most 12, each one ADR 0027 frame)
+  need no press: the wave, the cursor Astrid and its box show it is live, and
+  Escape or "stop" ends it.
+- **Do mode by default.** Astrid performs each step's bounded action itself
+  (click, short type, plain key, scroll; freshness-checked by the host as
+  before), then looks again to verify. It asks first ("... Shall I?" [Do it]
+  [Stop]) only when the model marks a step `confirm`: sending, deleting,
+  buying or paying, posting publicly, or submitting a form. Steps it can't do
+  (passwords, codes) and actions the host refuses fall back to showing, with
+  Done. If the screen changed under the target it looks again once. "Show me
+  how...", "how do I...", "where is..." asks use Guide mode (point, circle,
+  Done) as before.
+- **Exact targets.** With each operator look the presence app reads the
+  frontmost app's interactive controls through macOS Accessibility (role,
+  title or description, frame; never text field values), clipped to the
+  display, at most 150. Chromium apps are asked for their tree with
+  `AXManualAccessibility`. The runtime sanitizes them (`sanitize_elements`) and
+  adds them to the look result. The model names a control by id, and Astrid
+  acts on its exact centre in display points. Its own pixel guess is used only
+  when the control isn't listed. An id that isn't in that look's list is
+  refused, never guessed. The element labels are screen content and go to the
+  model under the same look as the frame.
+- **One Astrid.** In `--ask` mode the overlay exists from launch (hidden), so
+  nothing is created mid-session. When operator starts, the cursor Astrid
+  appears where the ask mark was, the ask panel drops its mark and voice ring
+  and becomes a small box that follows the cursor. The box shows the agent
+  state (thinking orb plus label, e.g. "Click Like under the video") and any
+  question with its buttons. Voice still answers it. When the session ends,
+  the panel returns to its place with the answer. The native step card is
+  removed.
+
 ## Alternatives considered
 
 - **(b) A time-boxed "watching" grant.** Fewer presses, but it is a standing

@@ -106,23 +106,3 @@ public struct Fingerprint: Equatable, Sendable {
         return Double(total) / Double(count) <= Self.tolerance
     }
 }
-
-/// Where a step card goes: beside its target without covering it, inside the
-/// display. All in display points, y down.
-public enum StepCardLayout {
-    public static let gap: CGFloat = 28
-
-    public static func origin(card: CGSize, target: CGPoint?, display: CGSize) -> CGPoint {
-        guard let target else {
-            return CGPoint(x: (display.width - card.width) / 2, y: display.height * 0.62 - card.height / 2)
-        }
-        // Below and to the right of the target first, like a tooltip under a cursor.
-        var x = target.x + gap
-        var y = target.y + gap
-        if x + card.width > display.width - 12 { x = target.x - gap - card.width }
-        if y + card.height > display.height - 12 { y = target.y - gap - card.height }
-        x = min(max(12, x), max(12, display.width - card.width - 12))
-        y = min(max(12, y), max(12, display.height - card.height - 12))
-        return CGPoint(x: x, y: y)
-    }
-}

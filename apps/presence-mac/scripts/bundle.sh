@@ -7,6 +7,7 @@ set -eu
 cd "$(dirname "$0")/.."
 swift build -c release
 APP="$PWD/.build/Astrid Presence.app"
+OLD_HASH=$(codesign -d -r- "$APP" 2>&1 | sed -n 's/.*cdhash H"\([0-9a-f]*\)".*/\1/p' || true)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/astrid-presence "$APP/Contents/MacOS/astrid-presence"
@@ -43,3 +44,8 @@ else
   codesign --force --sign - --identifier dev.astrid.presence "$APP" >/dev/null
 fi
 echo "$APP"
+NEW_HASH=$(codesign -d -r- "$APP" 2>&1 | sed -n 's/.*cdhash H"\([0-9a-f]*\)".*/\1/p' || true)
+if [ -z "${ASTRID_SIGN_IDENTITY:-}" ] && [ -n "$OLD_HASH" ] && [ "$OLD_HASH" != "$NEW_HASH" ]; then
+  echo "note: the code changed, so macOS needs the grants again:" >&2
+  echo "  tccutil reset ScreenCapture dev.astrid.presence; tccutil reset Accessibility dev.astrid.presence" >&2
+fi

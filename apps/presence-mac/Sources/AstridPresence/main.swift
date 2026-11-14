@@ -183,17 +183,6 @@ if askMode {
     if sourceCount == 0 { source = .script([]) }
 }
 
-// Debug: ASTRID_STEP_CARD=/path.png renders a sample operator card offscreen and exits.
-if let path = ProcessInfo.processInfo.environment["ASTRID_STEP_CARD"] {
-    _ = NSApplication.shared
-    do {
-        try StepCard.renderSample(to: URL(fileURLWithPath: path))
-        exit(0)
-    } catch {
-        fail("step card render: \(error)")
-    }
-}
-
 // Debug: ASTRID_WAVE_FRAMES=DIR renders the intro wave offscreen to PNGs and exits.
 if let path = ProcessInfo.processInfo.environment["ASTRID_WAVE_FRAMES"] {
     do {

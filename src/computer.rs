@@ -373,10 +373,21 @@ impl ComputerRun {
                             if self.traffic > 2 * MAX_PNG {
                                 return Err("observation traffic exhausted");
                             }
+                            let elements = match &target {
+                                Target::Local { host, .. } => host.elements(),
+                                Target::Instabox(_) => None,
+                            };
                             let image = self.decoder.decode(&bytes, cancel).await.map_err(
                                 |_| "screenshot decode failed, cancelled or exceeded bounds",
                             )?;
-                            self.install(image, admitted, cancel)
+                            let (width, height) = (image.width, image.height);
+                            let mut observed = self.install(image, admitted, cancel)?;
+                            if let Some(list) =
+                                elements.and_then(|e| sanitize_elements(&e, width, height))
+                            {
+                                observed["elements"] = list;
+                            }
+                            Ok(observed)
                         }
                     };
                     let result = tokio::select! {biased;_=cancel.cancelled()=>Err("observation cancelled"),_=tokio::time::sleep_until(deadline)=>Err("observation deadline"),value=observe=>value};
@@ -617,6 +628,46 @@ pub(crate) fn handles(name: &str) -> bool {
 /// Presentation calls that never stop the run when rejected.
 pub(crate) fn is_presentation(name: &str) -> bool {
     matches!(name, "point_at" | "sketch" | "say")
+}
+
+/// At most this many on-screen elements go to the model with a look.
+pub const MAX_ELEMENTS: usize = 150;
+
+/// Keeps well-formed elements inside the frame: `[id, role, label, x, y, w, h]`
+/// with a short role and label (control characters removed), in display points.
+/// Anything else from the host is dropped.
+pub fn sanitize_elements(value: &Value, width: u32, height: u32) -> Option<Value> {
+    let clean = |text: &Value, max: usize| -> Option<String> {
+        let text: String = text
+            .as_str()?
+            .chars()
+            .map(|c| if c.is_control() { ' ' } else { c })
+            .take(max)
+            .collect();
+        Some(text.trim().to_owned())
+    };
+    let mut seen = std::collections::HashSet::new();
+    let list: Vec<Value> = value
+        .as_array()?
+        .iter()
+        .filter_map(|e| {
+            let e = e.as_array().filter(|e| e.len() == 7)?;
+            let id = e[0].as_u64().filter(|id| *id < 100_000)?;
+            let role = clean(&e[1], 24).filter(|r| !r.is_empty())?;
+            let label = clean(&e[2], 120)?;
+            let n = |v: &Value| v.as_i64();
+            let (x, y, w, h) = (n(&e[3])?, n(&e[4])?, n(&e[5])?, n(&e[6])?);
+            let inside = w > 0
+                && h > 0
+                && x >= 0
+                && y >= 0
+                && x + w <= i64::from(width)
+                && y + h <= i64::from(height);
+            (inside && seen.insert(id)).then(|| json!([id, role, label, x, y, w, h]))
+        })
+        .take(MAX_ELEMENTS)
+        .collect();
+    (!list.is_empty()).then_some(Value::Array(list))
 }
 
 /// The presence host's categorical capture reason, kept for the user

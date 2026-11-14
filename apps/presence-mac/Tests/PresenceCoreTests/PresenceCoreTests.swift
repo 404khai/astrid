@@ -591,23 +591,6 @@ final class OperatorTests: XCTestCase {
         let other = Fingerprint(rgba: rgba(width: 160, height: 100), width: 160, height: 100, bytesPerRow: 640)
         XCTAssertFalse(before.matches(other, around: CGPoint(x: 10, y: 10)))
     }
-
-    func testCardsSitBesideTheTargetInsideTheDisplay() {
-        let display = CGSize(width: 1512, height: 982), card = CGSize(width: 340, height: 180)
-        let below = StepCardLayout.origin(card: card, target: CGPoint(x: 300, y: 200), display: display)
-        XCTAssertEqual(below, CGPoint(x: 328, y: 228))
-        // Near the bottom-right corner the card flips above and to the left.
-        let flipped = StepCardLayout.origin(card: card, target: CGPoint(x: 1450, y: 900), display: display)
-        XCTAssertEqual(flipped, CGPoint(x: 1450 - 28 - 340, y: 900 - 28 - 180))
-        // Never covering the target point.
-        for target in [CGPoint(x: 0, y: 0), CGPoint(x: 1511, y: 981), CGPoint(x: 756, y: 491), CGPoint(x: 5, y: 970)] {
-            let origin = StepCardLayout.origin(card: card, target: target, display: display)
-            XCTAssertFalse(CGRect(origin: origin, size: card).contains(target), "\(target)")
-            XCTAssertTrue(CGRect(origin: .zero, size: display).contains(CGRect(origin: origin, size: card)))
-        }
-        let centred = StepCardLayout.origin(card: card, target: nil, display: display)
-        XCTAssertEqual(centred.x, (1512 - 340) / 2)
-    }
 }
 
 final class FrameEncodingTests: XCTestCase {
