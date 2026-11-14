@@ -1,0 +1,26 @@
+{
+  "name": "Cubee",
+  "body": {
+    "primary": {
+      "type": "cube",
+      "width": 191.49921875,
+      "height": 191.49921875,
+      "depth": 171.95848214285726,
+      "roundness": 0.73265625
+    },
+    "nodes": []
+  },
+  "colors": {
+    "body": "#e65c5c",
+    "eyes": "#111316"
+  },
+  "face": {
+    "eyes": {
+      "width": 1,
+      "height": 1,
+      "gap": 1,
+      "shiftY": -0.0731
+    },
+    "perspective": 0.5
+  }
+}

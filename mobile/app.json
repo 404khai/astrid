@@ -11,7 +11,8 @@
       "icon": "./assets/app-icon.png"
     },
     "platforms": [
-      "ios"
+      "ios",
+      "android"
     ],
     "plugins": [
       "expo-status-bar",
@@ -20,10 +21,37 @@
         {
           "ios": {
             "enableSceneSupport": true
+          },
+          "android": {
+            "usesCleartextTraffic": true
           }
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Astrid uses the camera to scan the pairing code on your Mac.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
         }
       ]
     ],
-    "icon": "./assets/app-icon.png"
+    "icon": "./assets/app-icon.png",
+    "android": {
+      "package": "dev.astrid.mobile",
+      "icon": "./assets/app-icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app-icon.png",
+        "backgroundColor": "#0b0b10"
+      },
+      "permissions": [
+        "CAMERA"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "scheme": "astrid"
   }
 }

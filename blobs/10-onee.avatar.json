@@ -1,0 +1,29 @@
+{
+  "name": "Onee",
+  "body": {
+    "primary": {
+      "type": "cone",
+      "width": 250,
+      "height": 182.006640625,
+      "depth": 225,
+      "roundness": 0,
+      "morphRoundness": 1.2003515624999999,
+      "tipRoundness": 2,
+      "baseRoundness": 2
+    },
+    "nodes": []
+  },
+  "colors": {
+    "body": "#dbe2f5",
+    "eyes": "#111316"
+  },
+  "face": {
+    "eyes": {
+      "width": 1,
+      "height": 1,
+      "gap": 1,
+      "shiftY": 0.2045
+    },
+    "perspective": 0.5
+  }
+}

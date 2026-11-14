@@ -103,7 +103,7 @@ final class PassthroughWebView: WKWebView {
 }
 
 /// WKUserContentController keeps its handlers alive; this breaks the cycle.
-private final class WeakHandler: NSObject, WKScriptMessageHandler {
+final class WeakHandler: NSObject, WKScriptMessageHandler {
     weak var target: WKScriptMessageHandler?
     init(_ target: WKScriptMessageHandler) { self.target = target }
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {

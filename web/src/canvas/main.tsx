@@ -92,6 +92,8 @@ function App() {
   const queue = useRef<Shape[]>([]);
   const ended = useRef(true);
   const touched = useRef(false);
+  /** Pointers down on the stage, for a two-finger pinch. */
+  const fingers = useRef(new Map<number, [number, number]>());
   const timer = useRef<number | undefined>(undefined);
   const stage = useRef<HTMLDivElement>(null);
   const content = useRef<SVGGElement>(null);
@@ -248,15 +250,34 @@ function App() {
   const hasSolids = scene.solids.length > 0;
 
   // Drag turns a 3D figure (or pans a flat one); two-finger scroll pans,
-  // pinch zooms, double-click puts it back.
+  // pinch zooms, double-click puts it back. On a touch screen (the phone app,
+  // ADR 0039) two fingers pinch to zoom.
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0 || (e.target as Element).closest("button, .cv-title")) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     touched.current = true;
     setMoving(true);
+    fingers.current.set(e.pointerId, [e.clientX, e.clientY]);
     let last = { x: e.clientX, y: e.clientY };
     const turn = hasSolids && !e.shiftKey;
     const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      const before = [...fingers.current.values()];
+      fingers.current.set(ev.pointerId, [ev.clientX, ev.clientY]);
+      if (fingers.current.size >= 2) {
+        const after = [...fingers.current.values()];
+        const span = (p: [number, number][]) => Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]);
+        const ratio = span(after) / Math.max(span(before), 1);
+        const rect = stage.current!.getBoundingClientRect();
+        const px = ((after[0][0] + after[1][0]) / 2 - rect.left - offset.x) / unit;
+        const py = ((after[0][1] + after[1][1]) / 2 - rect.top - offset.y) / unit;
+        setView((v) => {
+          const zoom = Math.min(6, Math.max(0.2, v.zoom * ratio));
+          return { zoom, x: px - ((px - v.x) / v.zoom) * zoom, y: py - ((py - v.y) / v.zoom) * zoom };
+        });
+        last = { x: ev.clientX, y: ev.clientY };
+        return;
+      }
       const dx = ev.clientX - last.x, dy = ev.clientY - last.y;
       last = { x: ev.clientX, y: ev.clientY };
       if (turn) {
@@ -265,13 +286,17 @@ function App() {
         setView((v) => ({ ...v, x: v.x + dx / unit, y: v.y + dy / unit }));
       }
     };
-    const up = () => {
-      setMoving(false);
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return;
+      fingers.current.delete(e.pointerId);
+      if (!fingers.current.size) setMoving(false);
       removeEventListener("pointermove", move);
       removeEventListener("pointerup", up);
+      removeEventListener("pointercancel", up);
     };
     addEventListener("pointermove", move);
     addEventListener("pointerup", up);
+    addEventListener("pointercancel", up);
   };
   const onWheel = (e: React.WheelEvent) => {
     // Embedded in a scrolling thread, plain scrolling belongs to the thread.

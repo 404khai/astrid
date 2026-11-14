@@ -13,9 +13,19 @@ the pointer on the window's left edge to peek it: it slides in exactly as
 when opened, but inside the chat card, over its content, instead of pushing it.
 Drag the sidebar's edge to resize it. The window buttons show only while the
 sidebar is open and wide enough for them.
-Settings follows Rex: General (model, mail source) and Themes, with four
+Settings follows Rex: General (model, mail source), Themes, with four
 light and four dark themes that colour the sidebar and the chat, and System,
-Light or Dark appearance.
+Light or Dark appearance, and Phone.
+
+**Phone** ([ADR 0039](../../docs/adr/0039-phone-companion.md)) pairs the Android
+app (`mobile/`) by QR code:
+- **The link.** Turn on "Let paired phones connect", press Pair Phone, and scan
+  the code in the phone app. The code works once, for two minutes.
+- **What the phone gets.** Your chats, kept in sync, and asks that run here and
+  are saved here. Phone asks have no mail.
+- **Where it reaches.** Only your local network, on port 47821, and only while
+  this app is open. Every frame is sealed with the phone's own key.
+- **Revoking.** Revoke a phone on the same page.
 
 **Diagrams**, under New Chat, shows every drawing Astrid has made as a grid; click one
 to open it in a modal (Esc closes it). On a Force Touch trackpad the sidebar
@@ -33,7 +43,7 @@ Requires **macOS 26+**, because it uses the Liquid Glass SwiftUI APIs.
   && open apps/astrid-desktop/.build/Astrid.app
 
 cd apps/astrid-desktop
-swift build && swift test        # 22 deterministic tests (store, titles, child protocol, themes, search, gallery, logo paths)
+swift build && swift test        # 33 deterministic tests (store, titles, child protocol, themes, search, gallery, logo paths, phone link)
 .build/debug/astrid-desktop --help
 ```
 
@@ -51,5 +61,5 @@ swift build && swift test        # 22 deterministic tests (store, titles, child 
   sends one ask at launch. `ASTRID_DESKTOP_PEEK=1` starts with a closed sidebar peeking.
   `ASTRID_DESKTOP_PAGE=diagrams` opens Diagrams (`ASTRID_DESKTOP_OPEN_DIAGRAM=1` also opens
   the newest in the modal). `ASTRID_DESKTOP_SETTINGS=1` opens Settings
-  (`ASTRID_DESKTOP_SETTINGS_PAGE=themes` for that page). `ASTRID_DESKTOP_CLOSE_AFTER=seconds` closes the
+  (`ASTRID_DESKTOP_SETTINGS_PAGE=themes|phone` for that page). `ASTRID_DESKTOP_CLOSE_AFTER=seconds` closes the
   window as its close button would.

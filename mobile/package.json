@@ -7,18 +7,29 @@
     "start": "expo start",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "export:ios": "expo export --platform ios"
+    "export:ios": "expo export --platform ios",
+    "android": "node scripts/build-canvas.mjs && expo run:android",
+    "canvas": "node scripts/build-canvas.mjs",
+    "apk": "node scripts/build-canvas.mjs && expo prebuild -p android --no-install && cd android && ./gradlew assembleRelease",
+    "test:link": "node src/link/crypto.test.mjs"
   },
   "dependencies": {
     "@expo/ui": "~57.0.22",
+    "@expo/vector-icons": "^15.0.2",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "expo": "~57.0.27",
     "expo-build-properties": "~57.0.22",
+    "expo-camera": "~57.0.6",
+    "expo-crypto": "~57.0.4",
+    "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
     "react": "19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "0.86.3",
-    "react-native-safe-area-context": "~5.7.0"
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",

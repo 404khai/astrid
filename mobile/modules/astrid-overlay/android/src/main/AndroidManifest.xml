@@ -1,0 +1,25 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <application>
+    <service
+      android:name="dev.astrid.overlay.OverlayService"
+      android:exported="false"
+      android:foregroundServiceType="specialUse">
+      <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="Astrid's bubble over other apps, which opens her ask panel when tapped" />
+    </service>
+    <activity
+      android:name="dev.astrid.overlay.AskActivity"
+      android:exported="false"
+      android:theme="@style/Theme.AstridAsk"
+      android:launchMode="singleTask"
+      android:taskAffinity="dev.astrid.mobile.ask"
+      android:excludeFromRecents="true"
+      android:windowSoftInputMode="adjustResize"
+      android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" />
+  </application>
+</manifest>

@@ -60,6 +60,15 @@ public final class ChatStore {
         }
     }
 
+    /// A chat as it is saved: the phone link sends this same shape (ADR 0039).
+    public static func encode(_ chat: ChatSession) throws -> Data {
+        try encoder.encode(chat)
+    }
+
+    public static func decode(_ data: Data) throws -> ChatSession {
+        try decoder.decode(ChatSession.self, from: data)
+    }
+
     public func save(_ chat: ChatSession) throws {
         let manager = FileManager.default
         try manager.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])

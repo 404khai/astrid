@@ -225,6 +225,8 @@ struct GlassCircle: View {
 }
 
 struct Sidebar: View {
+    @State private var renaming: ChatSession?
+    @State private var newTitle = ""
     @ObservedObject var model: ChatModel
     @ObservedObject var settings: AppSettings
     /// Peeking over the card: the header's button pair is drawn again in the
@@ -255,9 +257,11 @@ struct Sidebar: View {
                 ScrollView {
                     LazyVStack(spacing: 2) {
                         ForEach(model.visibleChats) { chat in
-                            SidebarRow(symbol: chat.messages.contains { $0.diagram != nil } ? "scribble.variable" : "bubble.left",
-                                       title: chat.title, selected: model.page == .chat && chat.id == model.selection) { model.show(chat: chat.id) }
+                            SidebarRow(symbol: chat.icon.map(ChatGlyph.symbol) ?? (chat.messages.contains { $0.diagram != nil } ? "scribble.variable" : "bubble.left"),
+                                       title: chat.title, selected: model.page == .chat && chat.id == model.selection,
+                                       tint: ChatStyle.hex(chat.color).map { Color(hex: $0) }) { model.show(chat: chat.id) }
                                 .help(chat.updated.formatted(.relative(presentation: .named)))
+                                .contextMenu { ChatMenu(model: model, chat: chat) { renaming = chat; newTitle = chat.title } }
                         }
                         if model.visibleChats.isEmpty {
                             Text(model.chats.isEmpty ? "Your chats will show up here." : "No chats match.")
@@ -272,6 +276,8 @@ struct Sidebar: View {
                 .scrollIndicators(.never)
             }
 
+            BlobsRow(ui: model.config.ui, settings: settings, model: model)
+                .padding(.bottom, 4)
             HStack {
                 AstridLogoMark(size: 21)
                     .frame(width: 38, height: 38)
@@ -285,6 +291,64 @@ struct Sidebar: View {
         .padding(.horizontal, 12)
         .padding(.top, topInset)
         .foregroundStyle(palette.sidebarText)
+        .alert("Rename chat", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: $newTitle)
+            Button("Rename") { if let chat = renaming { model.restyle(chat.id, title: newTitle) } }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+}
+
+/// SF Symbols for `ChatStyle.icons`.
+enum ChatGlyph {
+    static func symbol(_ name: String) -> String {
+        [
+            "chat": "bubble.left", "star": "star", "brain": "brain.head.profile", "code": "chevron.left.forwardslash.chevron.right",
+            "book": "book.closed", "heart": "heart", "bolt": "bolt", "globe": "globe", "flask": "flask", "music": "music.note",
+            "house": "house", "camera": "camera", "map": "map", "leaf": "leaf",
+        ][name] ?? "bubble.left"
+    }
+}
+
+/// A chat's right-click menu: rename, icon and colour.
+struct ChatMenu: View {
+    @ObservedObject var model: ChatModel
+    var chat: ChatSession
+    var rename: () -> Void
+
+    var body: some View {
+        Button("Rename…", systemImage: "pencil", action: rename)
+        Menu("Icon") {
+            Button("Default") { model.restyle(chat.id, icon: "") }
+            Divider()
+            ForEach(ChatStyle.icons, id: \.self) { icon in
+                Button(icon.capitalized, systemImage: ChatGlyph.symbol(icon)) { model.restyle(chat.id, icon: icon) }
+            }
+        }
+        Menu("Colour") {
+            Button("Default") { model.restyle(chat.id, color: "") }
+            Divider()
+            ForEach(ChatStyle.colors, id: \.name) { color in
+                Button {
+                    model.restyle(chat.id, color: color.name)
+                } label: {
+                    Label {
+                        Text(color.name.capitalized)
+                    } icon: {
+                        Image(nsImage: ChatMenu.swatch(color.hex))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Menus draw images, not shapes: a small round swatch.
+    static func swatch(_ hex: String) -> NSImage {
+        NSImage(size: NSSize(width: 12, height: 12), flipped: false) { rect in
+            NSColor(Color(hex: hex)).setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 1, dy: 1)).fill()
+            return true
+        }
     }
 }
 
@@ -340,6 +404,7 @@ struct SidebarRow: View {
     var symbol: String
     var title: String
     var selected: Bool
+    var tint: Color? = nil
     var action: () -> Void
     @Environment(\.palette) private var palette
     @State private var hovering = false
@@ -350,7 +415,8 @@ struct SidebarRow: View {
                 Image(systemName: symbol)
                     .font(.system(size: 13))
                     .frame(width: 18)
-                    .opacity(0.8)
+                    .foregroundStyle(tint ?? palette.sidebarText)
+                    .opacity(tint == nil ? 0.8 : 1)
                 Text(title)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -451,8 +517,11 @@ struct ThreadView: View {
             }
         }
         .overlay {
-            if thread.isEmpty { EmptyThread(ui: model.config.ui) }
+            if thread.isEmpty { EmptyThread(ui: model.config.ui, draft: model.draft) }
         }
+        // Voice mode floats over the thread with nothing behind it: inside the
+        // composer bar it took the bar's backdrop with it.
+        .overlay(alignment: .bottom) { VoiceLayer(model: model, voice: model.voice) }
     }
 }
 
@@ -473,13 +542,33 @@ struct AstridMark: View {
     }
 }
 
+/// Voice mode's panel, when it's on.
+struct VoiceLayer: View {
+    @ObservedObject var model: ChatModel
+    @ObservedObject var voice: VoiceMode
+
+    var body: some View {
+        ZStack {
+            if voice.phase != .off {
+                VoicePanel(ui: model.config.ui, voice: voice)
+                    .frame(maxWidth: 760)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 6)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottom)))
+            }
+        }
+        .animation(.smooth(duration: 0.35), value: voice.phase == .off)
+    }
+}
+
 struct EmptyThread: View {
     var ui: URL
+    var draft = ""
     @Environment(\.palette) private var palette
 
     var body: some View {
         VStack(spacing: 14) {
-            AstridLogoMark(size: 64)
+            TrackingLogoMark(size: 64, draft: draft)
             Text("Ask Astrid")
                 .font(.title2.weight(.semibold))
             Text("Each chat keeps what you sent, Astrid's replies\nand the drawings she made.")
@@ -626,11 +715,19 @@ struct ApprovalCard: View {
 
 struct Composer: View {
     @ObservedObject var model: ChatModel
+    @ObservedObject private var voice: VoiceMode
     @FocusState private var focused: Bool
     @Environment(\.palette) private var palette
 
+    init(model: ChatModel) {
+        self.model = model
+        voice = model.voice
+    }
+
     private var running: Bool { model.live != nil }
     private var elsewhere: Bool { model.live.map { $0.chatID != model.selection } ?? false }
+    private var typing: Bool { !model.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var talking: Bool { voice.phase != .off }
 
     var body: some View {
         VStack(spacing: 6) {
@@ -642,6 +739,11 @@ struct Composer: View {
             if let error = model.saveError {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
+            if let problem = voice.problem {
+                Text(problem).font(.caption).foregroundStyle(.red)
+            }
+            // The field stays in the window while she talks (hidden): taking a
+            // focused field out sends AppKit's key-view search round forever.
             GlassEffectContainer(spacing: 10) {
                 HStack(alignment: .bottom, spacing: 10) {
                     TextField("Ask Astrid", text: $model.draft, axis: .vertical)
@@ -651,29 +753,16 @@ struct Composer: View {
                         .onSubmit { model.send() }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 11)
-                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 20))
-                    if running {
-                        Button { model.cancel() } label: {
-                            Image(systemName: "stop.fill").frame(width: 22, height: 22)
-                        }
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.circle)
-                        .controlSize(.large)
-                        .keyboardShortcut(.cancelAction)
-                        .help("Stop (Esc)")
-                    } else {
-                        Button { model.send() } label: {
-                            Image(systemName: "arrow.up").fontWeight(.semibold).frame(width: 22, height: 22)
-                        }
-                        .buttonStyle(.glassProminent)
-                        .tint(palette.accent)
-                        .buttonBorderShape(.circle)
-                        .controlSize(.large)
-                        .disabled(!model.canSend)
-                        .help("Send (Return)")
-                    }
+                        .opacity(talking ? 0 : 1)
+                        .glassEffect(talking ? .identity : .regular.interactive(), in: .rect(cornerRadius: 20))
+                    if !talking { button }
                 }
+                .opacity(talking ? 0 : 1)
+                .disabled(talking)
+                .accessibilityHidden(talking)
             }
+            .animation(.smooth(duration: 0.35), value: talking)
+            .animation(.smooth(duration: 0.2), value: typing)
         }
         .frame(maxWidth: 760)
         .padding(.horizontal, 28)
@@ -681,6 +770,106 @@ struct Composer: View {
         .padding(.top, 6)
         .frame(maxWidth: .infinity)
         .onAppear { focused = true }
-        .onChange(of: model.selection) { _, _ in focused = true }
+        .onChange(of: model.selection) { _, _ in if !talking { focused = true } }
+        .onChange(of: talking) { _, on in if !on { focused = true } }
+        .onKeyPress(.escape) {
+            guard talking else { return .ignored }
+            voice.end()
+            return .handled
+        }
+    }
+
+    @ViewBuilder private var button: some View {
+        if running {
+            Button { model.cancel() } label: {
+                Image(systemName: "stop.fill").frame(width: 22, height: 22)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .keyboardShortcut(.cancelAction)
+            .help("Stop (Esc)")
+        } else if typing {
+            Button { model.send() } label: {
+                Image(systemName: "arrow.up").fontWeight(.semibold).frame(width: 22, height: 22)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(palette.accent)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .disabled(!model.canSend)
+            .help("Send (Return)")
+        } else {
+            Button {
+                // Let go of the field first, then talk.
+                focused = false
+                NSApp.keyWindow?.makeFirstResponder(nil)
+                DispatchQueue.main.async { voice.start() }
+            } label: {
+                Image(systemName: "waveform").fontWeight(.semibold).frame(width: 22, height: 22)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(palette.accent)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .help("Talk to Astrid")
+        }
     }
 }
+
+/// The composer in voice mode: Astrid as an orb in her voice ring, which
+/// moves with your voice while she listens and with hers while she speaks;
+/// mute on the left, back to the keyboard on the right. Tap her to interrupt.
+struct VoicePanel: View {
+    var ui: URL
+    @ObservedObject var voice: VoiceMode
+    @Environment(\.palette) private var palette
+
+    private var label: String {
+        if voice.muted && voice.phase == .listening { return "Muted" }
+        switch voice.phase {
+        case .listening: return voice.heard.isEmpty ? "Listening…" : voice.heard
+        case .thinking: return "Thinking…"
+        case .speaking: return "Tap to interrupt"
+        case .off: return ""
+        }
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            VStack(spacing: 8) {
+                VoiceRingView(ui: ui, voice: voice)
+                    .frame(width: 210, height: 210)
+                    .accessibilityLabel("Astrid, \(label)")
+                Text(label)
+                    .font(.callout)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(voice.phase == .listening && !voice.heard.isEmpty ? palette.text : palette.secondary)
+                    .frame(maxWidth: 420, minHeight: 36, alignment: .top)
+                    .contentTransition(.opacity)
+                    .animation(.smooth, value: label)
+            }
+            .frame(maxWidth: .infinity)
+            HStack {
+                Button { voice.toggleMute() } label: {
+                    Image(systemName: voice.muted ? "mic.slash.fill" : "mic.fill").frame(width: 24, height: 24)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .controlSize(.extraLarge)
+                .help(voice.muted ? "Unmute" : "Mute")
+                Spacer()
+                Button { voice.end() } label: {
+                    Image(systemName: "keyboard").frame(width: 24, height: 24)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .controlSize(.extraLarge)
+                .help("Back to typing (Esc)")
+            }
+            .padding(.bottom, 44)
+        }
+    }
+}
+

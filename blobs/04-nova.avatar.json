@@ -1,0 +1,26 @@
+{
+  "name": "Nova",
+  "body": {
+    "primary": {
+      "type": "capsule",
+      "width": 205,
+      "height": 270,
+      "depth": 205,
+      "roundness": 1
+    },
+    "nodes": []
+  },
+  "colors": {
+    "body": "#55b6c3",
+    "eyes": "#111316"
+  },
+  "face": {
+    "eyes": {
+      "width": 1,
+      "height": 1,
+      "gap": 1,
+      "shiftY": -0.0206
+    },
+    "perspective": 0.5
+  }
+}

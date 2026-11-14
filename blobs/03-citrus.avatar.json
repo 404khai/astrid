@@ -1,0 +1,29 @@
+{
+  "name": "Citrus",
+  "body": {
+    "primary": {
+      "type": "cone",
+      "width": 252.708984375,
+      "height": 274.9671875,
+      "depth": 225,
+      "roundness": 0,
+      "morphRoundness": 1.1473828125,
+      "tipRoundness": 0.743515625,
+      "baseRoundness": 1.34375
+    },
+    "nodes": []
+  },
+  "colors": {
+    "body": "#ffcf24",
+    "eyes": "#000000"
+  },
+  "face": {
+    "eyes": {
+      "width": 1,
+      "height": 1,
+      "gap": 1,
+      "shiftY": 0.167
+    },
+    "perspective": 0.5
+  }
+}
