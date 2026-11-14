@@ -159,7 +159,7 @@ approval, as with ADRs 0021–0025.
 | V2-03 | **Voice** (push-to-talk + on-device STT + voice ring in review; ADR 0034; TTS/barge-in next) | Push-to-talk, streaming STT/TTS, subtitles, barge-in cancellation; latency spans in traces. |
 | V2-04 | **Anatomy figures, live** (live canvas first slice; ADR 0036) | `show_figure` renders a sandboxed, interactive figure card next to the subject; figure checks pass. |
 | V2-05 | **Guided walkthroughs** (`/operator`; [ADR 0038](../adr/0038-operator-walkthroughs.md)) | Multi-step tasks with wait/re-look/verify; never advances on an unverified step. |
-| V2-06 | **Phone companion** | Phone asks routed to the Mac runtime; Android overlay prototype. |
+| V2-06 | **Phone companion** ([ADR 0039](../adr/0039-phone-companion.md)) | Phone asks routed to the Mac runtime; Android overlay prototype. QR-paired sealed LAN link to the desktop app with chat sync, edge wave, canvas. |
 | V2-07 | **Memory you control** | Inspectable, deletable personal context. |
 | later | **Do it for me** | ADR 0023/0024 actions behind the same presence UI. |
 

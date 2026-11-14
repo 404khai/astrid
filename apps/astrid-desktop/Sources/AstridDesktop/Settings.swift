@@ -17,6 +17,11 @@ final class AppSettings: ObservableObject {
     @Published var sidebarWidth: Double { didSet { defaults.set(sidebarWidth, forKey: "sidebar.width") } }
     @Published var storedModel: String { didSet { defaults.set(storedModel, forKey: "ask.model") } }
     @Published var storedMail: String { didSet { defaults.set(storedMail, forKey: "ask.mail") } }
+    /// The row of blobs above the sidebar's foot, and the one picked.
+    @Published var showBlobs: Bool { didSet { defaults.set(showBlobs, forKey: "blobs.show") } }
+    @Published var blob: String? { didSet { defaults.set(blob, forKey: "blobs.selected") } }
+    /// Which bots show in the row, in order (file names).
+    @Published var blobsShown: [String] { didSet { defaults.set(blobsShown, forKey: "blobs.shown") } }
     /// Not stored: whether the settings sheet is open.
     @Published var showSettings = false
 
@@ -38,6 +43,9 @@ final class AppSettings: ObservableObject {
         sidebarShown = defaults.object(forKey: "sidebar.shown") as? Bool ?? true
         let width = defaults.object(forKey: "sidebar.width") as? Double ?? Self.sidebarDefault
         sidebarWidth = min(max(width, Self.sidebarMin), Self.sidebarMax)
+        showBlobs = defaults.object(forKey: "blobs.show") as? Bool ?? true
+        blob = defaults.string(forKey: "blobs.selected")
+        blobsShown = defaults.stringArray(forKey: "blobs.shown") ?? Blobs.defaults
         storedModel = defaults.string(forKey: "ask.model") ?? "claude-code/sonnet"
         let mail = defaults.string(forKey: "ask.mail") ?? "gmail"
         storedMail = Self.mailSources.contains(mail) ? mail : "gmail"

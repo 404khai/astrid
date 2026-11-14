@@ -2,3 +2,6 @@ node_modules/
 .expo/
 dist/
 ios/
+/android/
+modules/astrid-overlay/android/src/main/assets/astrid-canvas.html
+modules/*/android/build/

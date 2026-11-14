@@ -1,0 +1,38 @@
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+#root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+.blob {
+  flex: 0 1 38px;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.blob:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.blob.on {
+  background: rgba(255, 255, 255, 0.08);
+}
+.blob .bs-avatar {
+  max-width: 100%;
+}

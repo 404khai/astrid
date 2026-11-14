@@ -203,3 +203,43 @@ maintainer asked for a full desktop app on that same native stack, with macOS
   - **Low** for the layout.
   - **Medium** for the chat file format, which is versioned.
   - **Low** for the additive `history` field.
+
+## Amendment 2026-11-14: voice mode, providers, About
+
+At the maintainer's request, the composer's empty-state button is a waveform:
+- **Voice mode.** Pressing the waveform turns the input into Astrid with her
+  voice ring, and you talk straight away. What you say is sent when you stop.
+  Her reply is spoken, drawings included (she names what she drew), and then
+  she listens again.
+- **Leaving it.** A keyboard button (or Esc) goes back to typing, and typing
+  turns the waveform into Send.
+- **Same rules as presence.** It reuses presence's contracts: microphone only
+  while listening and on-device recognition only (ADR 0034), and the local
+  Kokoro voice or macOS's (ADR 0035). Nothing is saved or sent besides the
+  transcript asked.
+
+Settings › General groups the known models by provider (Claude Code, Claude
+API, Codex, OpenCode Go), with each provider's mark from `providers/` and an
+install or key status. The runtime still takes any exact model ID under "Other
+model". Settings gains About.
+
+## Amendment 2026-11-14: blobs
+
+At the maintainer's request:
+- **The row.** The sidebar shows a row of up to five "blobs" (little bots)
+  above its foot. Click one to pick it; the picked one reacts while Astrid
+  works.
+- **Settings › Blobs** (Giovanni icon) holds the show/hide toggle.
+- **The renderer** is the MIT-licensed `@bible-strong/avatar-web` package.
+- **The characters.** Asked about the licence, the maintainer chose to keep
+  Avatar Lab's ten built-in characters in the repo, in `blobs/` under their
+  own AGPL-3.0 licence (with credit and the changes listed in its README),
+  and to license the rest of Astrid under MIT (root `LICENSE`). The
+  characters were converted to the MIT runtime's character format.
+  Settings › Blobs picks which five show (default: Sunee, Cloudee, Citrus,
+  Freddy, Kirby). The user can add their own exports in
+  `~/Library/Application Support/Astrid/Blobs` (at most 512 KiB per file).
+- **If Astrid ever needs to be free of AGPL** (for example, a closed-source
+  build), deleting `blobs/` removes it; the app runs without bots.
+- **Voice mode's ring** is presence's `VoiceRing` (`web/voice.html`), fed by
+  the host's analyser frames.

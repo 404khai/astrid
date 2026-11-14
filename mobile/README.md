@@ -1,4 +1,52 @@
-# Astrid mobile concept
+# Astrid mobile
+
+## Android companion (V2-06)
+
+The Android app is Astrid's phone companion
+([ADR 0039](../docs/adr/0039-phone-companion.md)).
+
+**What it does:**
+- **Pairing.** It pairs with the desktop app by QR code.
+- **Chats.** It shows your chats and keeps them in sync.
+- **Asks.** Asks run on your Mac; the phone holds no model credentials.
+- **Drawings.** It draws Astrid's replies on the live canvas (`web/canvas.html`,
+  in a WebView).
+- **Bubble.** It can put Astrid on top of other apps. Tap the bubble to ask
+  from anywhere. The first time you switch it on, the Distortion Waves band
+  rises from the bottom of the screen and runs round its edges.
+
+**Build and install**, with USB debugging on and the phone plugged in. This
+needs the Android SDK and JDK 17+.
+
+```sh
+cd mobile
+npm ci
+npm run android                    # builds the canvas page, then the app, and installs it
+# or a standalone release APK (signed with the debug key), to sideload:
+npm run apk                        # -> android/app/build/outputs/apk/release/app-release.apk
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+npm run test:link                  # link crypto against the Mac's fixed vector
+```
+
+**Pairing:**
+1. On the Mac, open Astrid, then Settings › Phone, and turn on "Let paired
+   phones connect".
+2. Press Pair Phone.
+3. In the phone app, tap Scan QR code.
+
+Both devices must be on the same network. On the phone, "Astrid on screen"
+needs "Display over other apps", which the app opens for you.
+
+**Code:**
+- `src/App.android.tsx`: the Android app. `App.tsx` is the iOS concept below,
+  unchanged.
+- `src/phone/`: state, the overlay's ask panel and the canvas view.
+- `src/link/`: pairing and the sealed link.
+- `modules/astrid-overlay`: the Kotlin bubble service, the ask panel activity
+  and the AGSL edge wave.
+
+## iOS concept
+
 
 An isolated iOS-first Expo SDK 57 concept on `experiment/mobile`. All app files
 and generated native builds live in this folder. The Phase 4 statement from the original experiment is historical; current runtime direction is recorded in `../docs/CURRENT.md`.

@@ -1,0 +1,35 @@
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+#root {
+  display: grid;
+  place-items: center;
+}
+.vo-ring {
+  position: relative;
+  width: 200px;
+  height: 200px;
+}
+.vo-mark {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  border: 0;
+  border-radius: 32px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.vo-mark .astrid-logo {
+  width: 44px;
+  height: 36px;
+}

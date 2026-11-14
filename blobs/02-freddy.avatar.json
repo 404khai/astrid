@@ -1,0 +1,85 @@
+{
+  "name": "Freddy",
+  "body": {
+    "primary": {
+      "type": "cube",
+      "width": 174.732421875,
+      "height": 149.474609375,
+      "depth": 125.596484375,
+      "roundness": 0.7621875
+    },
+    "nodes": [
+      {
+        "surface": {
+          "type": "sphere",
+          "width": 81.60000000000001,
+          "height": 81.60000000000001,
+          "depth": 37.96875000000001,
+          "roundness": 1
+        },
+        "position": [
+          -82,
+          -72,
+          -18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "surface": {
+          "type": "sphere",
+          "width": 81.60000000000001,
+          "height": 81.60000000000001,
+          "depth": 37.024609375000004,
+          "roundness": 1
+        },
+        "position": [
+          82,
+          -72,
+          -18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "surface": {
+          "type": "cylinder",
+          "width": 59.483593750000004,
+          "height": 63.461328124999994,
+          "depth": 73.10000000000001,
+          "roundness": 1.5026171875,
+          "morphRoundness": 0.366171875
+        },
+        "position": [
+          -1.021484375,
+          -72,
+          -18
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "colors": {
+    "body": "#e6855c",
+    "eyes": "#ffffff"
+  },
+  "face": {
+    "eyes": {
+      "width": 1,
+      "height": 1,
+      "gap": 1,
+      "shiftY": -0.0577
+    },
+    "perspective": 0.5
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "Grok bot",
+  "body": {
+    "primary": {
+      "type": "sphere",
+      "width": 240,
+      "height": 240,
+      "depth": 240,
+      "roundness": 1
+    },
+    "nodes": []
+  },
+  "colors": {
+    "body": "#000000",
+    "eyes": "#ffffff"
+  },
+  "face": {
+    "eyes": {
+      "width": 1,
+      "height": 1,
+      "gap": 1,
+      "shiftY": -0.0583
+    },
+    "perspective": 0.5
+  }
+}

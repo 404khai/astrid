@@ -42,6 +42,10 @@ public struct ChatSession: Codable, Equatable, Identifiable, Sendable {
     public var created: Date
     public var updated: Date
     public var messages: [ChatMessage]
+    /// The chat's icon and colour, chosen by the user (`ChatStyle`); nil for
+    /// the defaults. Older files have neither.
+    public var icon: String?
+    public var color: String?
 
     /// A chat starts with the first message the user sends; it is named from it.
     public init(id: UUID = UUID(), first: ChatMessage) {
@@ -72,6 +76,39 @@ public struct ChatSession: Codable, Equatable, Identifiable, Sendable {
             guard !text.isEmpty else { return nil }
             return ["role": message.role.rawValue, "text": text]
         }
+    }
+}
+
+/// The icons and colours a chat can wear, as names both apps map to their own
+/// glyphs and the same hex colours.
+public enum ChatStyle {
+    public static let icons = ["chat", "star", "brain", "code", "book", "heart", "bolt", "globe", "flask", "music", "house", "camera", "map", "leaf"]
+    public static let colors: [(name: String, hex: String)] = [
+        ("blue", "#4459F9"), ("violet", "#8A5CFF"), ("pink", "#E5487F"), ("red", "#E5484D"), ("orange", "#F07A2B"),
+        ("yellow", "#E8B400"), ("green", "#3DBE6A"), ("teal", "#00C2A8"), ("grey", "#8E8E99"),
+    ]
+    public static let maxTitle = 80
+
+    public static func hex(_ name: String?) -> String? { colors.first { $0.name == name }?.hex }
+
+    /// Applies a rename, icon or colour; returns nil if nothing valid changed.
+    /// An empty icon or colour resets it to the default.
+    public static func apply(to chat: ChatSession, title: String?, icon: String?, color: String?) -> ChatSession? {
+        var next = chat
+        if let title {
+            let clean = title.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: " ")
+            guard !clean.isEmpty else { return nil }
+            next.title = String(clean.prefix(maxTitle))
+        }
+        if let icon {
+            guard icon.isEmpty || icons.contains(icon) else { return nil }
+            next.icon = icon.isEmpty ? nil : icon
+        }
+        if let color {
+            guard color.isEmpty || hex(color) != nil else { return nil }
+            next.color = color.isEmpty ? nil : color
+        }
+        return next == chat ? nil : next
     }
 }
 

@@ -109,6 +109,16 @@ without exact trial approval. PR, no merge. Same day (2026-11-14) the maintainer
 to `claude-code/sonnet` (local-look image path via the Claude Agent SDK), plain asks hand screen tasks to operator
 via an `operator-start` block, and voice answers step cards ("do it", "show me", "done", "stop").
 
+**V2-06 phone companion started 2026-11-14.** Maintainer: "time to work on v2-06 for astrid for my phone. it should
+be an overlay ... distortion wave along the edges of my phone screen ... load it onto my android phone ... qr code
+connection to my desktop app? with syncing of messages ... spatial weaver engine (canvas on my phone) ... stacked on
+#47". Branch `feat/phone-companion` from `feat/astrid-desktop` (`e88bf765`), same checkout. Asked how the phone
+connects (a Mac network listener is a cross-device trust decision), the maintainer chose "QR pairing + sync
+(Recommended)": [ADR 0039](docs/adr/0039-phone-companion.md). Expo app in `mobile/` gains Android, a Kotlin overlay
+module (bubble, see-through ask panel, AGSL edge wave), and the live canvas in a WebView. The desktop app hosts a
+LAN-only, opt-in, sealed WebSocket link; QR secret one-time/2 min; revocable per-phone keys; phone asks run on the Mac
+without mail and sync into its chat store. No cloud relay, public bind, daemon or iOS overlay. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

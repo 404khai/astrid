@@ -11,6 +11,7 @@
     "test": "playwright test"
   },
   "dependencies": {
+    "@bible-strong/avatar-web": "1.0.1",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/space-grotesk": "^5.2.10",
     "@hugeicons/core-free-icons": "^4.4.0",

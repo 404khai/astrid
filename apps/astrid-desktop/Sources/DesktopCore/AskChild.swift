@@ -121,6 +121,7 @@ public final class AskChild {
     private func start() -> Bool {
         let process = Process()
         process.executableURL = config.astrid
+        process.environment = Self.environment()
         process.arguments = arguments
         let stdin = Pipe(), stdout = Pipe()
         process.standardInput = stdin
@@ -164,5 +165,26 @@ public final class AskChild {
         try? input?.close()
         input = nil
         if process.isRunning { process.terminate() }
+    }
+
+    /// The runtime's environment. Opened from Finder or the Dock, the app gets
+    /// launchd's bare PATH, without nvm, Homebrew or ~/.local/bin, so the
+    /// Claude agent bridge can't find Node. This adds those folders and sets
+    /// `ASTRID_NODE` to the newest Node found, unless it's already set.
+    public static func environment(base: [String: String] = ProcessInfo.processInfo.environment, home: String = NSHomeDirectory()) -> [String: String] {
+        var env = base
+        let manager = FileManager.default
+        let nvm = "\(home)/.nvm/versions/node"
+        let nvmBins = ((try? manager.contentsOfDirectory(atPath: nvm)) ?? [])
+            .sorted { $0.compare($1, options: .numeric) == .orderedDescending }
+            .map { "\(nvm)/\($0)/bin" }
+        let extra = nvmBins + ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.local/bin", "\(home)/.bun/bin", "\(home)/.volta/bin"]
+        let path = (env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin").split(separator: ":").map(String.init)
+        env["PATH"] = (path + extra.filter { !path.contains($0) && manager.fileExists(atPath: $0) }).joined(separator: ":")
+        if env["ASTRID_NODE"] == nil {
+            let found = (path + extra).map { "\($0)/node" }.first { manager.isExecutableFile(atPath: $0) }
+            if let found { env["ASTRID_NODE"] = found }
+        }
+        return env
     }
 }
