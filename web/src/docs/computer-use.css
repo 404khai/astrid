@@ -1,0 +1,357 @@
+/* Computer use: Astrid's cursor, mark and state orb at work, with its step box. */
+.cu-grid {
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 0;
+}
+.cu-stage {
+  height: 340px;
+  cursor: default;
+}
+.cu-window {
+  position: absolute;
+  inset: 22px 22px 96px;
+  border: 1px solid #262626;
+  border-radius: 10px;
+  background: #171717;
+  overflow: hidden;
+  font-size: 12px;
+  color: #bdbdbd;
+}
+.cu-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-bottom: 1px solid #262626;
+  font: 400 10px/1 var(--mono);
+  color: #7a7a7a;
+}
+.cu-titlebar i {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: #333;
+}
+.cu-titlebar span {
+  margin-left: 8px;
+}
+.cu-body {
+  position: relative;
+  height: calc(100% - 26px);
+  padding: 10px 12px;
+  overflow: hidden;
+}
+.cu-toolbar {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.cu-target {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #fff;
+}
+.cu-scene-show .cu-target,
+.cu-scene-click .cu-target {
+  animation: cu-target 4.8s ease-in-out infinite;
+}
+@keyframes cu-target {
+  0%, 40% { border-color: #333; box-shadow: none; }
+  55%, 88% { border-color: var(--accent); box-shadow: 0 0 0 4px #4459f933; }
+  100% { border-color: #333; box-shadow: none; }
+}
+.cu-pressed {
+  animation-name: cu-press !important;
+}
+@keyframes cu-press {
+  0%, 52% { background: transparent; border-color: #333; }
+  58%, 80% { background: var(--button); border-color: var(--button); }
+  100% { background: transparent; border-color: #333; }
+}
+.cu-blocked {
+  animation: cu-blocked 4.8s ease-in-out infinite;
+}
+@keyframes cu-blocked {
+  0%, 50% { border-color: #333; }
+  58%, 90% { border-color: #f94447; color: #f94447; }
+  100% { border-color: #333; }
+}
+.cu-rows {
+  display: grid;
+  gap: 7px;
+}
+.cu-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cu-row span {
+  width: 72px;
+}
+.cu-row b {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #2a2a2a;
+}
+.cu-row-key b {
+  background: #2c3478;
+}
+.cu-scroll {
+  animation: cu-scroll 4.8s ease-in-out infinite;
+}
+@keyframes cu-scroll {
+  0%, 30% { transform: translateY(0); }
+  65%, 90% { transform: translateY(-74px); }
+  100% { transform: translateY(0); }
+}
+.cu-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+.cu-field b {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-weight: 400;
+}
+.cu-typed {
+  font-style: normal;
+  color: #fff;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  border-right: 2px solid #00f7d5;
+  animation: cu-type 4.8s steps(9) infinite;
+}
+@keyframes cu-type {
+  0%, 45% { width: 0; }
+  80%, 95% { width: 9ch; }
+  100% { width: 0; }
+}
+.cu-field-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cu-chip {
+  padding: 3px 8px;
+  border: 1px solid #333;
+  border-radius: 6px;
+}
+.cu-mail {
+  display: grid;
+  gap: 8px;
+}
+.cu-mail b {
+  height: 6px;
+  border-radius: 3px;
+  background: #2a2a2a;
+}
+.cu-mail b:nth-child(2) {
+  width: 80%;
+}
+.cu-mail b:nth-child(3) {
+  width: 55%;
+}
+.cu-ripple {
+  position: absolute;
+  right: 26px;
+  top: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #00f7d5;
+  opacity: 0;
+  animation: cu-ripple 4.8s ease-out infinite;
+}
+@keyframes cu-ripple {
+  0%, 54% { opacity: 0; transform: scale(0.3); }
+  58% { opacity: 1; transform: scale(0.5); }
+  75%, 100% { opacity: 0; transform: scale(1.6); }
+}
+.cu-scene-look .cu-window::after {
+  content: "";
+  position: absolute;
+  inset: 26px 0 auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00f7d5, transparent);
+  animation: cu-scan 2.4s linear infinite;
+}
+@keyframes cu-scan {
+  from { transform: translateY(0); }
+  to { transform: translateY(190px); }
+}
+.cu-pilot {
+  position: absolute;
+  left: var(--from-x);
+  top: var(--from-y);
+  animation: cu-travel 4.8s cubic-bezier(0.65, 0, 0.25, 1) infinite;
+  z-index: 2;
+}
+@keyframes cu-travel {
+  0%, 12% { left: var(--from-x); top: var(--from-y); }
+  45%, 88% { left: var(--to-x); top: var(--to-y); }
+  100% { left: var(--from-x); top: var(--from-y); }
+}
+.cu-operator {
+  position: relative;
+}
+.cu-art {
+  position: absolute;
+  overflow: visible;
+  color: var(--cc-cursor);
+  filter: drop-shadow(0 2px 4px #0006);
+}
+.cu-follow {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: follow-bob 2.4s ease-in-out infinite;
+}
+.cu-follow .astrid-logo {
+  width: 30px;
+  height: 24px;
+}
+.cu-box-slot {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 14px;
+  z-index: 3;
+}
+.cu-box {
+  padding: 10px 14px 12px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cu-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 400 11px/16px var(--mono);
+  letter-spacing: 0.06em;
+  color: #cfcfcf;
+}
+.cu-box p {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.cu-box small {
+  font: 400 10px/14px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.cu-actions {
+  display: flex;
+  gap: 8px;
+}
+.cu-btn {
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--button);
+}
+.cu-btn-ghost {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #3a3a3a;
+}
+.cu-ask {
+  max-width: 1300px;
+  margin: 1px auto 0;
+  padding: 56px 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  background-color: #0f0f0f;
+  background-image: radial-gradient(#ffffff17 1px, transparent 1.2px);
+  background-size: 16px 16px;
+}
+.cu-ask-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cu-input {
+  width: min(520px, 70vw);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 18px 0 12px;
+  border-radius: 24px;
+}
+.cu-input-mark .astrid-logo {
+  width: 26px;
+  height: 21px;
+}
+.cu-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: #fff;
+  font: 400 15px/22px "Space Grotesk", sans-serif;
+}
+.cu-input input::placeholder {
+  color: #6b6b6b;
+}
+.cu-mic {
+  display: grid;
+  color: #cfcfcf;
+}
+.cu-send {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background: var(--button);
+  transition: opacity 0.18s ease;
+}
+.cu-send-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 1100px) {
+  .cu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 650px) {
+  .cu-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cu-pilot {
+    animation: none;
+    left: var(--to-x);
+    top: var(--to-y);
+  }
+  .cu-scroll,
+  .cu-ripple,
+  .cu-target,
+  .cu-blocked,
+  .cu-follow,
+  .cu-scene-look .cu-window::after {
+    animation: none;
+  }
+  .cu-typed {
+    animation: none;
+    width: 9ch;
+  }
+}

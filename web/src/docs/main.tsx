@@ -13,9 +13,11 @@ import { ScrollIndicator } from "../components/nexvyn/ScrollIndicator";
 import { VerseText } from "../components/VerseText";
 import { CursorGrid } from "./Cursors";
 import { ListeningCard, OrbGrid, OutputBox } from "./AgentStates";
+import { AskBox, ComputerUseGrid } from "./ComputerUse";
 import "../styles.css";
 import "./cursors.css";
 import "./agent-states.css";
+import "./computer-use.css";
 import "./docs.css";
 
 const repo = "https://github.com/404khai/astrid";
@@ -206,7 +208,17 @@ function Components() {
           <OutputBox />
         </div>
       </Section>
-      <Section index={2} eyebrow="03 / FROM NEXVYN" title="Navigation pieces">
+      <Section index={2} eyebrow="03 / COMPUTER USE" title="Astrid at work on screen">
+        <p className="doc-text">
+          When Astrid operates your Mac, its cursor carries the mark and a state orb, and the
+          presence step box says what it is doing. Each action has its own cursor and eyes:
+          looking, pointing for <b>Show me</b>, then clicking, typing or scrolling only after
+          <b> Do it</b>, and stopping at anything it isn’t allowed to do.
+        </p>
+        <ComputerUseGrid />
+        <AskBox />
+      </Section>
+      <Section index={3} eyebrow="04 / FROM NEXVYN" title="Navigation pieces">
         <p className="doc-text">
           Adapted from Nexvyn UI to Astrid’s scoped CSS, without extra animation libraries: the
           bounce sidebar on the left, the scroll indicator on the right, and the navigation
@@ -221,7 +233,7 @@ function Components() {
 const sectionTitles: Record<PageId, string[]> = {
   overview: ["Compass", "Start here"],
   brand: ["Mark", "Colour", "Backgrounds", "Type"],
-  components: ["Cursors", "Agent states", "Navigation"],
+  components: ["Cursors", "Agent states", "Computer use", "Navigation"],
 };
 
 function Docs() {
