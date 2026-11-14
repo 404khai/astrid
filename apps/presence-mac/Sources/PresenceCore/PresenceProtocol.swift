@@ -45,8 +45,9 @@ public enum PresenceEvent: Equatable, Sendable {
     /// Fade in; optionally reposition first.
     case show(at: PresencePoint?)
     case hide
-    /// Glide Astrid's cursor tip (the hotspot) to a point.
-    case pointAt(PresencePoint)
+    /// Glide Astrid's cursor tip (the hotspot) to a point. `cursor` picks the
+    /// style that says what to do there; nil is Astrid's own arrow.
+    case pointAt(PresencePoint, cursor: CursorStyle? = nil)
     /// Subtitle text. Empty text clears. `final == false` is a streaming
     /// partial that never auto-clears; `durationMs` overrides the reading time.
     case say(text: String, final: Bool, durationMs: Int?)
@@ -56,6 +57,9 @@ public enum PresenceEvent: Equatable, Sendable {
     /// Script pacing: hold later events for a number of milliseconds.
     case wait(ms: Int)
     case quit
+    /// Play the Distortion Waves signal now (an operator session went live),
+    /// unless Reduce Motion or --no-intro; ignored while a wave is running.
+    case wave
     /// Capture one display at 1x point resolution, excluding Astrid's own
     /// overlay (ADR 0027). Answered on stdout with `frame` or `capture_failed`.
     case capture(requestId: String, display: Int)
@@ -107,7 +111,14 @@ extension PresenceProtocol {
         case "hide":
             return .hide
         case "point_at":
-            return .pointAt(try reader.point())
+            var cursor: CursorStyle?
+            if let name = try reader.string("cursor") {
+                guard let style = CursorStyle(rawValue: name) else {
+                    throw PresenceProtocolError("unknown cursor \"\(name.prefix(32))\"")
+                }
+                cursor = style
+            }
+            return .pointAt(try reader.point(), cursor: cursor)
         case "say":
             let text = try reader.string("text") ?? ""
             guard text.count <= Limits.maxTextCharacters else {
@@ -138,6 +149,8 @@ extension PresenceProtocol {
             return .wait(ms: ms)
         case "quit":
             return .quit
+        case "wave":
+            return .wave
         case "capture":
             guard let id = try reader.string("request_id"), isRequestId(id) else {
                 throw PresenceProtocolError("\"request_id\" must be 1...64 characters of [A-Za-z0-9-]")
@@ -320,9 +333,10 @@ extension PresenceProtocol {
             if let at { put(at) }
         case .hide:
             fields["type"] = "hide"
-        case let .pointAt(point):
+        case let .pointAt(point, cursor):
             fields["type"] = "point_at"
             put(point)
+            if let cursor { fields["cursor"] = cursor.rawValue }
         case let .say(text, final, durationMs):
             fields["type"] = "say"
             fields["text"] = text
@@ -348,6 +362,8 @@ extension PresenceProtocol {
             fields["ms"] = ms
         case .quit:
             fields["type"] = "quit"
+        case .wave:
+            fields["type"] = "wave"
         case let .capture(requestId, display):
             fields["type"] = "capture"
             fields["request_id"] = requestId

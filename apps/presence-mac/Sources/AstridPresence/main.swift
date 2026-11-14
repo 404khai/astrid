@@ -28,6 +28,8 @@ OPTIONS
   --ask            Show only the Astrid mark in the bottom-right corner; click it to
                    ask (ADR 0033). Answers come from `astrid presence-ask`.
   --ask-model M    Model for --ask (default claude-code/sonnet).
+  --operator-model M  Image model for operator walkthroughs (ADR 0038):
+                   claude-code/sonnet (default), claude-code/opus or gpt-5.6-sol/terra/luna.
   --ask-mail SRC   gmail, apple, all or none (default gmail).
   --ask-voice V    Kokoro voice for spoken replies (default af_heart).
   --voice-cmd PATH The astrid-voice executable (default: apps/astrid-voice/.venv/bin/astrid-voice;
@@ -64,6 +66,7 @@ var askMode = false
 var askModel = "claude-code/sonnet"
 var askMail: String? = "gmail"
 var askVoice = "af_heart"
+var operatorModel: String?
 var voiceCommandPath: String?
 var astridPath: String?
 var askUIPath: String?
@@ -127,6 +130,11 @@ while let argument = arguments.popFirst() {
     case "--ask-mail":
         guard let value = arguments.popFirst(), ["gmail", "apple", "all", "none"].contains(value) else { fail("--ask-mail needs gmail, apple, all or none") }
         askMail = value == "none" ? nil : value
+    case "--operator-model":
+        guard let value = arguments.popFirst(), ["claude-code/sonnet", "claude-code/opus", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].contains(value) else {
+            fail("--operator-model needs claude-code/sonnet, claude-code/opus or gpt-5.6-sol/terra/luna")
+        }
+        operatorModel = value
     case "--astrid":
         guard let value = arguments.popFirst() else { fail("--astrid needs a path") }
         astridPath = value
@@ -170,7 +178,7 @@ if askMode {
         fail("astrid binary not found: run `cargo build` in the repo, or pass --astrid")
     }
     let voiceCommand = voiceCommandPath.map { URL(fileURLWithPath: $0) } ?? repoFile("apps/astrid-voice/.venv/bin/astrid-voice")
-    askConfig = AskConfig(ui: ui, astrid: astrid, model: askModel, mail: askMail, voiceCommand: voiceCommand, voiceName: askVoice)
+    askConfig = AskConfig(ui: ui, astrid: astrid, model: askModel, mail: askMail, voiceCommand: voiceCommand, voiceName: askVoice, operatorModel: operatorModel)
     // The ask surface replaces the scripted demo; Astrid waits in the corner.
     if sourceCount == 0 { source = .script([]) }
 }

@@ -7,6 +7,9 @@
 //!         | {"type":"approval","id":n,"title":..,"detail":..} | {"type":"answer","text":..,"brief":{..}|null}
 //!         | {"type":"canvas","event":"begin"|"shape"|"end",..} (ADR 0036)
 //!         | {"type":"error","message":..} | {"type":"done","outcome":..}
+//!
+//! An ask starting with `/operator` runs a guided walkthrough instead (ADR
+//! 0038); its extra messages are listed in `operator_bridge`.
 use crate::presence_canvas::{CANVAS_INSTRUCTIONS, CanvasStream};
 use astrid::{
     cancellation::Cancellation,
@@ -91,6 +94,97 @@ pub fn compose_task(ask: &str, history: &[Turn]) -> String {
         "{ask}\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}"
     ));
     task
+}
+
+/// ADR 0038: lets the ask model hand screen tasks to operator, so the user can
+/// just say what they want ("turn on dark mode") without `/operator`.
+pub const OPERATOR_HINT: &str = "Decide this first. If the user wants to get something done on their Mac's screen (change a setting, use an app or a website, click, open, subscribe or unsubscribe, find a button or menu), reply with only one fenced code block tagged `operator-start` containing JSON {\"goal\": the task as one short imperative sentence}, and nothing else: no brief, no mail tools. Words like \"this\", \"here\", \"this page\", \"this tab\", \"this channel\" or \"this video\" mean what is on their screen right now. Astrid then asks to look at their screen and walks them through it step by step. Only questions about their email use the mail tools; answer everything else normally.";
+
+/// Clear on-screen requests go straight to operator, with no model call and
+/// no chance of being read as an email question. Conservative: anything about
+/// mail, or without an on-screen reference or a settings verb, is left to the
+/// ask model (which still has `OPERATOR_HINT`).
+pub fn screen_task(ask: &str) -> Option<String> {
+    let goal = strip_wake_word(ask);
+    let lower = format!(
+        " {} ",
+        goal.to_lowercase().replace(['?', '!', '.', ','], " ")
+    );
+    let words = |list: &[&str]| list.iter().any(|w| lower.contains(&format!(" {w} ")));
+    if words(&[
+        "email",
+        "emails",
+        "e-mail",
+        "mail",
+        "inbox",
+        "gmail",
+        "newsletter",
+        "newsletters",
+        "draw",
+        "sketch",
+        "diagram",
+    ]) {
+        return None;
+    }
+    let on_screen = words(&[
+        "this channel",
+        "this page",
+        "this tab",
+        "this video",
+        "this site",
+        "this website",
+        "this window",
+        "this app",
+        "this button",
+        "this menu",
+        "this setting",
+        "this account",
+        "this playlist",
+        "this post",
+        "this repo",
+        "this profile",
+        "this form",
+        "this file",
+        "on my screen",
+        "on screen",
+        "on this page",
+        "here",
+    ]);
+    let settings = ["turn on ", "turn off ", "enable ", "disable ", "switch to "]
+        .iter()
+        .any(|v| lower.trim_start().starts_with(v));
+    (on_screen || settings).then(|| goal.to_owned())
+}
+
+/// Voice asks often start with "Astrid" or "hey Astrid"; the goal doesn't.
+fn strip_wake_word(ask: &str) -> &str {
+    let trimmed = ask.trim();
+    for wake in ["hey astrid", "ok astrid", "okay astrid", "astrid"] {
+        if trimmed.is_char_boundary(wake.len()) && trimmed[..wake.len()].eq_ignore_ascii_case(wake)
+        {
+            let rest = &trimmed[wake.len()..];
+            // Only a whole word: "Astridine" keeps its name.
+            if rest.starts_with(|c: char| c.is_alphanumeric()) {
+                continue;
+            }
+            let rest = rest.trim_start_matches([',', ' ', ':', '-']);
+            if !rest.is_empty() {
+                return rest;
+            }
+        }
+    }
+    trimmed
+}
+
+/// The goal from a reply that hands the ask to operator, if it is one.
+pub fn operator_request(reply: &str) -> Option<String> {
+    let start = reply.find("```operator-start")?;
+    let rest = &reply[start + "```operator-start".len()..];
+    let end = rest.find("```")?;
+    let value: Value = serde_json::from_str(rest[..end].trim()).ok()?;
+    let goal = value["goal"].as_str()?.trim();
+    (!goal.is_empty() && goal.chars().count() <= 300 && !goal.chars().any(char::is_control))
+        .then(|| goal.to_owned())
 }
 
 /// Asks the model to finish with a machine-readable brief the UI renders.
@@ -179,28 +273,128 @@ fn state_for(kind: &EventKind) -> Option<(&'static str, String)> {
     }
 }
 
+/// The operator's model and display (ADR 0038). The provider is the ADR 0024
+/// image path, so only the exact gpt-5.6 models are accepted.
+pub struct OperatorSetup {
+    pub provider: Box<dyn ModelProvider>,
+    pub model: String,
+    pub display: u32,
+}
+
+/// `/operator <goal>`: the goal, if this ask starts an operator session.
+pub fn operator_goal(ask: &str) -> Option<&str> {
+    let rest = ask.strip_prefix("/operator")?;
+    (rest.is_empty() || rest.starts_with(char::is_whitespace)).then(|| rest.trim())
+}
+
+async fn operate(
+    goal: &str,
+    setup: Option<&OperatorSetup>,
+    bridge: &Arc<crate::operator_bridge::Bridge>,
+    cancel: &Cancellation,
+) -> &'static str {
+    use astrid::operator::{Outcome, RuntimeEyes, walk};
+    let Some(setup) = setup else {
+        emit(
+            json!({"type":"error","message":"Operator isn't available: start presence-ask with --operator-model."}),
+        );
+        return "failed";
+    };
+    if goal.is_empty() {
+        emit(
+            json!({"type":"error","message":"Tell me what to do, e.g. /operator export this page as a PDF."}),
+        );
+        return "failed";
+    }
+    let tools = match workspace().map_err(|e| e.to_string()).and_then(|w| {
+        let computer = astrid::computer::Computer::local(
+            format!("local-euid:{}", unsafe { libc::geteuid() }),
+            setup.display,
+            bridge.clone(),
+            Arc::new(astrid::computer_png::DecodeWorker::new(
+                std::env::current_exe().map_err(|e| e.to_string())?,
+            )),
+        )?;
+        Ok(Tools::new(w, Duration::from_secs(1))
+            .map_err(|e| e.to_string())?
+            .with_computer(computer))
+    }) {
+        Ok(tools) => tools,
+        Err(error) => {
+            emit(json!({"type":"error","message":error}));
+            return "failed";
+        }
+    };
+    let mut eyes = RuntimeEyes {
+        provider: setup.provider.as_ref(),
+        tools: &tools,
+        model: setup.model.clone(),
+    };
+    let session = crate::operator_bridge::Session {
+        bridge: bridge.clone(),
+        display: setup.display,
+        cancel: cancel.clone(),
+    };
+    // The presence app hides the ask panel's mark and lets the cursor Astrid,
+    // with its box following it, carry the session (ADR 0038).
+    emit(json!({"type":"operator","on":true}));
+    let outcome = walk(
+        goal,
+        astrid::operator::mode_for(goal),
+        setup.display,
+        &mut eyes,
+        &session,
+        cancel,
+    )
+    .await;
+    emit(json!({"type":"operator","on":false}));
+    match outcome {
+        Outcome::Completed(summary) => {
+            emit(json!({"type":"answer","text":summary,"brief":null,"canvas":false}));
+            "completed"
+        }
+        Outcome::Stopped(reason) => {
+            emit(json!({"type":"answer","text":reason,"brief":null,"canvas":false}));
+            "cancelled"
+        }
+        Outcome::Failed(error) => {
+            emit(json!({"type":"error","message":error}));
+            "failed"
+        }
+    }
+}
+
 pub async fn serve(
     provider: Box<dyn ModelProvider>,
     tools: Tools,
     model: String,
+    operator: Option<OperatorSetup>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let pending: Pending = Arc::default();
+    let bridge = Arc::new(crate::operator_bridge::Bridge::new(emit));
     let (asks_tx, mut asks_rx) = tokio::sync::mpsc::channel::<(String, Vec<Turn>)>(4);
     let cancel_slot: Arc<Mutex<Option<Cancellation>>> = Arc::default();
     {
         let pending = pending.clone();
         let cancel_slot = cancel_slot.clone();
+        let bridge = bridge.clone();
         // Plain thread: blocking stdin reads never stall the runtime.
         std::thread::spawn(move || {
             use std::io::BufRead;
             for line in io::stdin().lock().lines() {
                 let Ok(line) = line else { break };
-                if line.len() > 64 * 1024 {
+                // Only operator frames may be large (a 1 MiB PNG as base64).
+                if line.len() > astrid::presence::MAX_LINE
+                    || line.len() > 64 * 1024 && !line.contains("\"frame\"")
+                {
                     continue;
                 }
                 let Ok(message) = serde_json::from_str::<Value>(&line) else {
                     continue;
                 };
+                if bridge.receive(&message) {
+                    continue;
+                }
                 match message["type"].as_str() {
                     Some("ask") => {
                         let text = message["text"]
@@ -247,10 +441,29 @@ pub async fn serve(
             }
         });
     }
+    // Operator looks decode frames in a worker with a 2 s limit; start it once
+    // now so the first look doesn't pay for process start-up.
+    if operator.is_some()
+        && let Ok(exe) = std::env::current_exe()
+    {
+        tokio::spawn(async move {
+            astrid::computer_png::DecodeWorker::new(exe).warm_up().await;
+        });
+    }
     emit(json!({"type":"ready","model":model}));
     while let Some((ask, history)) = asks_rx.recv().await {
         let cancel = Cancellation::default();
         *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(cancel.clone());
+        let routed = operator_goal(&ask)
+            .map(str::to_owned)
+            .or_else(|| operator.as_ref().and_then(|_| screen_task(&ask)));
+        if let Some(goal) = routed {
+            let outcome = operate(&goal, operator.as_ref(), &bridge, &cancel).await;
+            emit(json!({"type":"done","outcome":outcome}));
+            emit(json!({"type":"state","state":"idle","label":"Ready"}));
+            *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = None;
+            continue;
+        }
         let (events_tx, mut events_rx) =
             tokio::sync::mpsc::channel::<astrid::events::ExecutionEvent>(256);
         let mut approvals = UiApprovals {
@@ -262,7 +475,11 @@ pub async fn serve(
             observability: None,
             context_budget: Some(Default::default()),
             model: model.clone(),
-            task: compose_task(&ask, &history),
+            task: if operator.is_some() {
+                format!("{OPERATOR_HINT}\n\n{}", compose_task(&ask, &history))
+            } else {
+                compose_task(&ask, &history)
+            },
             max_model_calls: 8,
             permissions: PermissionPolicy::read_only(),
         };
@@ -289,7 +506,19 @@ pub async fn serve(
         let (result, ()) = tokio::join!(run, forward);
         match result {
             Ok(result) => {
+                let handoff = match &result.outcome {
+                    RunOutcome::Completed if operator.is_some() => {
+                        operator_request(&result.final_text)
+                    }
+                    _ => None,
+                };
                 let outcome = match &result.outcome {
+                    // The ask model inferred a screen task: operator takes over.
+                    RunOutcome::Completed if let Some(goal) = handoff => {
+                        operate(&goal, operator.as_ref(), &bridge, &cancel)
+                            .await
+                            .to_string()
+                    }
                     RunOutcome::Completed => {
                         // Providers that don't stream text still get their drawing.
                         if !canvas.started() {
@@ -418,6 +647,69 @@ mod tests {
         assert!(task.starts_with(
             "Earlier in this conversation (context only):\nUser: draw a pump\nAstrid: Here is a pump.\n\nThe user now asks:\nmake it bigger\n\n"
         ));
+    }
+
+    #[test]
+    fn clear_screen_requests_go_straight_to_operator() {
+        for (ask, goal) in [
+            (
+                "astrid unsubscribe from this channel",
+                "unsubscribe from this channel",
+            ),
+            (
+                "Astrid, unsubscribe from this channel.",
+                "unsubscribe from this channel.",
+            ),
+            ("hey Astrid like this video", "like this video"),
+            ("turn on dark mode", "turn on dark mode"),
+            (
+                "where's the export button on this page?",
+                "where's the export button on this page?",
+            ),
+            ("close this tab", "close this tab"),
+        ] {
+            assert_eq!(screen_task(ask).as_deref(), Some(goal), "{ask}");
+        }
+        for ask in [
+            "unsubscribe me from that newsletter email",
+            "any emails from Sam today?",
+            "summarize my inbox",
+            "draw a pump",
+            "what's the capital of France",
+            "astrid",
+            "Astridine is a word",
+        ] {
+            assert_eq!(screen_task(ask), None, "{ask}");
+        }
+        assert_eq!(strip_wake_word("Astridine here"), "Astridine here");
+    }
+
+    #[test]
+    fn replies_can_hand_a_screen_task_to_operator() {
+        assert_eq!(
+            operator_request("```operator-start\n{\"goal\": \"Turn on dark mode\"}\n```")
+                .as_deref(),
+            Some("Turn on dark mode")
+        );
+        for reply in [
+            "Dark mode is in System Settings.",
+            "```operator-start\n{\"goal\": \"\"}\n```",
+            "```operator-start\n{not json}\n```",
+            "```operator-start\n{\"goal\": \"a\\nb\"}\n```",
+        ] {
+            assert_eq!(operator_request(reply), None, "{reply}");
+        }
+    }
+
+    #[test]
+    fn operator_asks_are_recognised_by_their_command() {
+        assert_eq!(
+            operator_goal("/operator export as PDF"),
+            Some("export as PDF")
+        );
+        assert_eq!(operator_goal("/operator"), Some(""));
+        assert_eq!(operator_goal("/operatorx go"), None);
+        assert_eq!(operator_goal("what is /operator"), None);
     }
 
     #[test]

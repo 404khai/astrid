@@ -2,12 +2,12 @@
 # Builds "Astrid Presence.app" so macOS's Screen Recording grant belongs to
 # Astrid's presence host (ADR 0027), not to the terminal that launches it.
 # The runtime starts the bundle through LaunchServices (`open`) so TCC
-# attributes capture to this app. Ad-hoc signed: rebuilding changes the code
-# signature, and macOS may ask for the grant again.
+# attributes capture to this app. See the signing note at the end.
 set -eu
 cd "$(dirname "$0")/.."
 swift build -c release
 APP="$PWD/.build/Astrid Presence.app"
+OLD_HASH=$(codesign -d -r- "$APP" 2>&1 | sed -n 's/.*cdhash H"\([0-9a-f]*\)".*/\1/p' || true)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp .build/release/astrid-presence "$APP/Contents/MacOS/astrid-presence"
@@ -30,5 +30,29 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
-codesign --force --sign - "$APP" >/dev/null
+# Screen Recording and Accessibility grants are tied to the code signature.
+# Ad-hoc signing is matched by exact code hash: the grant survives re-running
+# this script on unchanged code, but a code change needs the grant again
+# (`tccutil reset ScreenCapture dev.astrid.presence`, then relaunch). TCC does
+# not honour a custom identifier-only requirement on ad-hoc code, so none is
+# set. With a real signing identity in ASTRID_SIGN_IDENTITY (an Apple
+# Development certificate, or a self-signed code-signing one), grants survive
+# rebuilds.
+# A private self-signed identity in its own keychain (~/.astrid/signing, made
+# once by scripts/signing-identity.sh) gives a stable designated requirement
+# (identifier + certificate), so grants survive rebuilds.
+DEV_KEYCHAIN="$HOME/.astrid/signing/astrid-dev.keychain-db"
+if [ -z "${ASTRID_SIGN_IDENTITY:-}" ] && [ -f "$DEV_KEYCHAIN" ]; then
+  security unlock-keychain -p "$(cat "$HOME/.astrid/signing/keychain.pass")" "$DEV_KEYCHAIN"
+  codesign --force --sign "Astrid Presence Dev" --keychain "$DEV_KEYCHAIN" --identifier dev.astrid.presence "$APP" >/dev/null
+elif [ -n "${ASTRID_SIGN_IDENTITY:-}" ]; then
+  codesign --force --sign "$ASTRID_SIGN_IDENTITY" --identifier dev.astrid.presence "$APP" >/dev/null
+else
+  codesign --force --sign - --identifier dev.astrid.presence "$APP" >/dev/null
+fi
 echo "$APP"
+NEW_HASH=$(codesign -d -r- "$APP" 2>&1 | sed -n 's/.*cdhash H"\([0-9a-f]*\)".*/\1/p' || true)
+if [ -z "${ASTRID_SIGN_IDENTITY:-}" ] && [ ! -f "$DEV_KEYCHAIN" ] && [ -n "$OLD_HASH" ] && [ "$OLD_HASH" != "$NEW_HASH" ]; then
+  echo "note: the code changed, so macOS needs the grants again:" >&2
+  echo "  tccutil reset ScreenCapture dev.astrid.presence; tccutil reset Accessibility dev.astrid.presence" >&2
+fi

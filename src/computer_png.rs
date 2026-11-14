@@ -208,6 +208,35 @@ impl DecodeWorker {
             inline: true,
         }
     }
+    /// Runs the worker once on a 1x1 PNG so the first real frame doesn't pay
+    /// for process start-up (macOS scans a freshly built binary on its first
+    /// launch, which alone can exceed the 2 s decode limit).
+    pub async fn warm_up(&self) -> bool {
+        let mut tiny = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut tiny, 1, 1);
+            encoder.set_color(png::ColorType::Rgb);
+            encoder.set_depth(png::BitDepth::Eight);
+            let Ok(mut writer) = encoder.write_header() else {
+                return false;
+            };
+            if writer.write_image_data(&[0, 0, 0]).is_err() {
+                return false;
+            }
+        }
+        let cancel = Cancellation::default();
+        // Generous: this is only a warm-up, never a look.
+        tokio::time::timeout(Duration::from_secs(20), async {
+            for _ in 0..3 {
+                if self.validate(&tiny, &cancel).await.is_ok() {
+                    return true;
+                }
+            }
+            false
+        })
+        .await
+        .unwrap_or(false)
+    }
     pub async fn validate(
         &self,
         bytes: &[u8],
@@ -286,6 +315,11 @@ impl DecodeWorker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn the_worker_warms_up_on_a_tiny_frame() {
+        assert!(DecodeWorker::inline().warm_up().await);
+    }
+
     pub(crate) fn fixture() -> Vec<u8> {
         let mut bytes = Vec::new();
         {

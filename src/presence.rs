@@ -29,6 +29,13 @@ pub trait LookHost: Send + Sync {
     async fn capture(&self, display: u32, cancel: &Cancellation) -> Result<Vec<u8>, String>;
     /// Writes one presence protocol v1 event.
     async fn present(&self, event: Value) -> Result<(), String>;
+    /// ADR 0038: the frontmost window's interactive elements read through
+    /// macOS Accessibility with the latest capture, as untrusted host data
+    /// (`[[id, role, label, x, y, w, h], ...]` in display points). The runtime
+    /// sanitizes it. Hosts without it return None.
+    fn elements(&self) -> Option<Value> {
+        None
+    }
 }
 
 /// How to start the host.

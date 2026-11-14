@@ -33,6 +33,7 @@ pub mod desktop;
 pub mod instabox;
 pub mod keychain;
 pub mod mail;
+pub mod operator;
 pub mod presence;
 pub mod remote;
 

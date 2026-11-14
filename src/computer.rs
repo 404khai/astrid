@@ -30,6 +30,9 @@ const LOOK_POLICY: &str = "v2-02-local-look-v1";
 /// ADR 0027 presentation calls per run (point_at, sketch, say).
 const MAX_PRESENTATIONS: usize = 24;
 const DESTINATION: &str = "https://api.openai.com/v1/responses";
+/// ADR 0038: a local look may also go to Claude through the Claude Agent SDK.
+const CLAUDE_DESTINATION: &str =
+    "Anthropic, through the Claude Agent SDK on this Mac's Claude Code login";
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ObserveKind {
@@ -361,20 +364,30 @@ impl ComputerRun {
                                     .capture(&self.owner.machine_id, cancel)
                                     .await
                                     .map_err(crate::computer_wire::WireError::capture_failure)?,
-                                Target::Local { host, display } => {
-                                    host.capture(*display, cancel).await.map_err(|_| {
-                                        "local capture failed (see presence host; Screen Recording permission may be required)"
-                                    })?
-                                }
+                                Target::Local { host, display } => host
+                                    .capture(*display, cancel)
+                                    .await
+                                    .map_err(|e| local_capture_failure(&e))?,
                             };
                             self.traffic = self.traffic.saturating_add(bytes.len());
                             if self.traffic > 2 * MAX_PNG {
                                 return Err("observation traffic exhausted");
                             }
+                            let elements = match &target {
+                                Target::Local { host, .. } => host.elements(),
+                                Target::Instabox(_) => None,
+                            };
                             let image = self.decoder.decode(&bytes, cancel).await.map_err(
                                 |_| "screenshot decode failed, cancelled or exceeded bounds",
                             )?;
-                            self.install(image, admitted, cancel)
+                            let (width, height) = (image.width, image.height);
+                            let mut observed = self.install(image, admitted, cancel)?;
+                            if let Some(list) =
+                                elements.and_then(|e| sanitize_elements(&e, width, height))
+                            {
+                                observed["elements"] = list;
+                            }
+                            Ok(observed)
                         }
                     };
                     let result = tokio::select! {biased;_=cancel.cancelled()=>Err("observation cancelled"),_=tokio::time::sleep_until(deadline)=>Err("observation deadline"),value=observe=>value};
@@ -566,7 +579,13 @@ impl ComputerRun {
             return Ok(None);
         }
         self.pending = false;
-        if !supported_model(model) || provider != "openai_codex_subscription" {
+        let local = self.is_local();
+        let verified = if local {
+            vision_destination(provider, model).is_some()
+        } else {
+            supported_model(model) && provider == "openai_codex_subscription"
+        };
+        if !verified {
             return Err("configured model/provider does not have verified CU image support".into());
         }
         let frame = self.frame.lock().unwrap_or_else(|e| e.into_inner());
@@ -574,7 +593,6 @@ impl ComputerRun {
             .as_ref()
             .filter(|f| Instant::now() < f.expires)
             .ok_or("image expired before disclosure")?;
-        let local = self.is_local();
         // A local look's single approval named this provider and model; any
         // other model would need a fresh approval, which this path never asks.
         if local && (provider, model) != (self.disclose_to.0.as_str(), self.disclose_to.1.as_str())
@@ -612,8 +630,86 @@ pub(crate) fn is_presentation(name: &str) -> bool {
     matches!(name, "point_at" | "sketch" | "say")
 }
 
+/// At most this many on-screen elements go to the model with a look.
+pub const MAX_ELEMENTS: usize = 150;
+
+/// Keeps well-formed elements inside the frame: `[id, role, label, x, y, w, h]`
+/// with a short role and label (control characters removed), in display points.
+/// Anything else from the host is dropped.
+pub fn sanitize_elements(value: &Value, width: u32, height: u32) -> Option<Value> {
+    let clean = |text: &Value, max: usize| -> Option<String> {
+        let text: String = text
+            .as_str()?
+            .chars()
+            .map(|c| if c.is_control() { ' ' } else { c })
+            .take(max)
+            .collect();
+        Some(text.trim().to_owned())
+    };
+    let mut seen = std::collections::HashSet::new();
+    let list: Vec<Value> = value
+        .as_array()?
+        .iter()
+        .filter_map(|e| {
+            let e = e.as_array().filter(|e| e.len() == 7)?;
+            let id = e[0].as_u64().filter(|id| *id < 100_000)?;
+            let role = clean(&e[1], 24).filter(|r| !r.is_empty())?;
+            let label = clean(&e[2], 120)?;
+            let n = |v: &Value| v.as_i64();
+            let (x, y, w, h) = (n(&e[3])?, n(&e[4])?, n(&e[5])?, n(&e[6])?);
+            let inside = w > 0
+                && h > 0
+                && x >= 0
+                && y >= 0
+                && x + w <= i64::from(width)
+                && y + h <= i64::from(height);
+            (inside && seen.insert(id)).then(|| json!([id, role, label, x, y, w, h]))
+        })
+        .take(MAX_ELEMENTS)
+        .collect();
+    (!list.is_empty()).then_some(Value::Array(list))
+}
+
+/// The presence host's categorical capture reason, kept for the user
+/// (never screen content). Unknown reasons stay generic.
+pub fn local_capture_failure(error: &str) -> &'static str {
+    const KNOWN: [&str; 6] = [
+        "screen_recording_permission_required",
+        "frame_png_exceeds_1mib",
+        "display_exceeds_frame_limits",
+        "display_unavailable",
+        "encode_failed",
+        "capture_failed",
+    ];
+    if let Some(reason) = KNOWN.iter().find(|r| error.contains(*r)) {
+        return reason;
+    }
+    if error.contains("timed out") {
+        return "capture_timed_out";
+    }
+    "local_capture_failed"
+}
 pub fn supported_model(model: &str) -> bool {
     matches!(model, "gpt-5.6-sol" | "gpt-5.6-terra" | "gpt-5.6-luna")
+}
+/// Where a local look's frame may be sent, for an exact provider and model
+/// (ADRs 0024, 0038). InstaBox computer use stays OpenAI-only.
+pub fn vision_destination(provider: &str, model: &str) -> Option<&'static str> {
+    match provider {
+        "openai_codex_subscription" if supported_model(model) => Some(DESTINATION),
+        "claude_agent_sdk" if matches!(model, "claude-code/sonnet" | "claude-code/opus") => {
+            Some(CLAUDE_DESTINATION)
+        }
+        _ => None,
+    }
+}
+/// What the approval says about retention for each destination.
+fn retention(provider: &str) -> Value {
+    if provider == "openai_codex_subscription" {
+        json!({"store": false})
+    } else {
+        json!({"store": "not applicable; Anthropic's Claude Code data policy applies"})
+    }
 }
 pub(crate) enum Prepared {
     Observe(ObserveRequest),
@@ -676,10 +772,10 @@ impl Prepared {
             }) => ascii_json(
                 &json!({"capability":"local.look","includes":["gui.observe","image.disclose"],"principal":owner.principal,"run_id":owner.run_id,"tool_call_id":id,"call_id":call_id,
                 "target":{"this_mac_display":look.display,"capture":"ScreenCaptureKit at 1x display points; Astrid's own overlay excluded; cursor hidden"},
-                "disclosure":{"provider":look.provider,"model":look.model,"destination":DESTINATION,"detail":"original","image_count":1,"store":false},
+                "disclosure":{"provider":look.provider,"model":look.model,"destination":vision_destination(&look.provider,&look.model).unwrap_or(DESTINATION),"detail":"original","image_count":1,"retention":retention(&look.provider)},
                 "policy":LOOK_POLICY,
                 "limits":{"png_bytes":MAX_PNG,"pixels":4096000,"dimension":2560,"looks_per_run":2,"window_seconds":30,"memory_retention_seconds":10,"response_deadline_seconds":60},
-                "warning":"Approving captures this whole display once AND sends that one frame to the named provider/model. No redaction. Other apps' windows, notifications and private content on that display are included. No image disk/history/trace storage; provider data policies still apply and store:false is not zero retention. Model outputs may describe what is on screen. Declining captures nothing."}),
+                "warning":"Approving captures this whole display once AND sends that one frame to the named provider/model. No redaction. Other apps' windows, notifications and private content on that display are included. No image disk/history/trace storage; provider data policies still apply (OpenAI store:false is not zero retention). Model outputs may describe what is on screen. Declining captures nothing."}),
             ),
             Self::Observe(r) => ascii_json(
                 &json!({"capability":"gui.observe","principal":r.owner.principal,"run_id":r.owner.run_id,"tool_call_id":r.id,"call_id":r.call_id,"machine_id":r.owner.machine_id,"kind":r.kind,"policy":OBSERVE_POLICY,
@@ -830,7 +926,7 @@ impl VisionInput {
     }
     pub(crate) fn description(&self) -> String {
         ascii_json(
-            &json!({"capability":"image.disclose","principal":self.binding.owner.principal,"run_id":self.binding.owner.run_id,"model_call_id":self.binding.model_call_id,"frame_id":self.binding.frame_id,"machine_id":self.binding.owner.machine_id,"native_width":self.binding.width,"native_height":self.binding.height,"provider":self.binding.provider,"model":self.binding.model,"destination":DESTINATION,"detail":"original","image_count":1,"image_token_estimate_with_margin":self.estimate(),"store":false,"response_deadline_seconds_from_post_admission":60,"upload_headers_and_image_deadline":"10 seconds from capture admission; application image buffers released before response wait","expires_in_ms":self.expires.saturating_duration_since(Instant::now()).as_millis(),"approval_deadline":"10 seconds from capture admission; timer is already running. Type yes then Return. Expiry is not denial.","warning":"Send this whole native screen to the named provider once. No redaction. Local image expires within 10s of capture admission, no image history/replay/persistence. Provider data policies still apply; store:false is not zero retention. Model outputs may describe sensitive content."}),
+            &json!({"capability":"image.disclose","principal":self.binding.owner.principal,"run_id":self.binding.owner.run_id,"model_call_id":self.binding.model_call_id,"frame_id":self.binding.frame_id,"machine_id":self.binding.owner.machine_id,"native_width":self.binding.width,"native_height":self.binding.height,"provider":self.binding.provider,"model":self.binding.model,"destination":vision_destination(&self.binding.provider,&self.binding.model).unwrap_or(DESTINATION),"detail":"original","image_count":1,"image_token_estimate_with_margin":self.estimate(),"store":false,"response_deadline_seconds_from_post_admission":60,"upload_headers_and_image_deadline":"10 seconds from capture admission; application image buffers released before response wait","expires_in_ms":self.expires.saturating_duration_since(Instant::now()).as_millis(),"approval_deadline":"10 seconds from capture admission; timer is already running. Type yes then Return. Expiry is not denial.","warning":"Send this whole native screen to the named provider once. No redaction. Local image expires within 10s of capture admission, no image history/replay/persistence. Provider data policies still apply; store:false is not zero retention. Model outputs may describe sensitive content."}),
         )
     }
     pub(crate) fn approve(&self) -> DisclosureGrant {
@@ -941,13 +1037,21 @@ fn presentation_event(tool: &str, args: &Value, look: Option<LookFrame>) -> Resu
         "point_at" => {
             if object
                 .keys()
-                .any(|k| !matches!(k.as_str(), "frame_id" | "x" | "y"))
+                .any(|k| !matches!(k.as_str(), "frame_id" | "x" | "y" | "cursor"))
             {
-                return Err("point_at takes frame_id, x and y".into());
+                return Err("point_at takes frame_id, x, y and an optional cursor".into());
             }
             frame_matches(object)?;
             let (x, y) = point(args)?;
-            Ok(json!({"v":1,"type":"point_at","x":x,"y":y,"display":look.display}))
+            let mut event = json!({"v":1,"type":"point_at","x":x,"y":y,"display":look.display});
+            if let Some(cursor) = object.get("cursor") {
+                let cursor = cursor
+                    .as_str()
+                    .filter(|c| CURSOR_STYLES.contains(c))
+                    .ok_or_else(|| format!("cursor must be one of {}", CURSOR_STYLES.join(", ")))?;
+                event["cursor"] = json!(cursor);
+            }
+            Ok(event)
         }
         "sketch" => {
             if object
@@ -987,12 +1091,32 @@ fn presentation_event(tool: &str, args: &Value, look: Option<LookFrame>) -> Resu
     }
 }
 
+/// The presence host's fixed cursor styles (`CursorStyle` in PresenceCore),
+/// from the docs' Cursors page. Each says what to do at the target; none acts.
+pub const CURSOR_STYLES: [&str; 15] = [
+    "arrow_click",
+    "arrow",
+    "click",
+    "pointer",
+    "press",
+    "tap",
+    "text",
+    "grab",
+    "select",
+    "crosshair",
+    "focus",
+    "zoom_in",
+    "zoom_out",
+    "pen",
+    "not_allowed",
+];
+
 /// ADR 0027 local tools: one approved look, then presentation only.
 pub fn look_definitions() -> Vec<Value> {
     let point = json!({"type":"array","items":{"type":"integer","minimum":0,"maximum":2559},"minItems":2,"maxItems":2,"description":"[x, y] in display points of the current look frame"});
     vec![
         json!({"type":"function","name":"look","description":"Capture one frame of the user's configured Mac display and see it in your next request. The user approves each look (capture plus disclosure to you); at most 2 per run. Astrid's own overlay is not in the frame.","parameters":{"type":"object","properties":{},"additionalProperties":false}}),
-        json!({"type":"function","name":"point_at","description":"Glide Astrid's on-screen cursor to a point in the current look frame (display points, origin top-left). Presentation only: never clicks.","parameters":{"type":"object","properties":{"frame_id":{"type":"string","format":"uuid"},"x":{"type":"integer","minimum":0,"maximum":2559},"y":{"type":"integer","minimum":0,"maximum":2559}},"required":["frame_id","x","y"],"additionalProperties":false}}),
+        json!({"type":"function","name":"point_at","description":"Glide Astrid's on-screen cursor to a point in the current look frame (display points, origin top-left). Presentation only: never clicks. cursor shows the user what to do there: click, press (a button), tap, pointer (a link), text (type or select text), grab (drag), select (a region), crosshair (this exact spot), focus or zoom_in (look closer), zoom_out, pen (draw or write), not_allowed (don't), arrow; default arrow_click (just pointing).","parameters":{"type":"object","properties":{"frame_id":{"type":"string","format":"uuid"},"x":{"type":"integer","minimum":0,"maximum":2559},"y":{"type":"integer","minimum":0,"maximum":2559},"cursor":{"type":"string","enum":CURSOR_STYLES}},"required":["frame_id","x","y"],"additionalProperties":false}}),
         json!({"type":"function","name":"sketch","description":"Draw ink over the screen to highlight things in the current look frame: circle around a target, arrow toward it, or line under it. Presentation only.","parameters":{"type":"object","properties":{"frame_id":{"type":"string","format":"uuid"},"shapes":{"type":"array","minItems":1,"maxItems":8,"items":{"anyOf":[
             {"type":"object","properties":{"kind":{"const":"circle"},"x":{"type":"integer","minimum":0,"maximum":2559},"y":{"type":"integer","minimum":0,"maximum":2559},"r":{"type":"integer","minimum":4,"maximum":2560}},"required":["kind","x","y","r"],"additionalProperties":false},
             {"type":"object","properties":{"kind":{"enum":["arrow","line"]},"from":point,"to":point},"required":["kind","from","to"],"additionalProperties":false}

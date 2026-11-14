@@ -42,12 +42,13 @@ for runs, grants and limits, so the host must be a thin client.
    |---|---|---|
    | `show` | optional `x`, `y`, `display` | fade in, optionally jumping first |
    | `hide` | | fade out |
-   | `point_at` | `x`, `y`, optional `display` | glide the cursor hotspot to the point |
+   | `point_at` | `x`, `y`, optional `display`, optional `cursor` | glide the cursor hotspot to the point, drawn in `cursor`'s style |
    | `say` | `text`, optional `final` (default true), `duration_ms` | subtitle; empty text clears; non-final partials never auto-clear |
    | `sketch` | `shapes` (1–32), optional `display` | ink: `circle {x,y,r}`, `arrow {from:[x,y],to:[x,y]}`, `line {from,to}` |
    | `clear_ink` | | remove all ink |
    | `wait` | `ms` | script pacing: hold later events |
    | `quit` | | exit the host |
+   | `wave` | | play the Distortion Waves signal now (see the 2026-11-13 amendments) |
 
    **Coordinates** are global display points with the primary display's
    top-left corner as origin and y downward (Quartz convention). With
@@ -119,3 +120,25 @@ for runs, grants and limits, so the host must be a thin client.
   look grants (D2) or figure execution (D3), and does not make the host a daemon.
 - Cost of changing later: High for the host technology; Low for additive
   protocol fields; Medium for coordinate semantics.
+
+## Amendment 2026-11-13: cursor styles and the operator wave (V2-05, additive)
+
+The maintainer asked for "/operator" to "use the different cursor styles from
+the docs to do stuff" and, "if it is working, the distortion wave should be
+visible". Two additive v1 fields; nothing existing changes meaning.
+
+- **`point_at.cursor`.** An optional style from a fixed set that PresenceCore
+  validates (`CursorStyle`): `arrow_click` (the default, Astrid's own),
+  `arrow`, `click`, `pointer`, `press`, `tap`, `text`, `grab`, `select`,
+  `crosshair`, `focus`, `zoom_in`, `zoom_out`, `pen`, `not_allowed`. An unknown
+  name rejects the line. The art is copied from `web/src/components/cursors.tsx`
+  on the same 32×32 grid, each with its own hotspot on the target. A `point_at`
+  without `cursor` (and every `hide`) returns to `arrow_click`, so each point
+  says what to do on its own. Styles are presentation only: none clicks, types
+  or drags. The runtime's `point_at` tool takes the same optional `cursor`
+  (`CURSOR_STYLES` in `src/computer.rs`).
+- **`wave`.** Plays the intro's Distortion Waves on demand, for example when an
+  operator session goes live. Still skipped under Reduce Motion and with
+  `--no-intro`; a running wave is not restarted. The once-per-launch intro is
+  unchanged. The wave panel belongs to the host process, so ADR 0027 captures
+  exclude it like the rest of the overlay.

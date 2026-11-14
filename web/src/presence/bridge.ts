@@ -20,10 +20,24 @@ export type Incoming =
   | { type: "hotkey"; down: boolean }
   | { type: "transcript"; text: string; final: boolean }
   | { type: "voice-error"; message: string }
-  | { type: "canvas-open"; on: boolean };
+  | { type: "canvas-open"; on: boolean }
+  // ADR 0038 operator: a copy of the step card on screen, and what voice matched.
+  | { type: "operator"; on: boolean }
+  | {
+      type: "operator-card";
+      id: number;
+      text: string;
+      step: number | null;
+      total: number | null;
+      buttons: { id: string; label: string }[];
+    }
+  | { type: "operator-card-clear"; id: number }
+  | { type: "heard"; text: string; choice: string | null };
 
 export type Outgoing =
   | { type: "ask"; text: string }
+  | { type: "utterance"; text: string }
+  | { type: "choice"; id: number; choice: string }
   | { type: "approve"; id: number; approve: boolean }
   | { type: "cancel" }
   | { type: "listen"; on: boolean }

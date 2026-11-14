@@ -2,6 +2,7 @@
 
 Date: 2026-11-11
 Status: **Accepted 2026-11-11 (option 1)**. The maintainer answered "go for it, open the PR, when done" to the decision below.
+Extended 2026-11-14 by [ADR 0038](0038-operator-walkthroughs.md) for operator sessions only: up to 12 looks per session (still one per run, each approved by one press) and bounded "Do it" input on this Mac. `astrid run --look` is unchanged.
 Implementation notes: presentation calls validate against the run's latest look frame; two metadata-only events (`PresentationAllowed`, `ImageDisclosureCoveredByLook`) make the no-prompt paths explicit in the event state machine; the app bundle is launched through LaunchServices with private FIFOs.
 Related: ADRs 0022–0025 (remote observation, actions, disclosure, deadlines),
 0026 (presence host and protocol v1); [v2 gameplan](../plans/v2-gameplan.md) D2, V2-02;

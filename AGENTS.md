@@ -93,6 +93,22 @@ bottom middle to the top, and go". ADR 0026 amendment: vendored MIT Distortion W
 runtime-compiled Metal in a click-through panel, once per launch, skipped under Reduce Motion or
 `--no-intro`; no lens/blur over the screen. Branch `feat/presence-intro-wave` from main. PR, no merge.
 
+**V2-05 operator started 2026-11-13.** Maintainer: "let's work on v2-05, /operator new thread, new branch
+should be able to have screen context of what's on my screen, and use the different cursor styles from the
+docs to do stuff. if it is working, the distortion wave should be visible". Branch `feat/operator` from main
+`5e661fa7`, same checkout. First, independent of the open decisions: additive presence protocol fields
+(`point_at.cursor` from a fixed set of the docs' cursor styles; a `wave` event), recorded as an ADR 0026
+amendment. Asked about D2, guide versus act and the model, the maintainer answered "make the calls, the
+decisions" with a "Step 3 of 4 ... [Do it] [Show me]" card. [ADR 0038](docs/adr/0038-operator-walkthroughs.md)
+(agent's calls on that instruction): D2 (a) one look per card press, at most 12 per session; "Show me" points
+with the step's cursor, "Do it" performs one bounded, freshness-checked action on this Mac (click, short
+type, plain key, scroll) after the press that names it; operator uses gpt-5.6-sol (ADR 0024 path, no
+provider change); the wave plays when the first look is granted. No live capture, model call or input trial
+without exact trial approval. PR, no merge. Same day (2026-11-14) the maintainer asked for Claude instead
+("i don't have a codex sub rn") and to "talk normally and it will infer": ADR 0038 amendment, operator defaults
+to `claude-code/sonnet` (local-look image path via the Claude Agent SDK), plain asks hand screen tasks to operator
+via an `operator-start` block, and voice answers step cards ("do it", "show me", "done", "stop").
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

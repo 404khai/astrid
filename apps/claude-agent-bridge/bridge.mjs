@@ -6,8 +6,11 @@
 // Claude Code's built-in tools are disabled. Astrid's tools are declared via an
 // in-process MCP server so the model can call them, but every call is denied
 // here and returned to Astrid, whose runtime runs it under its own approvals.
+// ADR 0038: a request may carry one approved look frame ("image": base64 PNG),
+// sent as an image block in a single streaming user message, never stored.
 import { query, createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { pathToFileURL } from "node:url";
 
 const SERVER = "astrid";
 const PREFIX = `mcp__${SERVER}__`;
@@ -33,8 +36,31 @@ export function shape(parameters) {
   return out;
 }
 
+/** The SDK prompt: plain text, or one user message with the look frame. */
+export function prompt(request) {
+  const image = request.image;
+  if (!image) return request.prompt;
+  if (image.media_type !== "image/png" || typeof image.data !== "string") throw new Error("invalid image");
+  const message = {
+    type: "user",
+    parent_tool_use_id: null,
+    message: {
+      role: "user",
+      content: [
+        { type: "text", text: request.prompt },
+        { type: "text", text: String(image.text ?? "") },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: image.data } },
+      ],
+    },
+  };
+  return (async function* () {
+    yield message;
+  })();
+}
+
 async function main() {
   const request = await readRequest();
+  // The frame lives only in this process for this one turn.
   const calls = [];
   const server = createSdkMcpServer({
     name: SERVER,
@@ -50,7 +76,7 @@ async function main() {
   let text = "";
   let sessionId = null;
   const stream = query({
-    prompt: request.prompt,
+    prompt: prompt(request),
     options: {
       model: request.model,
       systemPrompt: request.system,
@@ -92,7 +118,10 @@ async function main() {
   emit({ type: "done", text, tool_calls: calls, session_id: sessionId });
 }
 
-main().catch((error) => {
-  emit({ type: "error", message: String(error?.message ?? error).slice(0, 2000) });
-  process.exitCode = 1;
-});
+// Run only as the bridge program, not when imported for checks.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main().catch((error) => {
+    emit({ type: "error", message: String(error?.message ?? error).slice(0, 2000) });
+    process.exitCode = 1;
+  });
+}

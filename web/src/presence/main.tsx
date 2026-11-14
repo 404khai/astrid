@@ -119,7 +119,27 @@ function App() {
   // you press the speaker on the answer.
   const dictated = useRef(false);
   const askedByVoice = useRef(false);
+  // ADR 0038: the operator step card on screen, answerable by voice.
+  type OpCard = {
+    id: number;
+    text: string;
+    step: number | null;
+    total: number | null;
+    buttons: { id: string; label: string }[];
+  };
+  // While operator runs, this page is only the small box beside the cursor
+  // Astrid: no mark or voice ring of its own.
+  const [operating, setOperating] = useState(false);
+  const [opCard, setOpCard] = useState<OpCard | null>(null);
+  const opCardRef = useRef<OpCard | null>(null);
+  opCardRef.current = opCard;
+  const [opHint, setOpHint] = useState<string | null>(null);
   const voice = useVoice((heard, final) => {
+    // While a step card waits, what you say answers it ("do it", "show me", "done").
+    if (opCardRef.current) {
+      if (final && heard.trim()) send({ type: "utterance", text: heard });
+      return;
+    }
     if (modeRef.current === "voice") {
       // Hands-free: what you said is sent as soon as you finish.
       if (final && heard.trim()) submitRef.current(heard);
@@ -154,6 +174,31 @@ function App() {
         }
         case "canvas-open":
           setCanvasOpen(m.on);
+          break;
+        case "operator-card": {
+          setOpCard({ id: m.id, text: m.text, step: m.step, total: m.total, buttons: m.buttons });
+          setOpHint(null);
+          // Spoken asks get spoken steps: the card, then what you can say.
+          if (askedByVoice.current || modeRef.current === "voice") {
+            const choices = m.buttons.map((b) => `“${b.label}”`);
+            const say = choices.length > 1 ? `${choices.slice(0, -1).join(", ")} or ${choices.at(-1)}` : choices[0];
+            speak(`${m.text} Say ${say}.`.replace(/[“”]/g, ""));
+          }
+          break;
+        }
+        case "operator":
+          setOperating(m.on);
+          if (!m.on) setOpCard(null);
+          break;
+        case "operator-card-clear":
+          setOpCard((card) => (card && card.id === m.id ? null : card));
+          break;
+        case "heard":
+          if (!m.choice && opCardRef.current) {
+            const hint = `Say ${opCardRef.current.buttons.map((b) => `“${b.label}”`).join(" or ")}.`;
+            setOpHint(hint);
+            if (modeRef.current === "voice") speak(hint.replace(/[“”]/g, ""));
+          }
           break;
         case "speaking":
           setSpeaking(m.on);
@@ -192,6 +237,8 @@ function App() {
           voiceRef.current.receive(m);
           break;
         case "done":
+          setOpCard(null);
+          setOpHint(null);
           setApproval(null);
           setAsking(null);
           askRef.current = null;
@@ -227,10 +274,11 @@ function App() {
   }, [mode, voice.listening, voice.heard]);
   const busyNow = asking !== null;
   useEffect(() => {
-    if (mode !== "voice" || busyNow || speaking || voice.listening || approval || voice.error) return;
+    // A waiting operator card listens too, so you can answer it hands-free.
+    if (mode !== "voice" || (busyNow && !opCard) || speaking || voice.listening || approval || voice.error) return;
     const resume = setTimeout(() => voiceRef.current.start(), 350);
     return () => clearTimeout(resume);
-  }, [mode, busyNow, speaking, voice.listening, approval, voice.error]);
+  }, [mode, busyNow, speaking, voice.listening, approval, voice.error, opCard]);
 
   const enterVoice = () => {
     setMode("voice");
@@ -290,6 +338,39 @@ function App() {
   const label = approval ? "Waiting for you" : state.label;
   const busy = asking !== null;
 
+  if (operating) {
+    const choose = (card: OpCard, choice: string) => {
+      send({ type: "choice", id: card.id, choice });
+      setOpCard(null);
+    };
+    return (
+      <div className="pr-root pr-operator" ref={root}>
+        <div className="pr-op-box" aria-live="polite">
+          <div className="pr-op-state">
+            <ThinkingOrb state={opCard ? looks.listening.orb : look.orb} size={20} theme="dark" paused={reduced} />
+            <span>{opCard?.step ? `Step ${opCard.step} of ${opCard.total}` : label}</span>
+          </div>
+          {opCard && <p className="pr-op-text">{opCard.text}</p>}
+          {opCard && (
+            <div className="pr-op-actions">
+              {opCard.buttons.map((b, i) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={i === 0 && b.id !== "stop" ? "pr-btn" : "pr-btn pr-btn-ghost"}
+                  onClick={() => choose(opCard, b.id)}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {opCard && (opHint || voice.listening) && <small className="pr-op-hint">{opHint ?? "Listening…"}</small>}
+        </div>
+      </div>
+    );
+  }
+
   if (!open) {
     return (
       <div className="pr-root pr-collapsed" ref={root}>
@@ -312,9 +393,11 @@ function App() {
       ? voice.heard?.trim() || "Listening…"
       : speaking
         ? "Speaking · ⌥Space to interrupt"
-        : busy
-          ? label
-          : voice.error ?? "";
+        : busy && opCard
+          ? opHint ?? `Say ${opCard.buttons.map((b) => `“${b.label}”`).join(" or ")}`
+          : busy
+            ? label
+            : voice.error ?? "";
     return (
       <div className="pr-root pr-voice" ref={root}>
         {(approval || error || (answer && !canvasOpen)) && (
@@ -377,6 +460,9 @@ function App() {
                 </div>
               )}
               {busy && <p className="pr-ask">“{asking}”</p>}
+              {busy && opCard && (
+                <p className="pr-ask">{opHint ?? `Say ${opCard.buttons.map((b) => `“${b.label}”`).join(" or ")}, or use the card.`}</p>
+              )}
               {approval && <ApprovalCard approval={approval} onDecide={decide} />}
               {error && !busy && <p className="pr-error">{error}</p>}
               {answer && !busy && !canvasOpen && (
@@ -411,7 +497,7 @@ function App() {
                 ref={input}
                 value={text}
                 disabled={busy}
-                placeholder={busy ? "Astrid is on it…" : voice.listening ? "Listening…" : "Ask about your email…"}
+                placeholder={busy ? "Astrid is on it…" : voice.listening ? "Listening…" : "Ask anything, or tell me what to do on screen…"}
                 onChange={(e) => {
                   setText(e.target.value);
                   if (!e.target.value.trim()) dictated.current = false;

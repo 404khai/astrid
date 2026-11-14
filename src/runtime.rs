@@ -765,8 +765,16 @@ async fn drive(
         if session.messages.len() != 1
             || config.routing.is_some()
             || config.context_budget.is_none()
-            || !crate::computer::supported_model(&config.model)
-            || provider.provider_name() != Some("openai_codex_subscription")
+            || !if local_look {
+                crate::computer::vision_destination(
+                    provider.provider_name().unwrap_or(""),
+                    &config.model,
+                )
+                .is_some()
+            } else {
+                crate::computer::supported_model(&config.model)
+                    && provider.provider_name() == Some("openai_codex_subscription")
+            }
         {
             return failure(
                 "computer_configuration",

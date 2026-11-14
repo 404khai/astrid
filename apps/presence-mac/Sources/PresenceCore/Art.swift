@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 
 /// Minimal SVG path-data parser for the shipped mark and cursor geometry:
-/// M/L/H/V/C/Z, absolute and relative, with implicit repeats.
+/// M/L/H/V/C/A/Z, absolute and relative, with implicit repeats.
 public enum SVGPath {
     public static func parse(_ d: String) throws -> CGPath {
         let path = CGMutablePath()
@@ -49,6 +49,12 @@ public enum SVGPath {
                 let p = base(try tokens.point())
                 path.addCurve(to: p, control1: c1, control2: c2)
                 current = p
+            case "a":
+                let rx = try tokens.number(), ry = try tokens.number(), rotation = try tokens.number()
+                let large = try tokens.number() != 0, sweep = try tokens.number() != 0
+                let p = base(try tokens.point())
+                addArc(to: path, from: current, to: p, rx: rx, ry: ry, degrees: rotation, large: large, sweep: sweep)
+                current = p
             case "z":
                 path.closeSubpath()
                 current = subpathStart
@@ -61,6 +67,43 @@ public enum SVGPath {
             }
         }
         return path
+    }
+
+    /// SVG elliptical arc, converted from endpoint to centre form (SVG 1.1
+    /// implementation notes F.6.5) and drawn as a transformed unit arc.
+    private static func addArc(to path: CGMutablePath, from p1: CGPoint, to p2: CGPoint, rx: Double, ry: Double, degrees: Double, large: Bool, sweep: Bool) {
+        var rx = abs(rx), ry = abs(ry)
+        guard rx > 0, ry > 0, p1 != p2 else {
+            if p1 != p2 { path.addLine(to: p2) }
+            return
+        }
+        let phi = degrees * .pi / 180, cosPhi = cos(phi), sinPhi = sin(phi)
+        let dx = (p1.x - p2.x) / 2, dy = (p1.y - p2.y) / 2
+        let x1 = cosPhi * dx + sinPhi * dy, y1 = -sinPhi * dx + cosPhi * dy
+        let lambda = (x1 * x1) / (rx * rx) + (y1 * y1) / (ry * ry)
+        if lambda > 1 {
+            rx *= lambda.squareRoot()
+            ry *= lambda.squareRoot()
+        }
+        let numerator = rx * rx * ry * ry - rx * rx * y1 * y1 - ry * ry * x1 * x1
+        let denominator = rx * rx * y1 * y1 + ry * ry * x1 * x1
+        let coefficient = (large != sweep ? 1.0 : -1.0) * max(0, numerator / denominator).squareRoot()
+        let cx1 = coefficient * rx * y1 / ry, cy1 = -coefficient * ry * x1 / rx
+        let center = CGPoint(x: cosPhi * cx1 - sinPhi * cy1 + (p1.x + p2.x) / 2,
+                             y: sinPhi * cx1 + cosPhi * cy1 + (p1.y + p2.y) / 2)
+        func angle(_ ux: Double, _ uy: Double, _ vx: Double, _ vy: Double) -> Double {
+            atan2(ux * vy - uy * vx, ux * vx + uy * vy)
+        }
+        let ux = (x1 - cx1) / rx, uy = (y1 - cy1) / ry
+        let vx = (-x1 - cx1) / rx, vy = (-y1 - cy1) / ry
+        let start = angle(1, 0, ux, uy)
+        var delta = angle(ux, uy, vx, vy)
+        if !sweep && delta > 0 { delta -= 2 * .pi }
+        if sweep && delta < 0 { delta += 2 * .pi }
+        let transform = CGAffineTransform(translationX: center.x, y: center.y)
+            .rotated(by: phi)
+            .scaledBy(x: rx, y: ry)
+        path.addArc(center: .zero, radius: 1, startAngle: start, endAngle: start + delta, clockwise: delta < 0, transform: transform)
     }
 
     private enum Token: Equatable {

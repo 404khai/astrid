@@ -19,21 +19,21 @@ public enum DemoScript {
             .sketch(shapes: [.circle(center: CGPoint(x: (w * 0.22).rounded(), y: (h * 0.28).rounded()), radius: 70)], display: 0),
             .say(text: "I point with my own cursor and circle things in ink.", final: true, durationMs: 3000),
             .wait(ms: 3200),
-            .pointAt(at(0.78, 0.30, primary)),
+            .pointAt(at(0.78, 0.30, primary), cursor: .click),
             .wait(ms: 1200),
             .sketch(shapes: [.arrow(
                 from: CGPoint(x: (w * 0.62).rounded(), y: (h * 0.52).rounded()),
                 to: CGPoint(x: (w * 0.76).rounded(), y: (h * 0.34).rounded()))], display: 0),
-            .say(text: "Arrows show where to look next.", final: true, durationMs: 2600),
+            .say(text: "My cursor changes to say what to do: click here...", final: true, durationMs: 2600),
             .wait(ms: 2800),
-            .pointAt(at(0.30, 0.72, primary)),
+            .pointAt(at(0.30, 0.72, primary), cursor: .text),
             .wait(ms: 1100),
             .sketch(shapes: [.line(
                 from: CGPoint(x: (w * 0.24).rounded(), y: (h * 0.72 + 14).rounded()),
                 to: CGPoint(x: (w * 0.42).rounded(), y: (h * 0.72 + 10).rounded()))], display: 0),
-            .say(text: "Subtitles follow along", final: false, durationMs: nil),
+            .say(text: "...type here. Subtitles follow along", final: false, durationMs: nil),
             .wait(ms: 700),
-            .say(text: "Subtitles follow along as I speak, word by word.", final: true, durationMs: 2600),
+            .say(text: "...type here. Subtitles follow along as I speak, word by word.", final: true, durationMs: 2600),
             .wait(ms: 2900),
         ]
         for display in layout.displays.dropFirst() {

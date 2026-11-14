@@ -33,7 +33,8 @@ The first time Astrid comes on screen, a colour wave (Libraries.dev
 `Sources/AstridPresence/Waves`) rises from the bottom middle of the main display
 to the top, lingers on the screen's edges and goes. `--no-intro` skips it, as
 does Reduce Motion; `ASTRID_WAVE_FRAMES=/tmp/wave .build/debug/astrid-presence`
-renders a few of its frames offscreen to PNGs.
+renders a few of its frames offscreen to PNGs. A `{"v":1,"type":"wave"}` event
+plays it again on demand (an operator session going live), with the same opt-outs.
 
 `--snapshot DIR` writes PNGs of Astrid's own layers (never the screen beneath)
 once a second; it is how the host is checked without Screen Recording access.
@@ -51,6 +52,29 @@ bundle's usage strings, so test it from the bundle:
   && open "apps/presence-mac/.build/Astrid Presence.app" --args --ask
 ```
 
+## Operator (ADR 0038)
+
+Just ask for something on your screen, typed or spoken ("turn on dark mode"),
+and Astrid hands it to operator; `/operator <goal>` forces it. Astrid asks once
+to look (the **Look** card names the display and the model, Claude (sonnet) by
+default through your Claude Code login, `--operator-model` to change it), the wave
+plays, and each step arrives as a card beside its target: **Show me** points
+with the step's cursor (click, text, grab, ...) and waits for **Done**; **Do it**
+performs only the action the card names, then looks again. Every look is one
+press; a step is never skipped until a new look verifies it. In voice mode you
+can answer cards out loud ("do it", "show me", "done", "stop"), and spoken asks
+get spoken steps.
+
+"Do it" posts real input, so the bundle needs Accessibility access (System
+Settings → Privacy & Security → Accessibility). With `--capture-source
+synthetic` no input is ever posted.
+
+```sh
+(cd web && npx vite build -c vite.presence.config.ts) && cargo build \
+  && apps/presence-mac/scripts/bundle.sh \
+  && open "apps/presence-mac/.build/Astrid Presence.app" --args --ask
+```
+
 ## Protocol v1 in one screen
 
 One JSON object per line, `#` lines are comments in scripts. Coordinates are
@@ -61,6 +85,7 @@ the displays.
 ```jsonl
 {"v":1,"type":"show","x":700,"y":400}
 {"v":1,"type":"point_at","x":300,"y":250}
+{"v":1,"type":"point_at","x":420,"y":180,"cursor":"text"}
 {"v":1,"type":"sketch","shapes":[{"kind":"circle","x":300,"y":250,"r":60}]}
 {"v":1,"type":"say","text":"This is the button you want."}
 {"v":1,"type":"wait","ms":2500}
@@ -70,6 +95,11 @@ the displays.
 {"v":1,"type":"hide"}
 {"v":1,"type":"quit"}
 ```
+
+`cursor` is one of `arrow_click` (default), `arrow`, `click`, `pointer`,
+`press`, `tap`, `text`, `grab`, `select`, `crosshair`, `focus`, `zoom_in`,
+`zoom_out`, `pen` or `not_allowed`: the docs' cursors, saying what to do at the
+point. The bundled demo shows `click` and `text`.
 
 ## Layout
 

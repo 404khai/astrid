@@ -1,4 +1,5 @@
 import CoreGraphics
+import ImageIO
 import XCTest
 @testable import PresenceCore
 
@@ -320,7 +321,7 @@ final class ArtTests: XCTestCase {
 
     func testRejectsUnsupportedPathData() {
         XCTAssertThrowsError(try SVGPath.parse("10 10"))
-        XCTAssertThrowsError(try SVGPath.parse("M0 0 A1 1 0 0 0 2 2"))
+        XCTAssertThrowsError(try SVGPath.parse("M0 0 Q1 1 2 2"))
         XCTAssertThrowsError(try SVGPath.parse("M0 0L"))
     }
 
@@ -359,13 +360,13 @@ final class DemoTests: XCTestCase {
         let events = DemoScript.events(for: layout)
         for event in events {
             XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(event)), event)
-            if case let .pointAt(point) = event {
+            if case let .pointAt(point, _) = event {
                 let global = try layout.resolve(point)
                 XCTAssertNotNil(layout.displays.first { $0.frame.contains(global) }, "\(point) is off screen")
             }
         }
         let displays = Set(events.compactMap { event -> Int? in
-            if case let .pointAt(point) = event { return point.display }
+            if case let .pointAt(point, _) = event { return point.display }
             return nil
         })
         XCTAssertEqual(displays, [0, 1])
@@ -474,5 +475,168 @@ final class TimerTests: XCTestCase {
         XCTAssertEqual(timerFiredText(fired[0], now: late), "Timer done: Tea (late 10 min)")
         try Data("garbage".utf8).write(to: url)
         XCTAssertEqual(TimerStore.load(from: url), TimerStore())
+    }
+}
+
+final class CursorStyleTests: XCTestCase {
+    func testPointAtCarriesAValidatedCursorStyle() throws {
+        XCTAssertEqual(
+            try PresenceProtocol.parse(line: #"{"v":1,"type":"point_at","x":1,"y":2,"display":0,"cursor":"text"}"#),
+            .pointAt(PresencePoint(x: 1, y: 2, display: 0), cursor: .text))
+        XCTAssertEqual(
+            try PresenceProtocol.parse(line: #"{"v":1,"type":"point_at","x":1,"y":2}"#),
+            .pointAt(PresencePoint(x: 1, y: 2), cursor: nil))
+        for line in [
+            #"{"v":1,"type":"point_at","x":1,"y":2,"cursor":"lasso"}"#,
+            #"{"v":1,"type":"point_at","x":1,"y":2,"cursor":"Text select"}"#,
+            #"{"v":1,"type":"point_at","x":1,"y":2,"cursor":3}"#,
+        ] {
+            XCTAssertThrowsError(try PresenceProtocol.parse(line: line), line)
+        }
+        for style in CursorStyle.allCases {
+            let event = PresenceEvent.pointAt(PresencePoint(x: 5, y: 6, display: 1), cursor: style)
+            XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(event)), event)
+        }
+        // No cursor encodes exactly as before, so v1 readers see no change.
+        XCTAssertFalse(PresenceProtocol.encode(.pointAt(PresencePoint(x: 5, y: 6))).contains("cursor"))
+    }
+
+    func testWaveIsAnEvent() throws {
+        XCTAssertEqual(try PresenceProtocol.parse(line: #"{"v":1,"type":"wave"}"#), .wave)
+        XCTAssertEqual(try PresenceProtocol.parse(line: PresenceProtocol.encode(.wave)), .wave)
+    }
+
+    func testEveryStyleHasDrawableArtOnTheGrid() throws {
+        let grid = CGRect(x: 0, y: 0, width: AstridArt.cursorGrid, height: AstridArt.cursorGrid)
+        XCTAssertEqual(CursorStyle.default, .arrowClick)
+        XCTAssertEqual(Set(CursorStyle.allCases.map(\.docsName)).count, CursorStyle.allCases.count)
+        for style in CursorStyle.allCases {
+            let art = AstridArt.cursor(style)
+            XCTAssertTrue(grid.contains(art.hotspot), "\(style) hotspot")
+            XCTAssertFalse(art.parts.isEmpty, "\(style)")
+            for part in art.parts {
+                XCTAssertTrue(part.fill != nil || part.stroke != nil, "\(style) part paints nothing")
+                var scale = CGAffineTransform(scaleX: part.scale, y: part.scale)
+                let path = try XCTUnwrap(try SVGPath.parse(part.path).copy(using: &scale), "\(style)")
+                XCTAssertFalse(path.isEmpty, "\(style)")
+                XCTAssertTrue(grid.insetBy(dx: -1, dy: -1).contains(path.boundingBoxOfPath), "\(style) leaves the grid: \(path.boundingBoxOfPath)")
+            }
+        }
+    }
+
+    func testArcsMatchTheirCircles() throws {
+        // A full circle as two half arcs, and a half arc, as the art uses them.
+        let circle = try SVGPath.parse("M3 13a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z").boundingBoxOfPath
+        XCTAssertEqual(circle.minX, 3, accuracy: 0.01)
+        XCTAssertEqual(circle.maxX, 23, accuracy: 0.01)
+        XCTAssertEqual(circle.minY, 3, accuracy: 0.01)
+        XCTAssertEqual(circle.maxY, 23, accuracy: 0.01)
+        // "a2 2 0 0 1 4 0" from (10, 7.5) bulges up to y = 5.5 (sweep 1, y down).
+        let knuckle = try SVGPath.parse("M10 7.5a2 2 0 0 1 4 0").boundingBoxOfPath
+        XCTAssertEqual(knuckle.minY, 5.5, accuracy: 0.01)
+        XCTAssertEqual(knuckle.maxY, 7.5, accuracy: 0.01)
+        // Radii too small for the endpoints scale up instead of failing.
+        let scaled = try SVGPath.parse("M0 0a1 1 0 0 1 10 0").boundingBoxOfPath
+        XCTAssertEqual(scaled.width, 10, accuracy: 0.01)
+        XCTAssertThrowsError(try SVGPath.parse("M0 0a1 1 0 0 1 10"))
+    }
+}
+
+final class OperatorTests: XCTestCase {
+    func testActionsAreBoundedLikeTheRuntime() throws {
+        XCTAssertEqual(try OperatorAction.parse(["kind": "click"]), .click)
+        XCTAssertEqual(try OperatorAction.parse(["kind": "type", "text": "Q3 report"]), .type("Q3 report"))
+        XCTAssertEqual(try OperatorAction.parse(["kind": "key", "key": "enter"]), .key("enter"))
+        XCTAssertEqual(try OperatorAction.parse(["kind": "scroll", "direction": "down", "notches": 3]), .scroll(down: true, notches: 3))
+        for bad: [String: Any] in [
+            ["kind": "drag"],
+            ["kind": "type", "text": ""],
+            ["kind": "type", "text": "a\nb"],
+            ["kind": "type", "text": String(repeating: "x", count: 201)],
+            ["kind": "key", "key": "cmd+q"],
+            ["kind": "scroll", "direction": "left", "notches": 1],
+            ["kind": "scroll", "direction": "up", "notches": 11],
+        ] {
+            XCTAssertThrowsError(try OperatorAction.parse(bad), "\(bad)")
+        }
+        // Same key set as the runtime's operator::KEYS.
+        XCTAssertEqual(Set(OperatorAction.keyCodes.keys), ["enter", "tab", "escape", "space", "up", "down", "left", "right"])
+    }
+
+    private func rgba(width: Int, height: Int, square: CGRect? = nil) -> [UInt8] {
+        var bytes = [UInt8](repeating: 40, count: width * height * 4)
+        if let square {
+            for y in Int(square.minY)..<Int(square.maxY) {
+                for x in Int(square.minX)..<Int(square.maxX) {
+                    let i = (y * width + x) * 4
+                    bytes[i] = 250; bytes[i + 1] = 250; bytes[i + 2] = 250
+                }
+            }
+        }
+        return bytes
+    }
+
+    func testFreshnessComparesOnlyTheAreaAroundTheTarget() {
+        let (w, h) = (320, 200)
+        let before = Fingerprint(rgba: rgba(width: w, height: h), width: w, height: h, bytesPerRow: w * 4)
+        XCTAssertEqual(before.width, 80)
+        XCTAssertEqual(before.height, 50)
+        // A change far from the target (a clock ticking in a corner) is fine.
+        let corner = Fingerprint(rgba: rgba(width: w, height: h, square: CGRect(x: 280, y: 0, width: 40, height: 20)), width: w, height: h, bytesPerRow: w * 4)
+        XCTAssertTrue(before.matches(corner, around: CGPoint(x: 60, y: 150)))
+        // A dialog appearing over the target is not.
+        let dialog = Fingerprint(rgba: rgba(width: w, height: h, square: CGRect(x: 30, y: 120, width: 80, height: 60)), width: w, height: h, bytesPerRow: w * 4)
+        XCTAssertFalse(before.matches(dialog, around: CGPoint(x: 60, y: 150)))
+        // Another display size never matches.
+        let other = Fingerprint(rgba: rgba(width: 160, height: 100), width: 160, height: 100, bytesPerRow: 640)
+        XCTAssertFalse(before.matches(other, around: CGPoint(x: 10, y: 10)))
+    }
+}
+
+final class FrameEncodingTests: XCTestCase {
+    /// A photo-like frame: gradients plus small per-pixel noise.
+    private func photo(width: Int, height: Int) -> [UInt8] {
+        var rgba = [UInt8](repeating: 255, count: width * height * 4)
+        var seed: UInt64 = 7
+        func noise() -> Int { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return Int(seed >> 61) - 4 }
+        for y in 0..<height {
+            for x in 0..<width {
+                let i = (y * width + x) * 4
+                rgba[i] = UInt8(clamping: x * 255 / width + noise())
+                rgba[i + 1] = UInt8(clamping: y * 255 / height + noise())
+                rgba[i + 2] = UInt8(clamping: (x + y) * 128 / (width + height) + noise())
+            }
+        }
+        return rgba
+    }
+
+    func testRealScreensAreFittedUnderTheLimitAtFullSize() throws {
+        let (w, h) = (400, 300)
+        let rgba = photo(width: w, height: h)
+        let full = try XCTUnwrap(FrameEncoding.fit(rgba: rgba, width: w, height: h, bytesPerRow: w * 4, limit: 10_000_000))
+        XCTAssertEqual(full.bits, 8)
+        // A tighter limit is met by quantizing, never by resizing.
+        let tight = try XCTUnwrap(FrameEncoding.fit(rgba: rgba, width: w, height: h, bytesPerRow: w * 4, limit: full.png.count / 2))
+        XCTAssertLessThan(tight.bits, 8)
+        XCTAssertLessThanOrEqual(tight.png.count, full.png.count / 2)
+        let source = try XCTUnwrap(CGImageSourceCreateWithData(tight.png as CFData, nil))
+        let props = try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
+        XCTAssertEqual(props[kCGImagePropertyPixelWidth] as? Int, w)
+        XCTAssertEqual(props[kCGImagePropertyPixelHeight] as? Int, h)
+        XCTAssertEqual(props[kCGImagePropertyHasAlpha] as? Bool ?? false, false)
+        // Nothing fits an impossible limit.
+        XCTAssertNil(FrameEncoding.fit(rgba: rgba, width: w, height: h, bytesPerRow: w * 4, limit: 100))
+    }
+
+    func testQuantizingKeepsBlackAndWhite() {
+        let rgba: [UInt8] = [0, 255, 128, 255, 255, 0, 17, 255]
+        for bits in FrameEncoding.steps {
+            let rgb = FrameEncoding.rgb(rgba, width: 2, height: 1, bytesPerRow: 8, bits: bits)
+            XCTAssertEqual(rgb[0], 0)
+            XCTAssertEqual(rgb[1], 255)
+            XCTAssertEqual(rgb[3], 255)
+            XCTAssertEqual(rgb[4], 0)
+        }
+        XCTAssertEqual(FrameEncoding.rgb(rgba, width: 2, height: 1, bytesPerRow: 8, bits: 8), [0, 255, 128, 255, 0, 17])
     }
 }

@@ -35,3 +35,21 @@ crc32fast = "1.5"
 [dev-dependencies]
 tokio = { version = "1", features = ["test-util"] }
 vt100 = "0.16.2"
+
+# The screenshot decode worker (`astrid __astrid_decode_png`) has a 2 s limit
+# (ADR 0022). Unoptimized PNG code takes about 4 s on a full 1x screen, so the
+# PNG crates are optimized even in debug builds (about 0.2 s).
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3
+[profile.dev.package.simd-adler32]
+opt-level = 3
+[profile.dev.package.adler2]
+opt-level = 3

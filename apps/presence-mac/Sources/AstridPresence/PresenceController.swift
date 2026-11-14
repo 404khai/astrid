@@ -45,6 +45,10 @@ final class PresenceController: NSObject, NSApplicationDelegate {
 
     private let askConfig: AskConfig?
     private var ask: AskController?
+    /// ADR 0038: true while an operator session drives the cursor Astrid.
+    private var operating = false
+    /// The latest look's fingerprint, for "Do it" freshness. Memory only.
+    private var lastLook: (id: String, display: Int, at: Date, fingerprint: Fingerprint)?
     /// The intro wave plays once, the first time Astrid comes on screen.
     private let intro: Bool
     private var introPlayed = false
@@ -66,8 +70,17 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     /// The Distortion Waves intro on the main display, once per launch; never
     /// under Reduce Motion or with --no-intro.
     private func playIntro() {
-        guard intro, !introPlayed, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        guard !introPlayed else { return }
         introPlayed = true
+        playWave()
+    }
+
+    /// The same wave on demand (`wave`, e.g. an operator session going live).
+    /// Skipped under Reduce Motion or with --no-intro; a running wave is not
+    /// restarted. The wave's panel is this process's window, so captures
+    /// exclude it like the rest of the overlay.
+    func playWave() {
+        guard intro, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         IntroWave.play(on: screen)
     }
 
@@ -83,6 +96,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         installStatusItem()
         if let askConfig {
             ask = AskController(config: askConfig)
+            ask?.host = self
+            AXElements.startTracking()
             // In --ask mode the mark is on screen from launch.
             playIntro()
         }
@@ -137,6 +152,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         let pointer = DisplayLayout.cocoaToQuartz(point: NSEvent.mouseLocation, primaryHeight: primaryHeight)
         motion.step(now: now, dt: dt, pointer: pointer, reduceMotion: reduceMotion)
+        // ADR 0038: the ask box rides beside the cursor Astrid while it works.
+        if operating { ask?.follow(tip: motion.tip, primaryHeight: primaryHeight) }
 
         let subtitleDisplay = layout.display(nearest: motion.tip)?.index
         CATransaction.begin()
@@ -173,8 +190,11 @@ final class PresenceController: NSObject, NSApplicationDelegate {
                 motion.show(now: now, reduceMotion: reduceMotion)
             case .hide:
                 motion.hide(reduceMotion: reduceMotion)
-            case let .pointAt(point):
-                motion.point(at: try layout.resolve(point), now: now, reduceMotion: reduceMotion)
+                for scene in scenes { scene.setCursor(.default) }
+            case let .pointAt(point, cursor):
+                let target = try layout.resolve(point)
+                for scene in scenes { scene.setCursor(cursor ?? .default) }
+                motion.point(at: target, now: now, reduceMotion: reduceMotion)
             case let .say(text, final, durationMs):
                 subtitle = text.isEmpty ? nil : text
                 if text.isEmpty || !final {
@@ -195,6 +215,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
                 break
             case .quit:
                 NSApp.terminate(nil)
+            case .wave:
+                playWave()
             case let .capture(requestId, display):
                 capture(requestId: requestId, display: display)
             case .timerStart, .timerCancel, .alarmSet, .timersList:
@@ -226,29 +248,36 @@ final class PresenceController: NSObject, NSApplicationDelegate {
     /// One frame for the runtime, answered on stdout. The overlay keeps
     /// drawing; ScreenCaptureKit excludes this process's windows.
     private func capture(requestId: String, display index: Int) {
-        let screens = NSScreen.screens
-        guard layout.displays.indices.contains(index), screens.indices.contains(index) else {
-            Output.emit(["type": "capture_failed", "request_id": requestId, "reason": "display_unavailable"])
-            return
-        }
-        let display = layout.displays[index], screen = screens[index], source = captureSource
         capturesInFlight += 1
-        Task { @MainActor in
-            let result = await FrameCapture.capture(display: display, screen: screen, source: source)
-            let reply: [String: Any]
-            switch result {
-            case let .success(frame):
-                reply = ["type": "frame", "request_id": requestId, "display": index,
-                         "width": frame.width, "height": frame.height,
-                         "png_base64": frame.png.base64EncodedString()]
-            case let .failure(failure):
-                reply = ["type": "capture_failed", "request_id": requestId, "reason": failure.reason]
-            }
+        captureFrame(requestId: requestId, display: index) { reply in
             // A frame line can be over a megabyte; never block drawing on the
             // reader draining the pipe.
             Output.queue.async {
                 Output.emit(reply)
                 DispatchQueue.main.async { self.capturesInFlight -= 1 }
+            }
+        }
+    }
+
+    /// Captures one display and hands back the `frame` or `capture_failed`
+    /// reply, on the main thread.
+    private func captureFrame(requestId: String, display index: Int, reply: @escaping ([String: Any]) -> Void) {
+        let screens = NSScreen.screens
+        guard layout.displays.indices.contains(index), screens.indices.contains(index) else {
+            reply(["type": "capture_failed", "request_id": requestId, "reason": "display_unavailable"])
+            return
+        }
+        let display = layout.displays[index], screen = screens[index], source = captureSource
+        Task { @MainActor in
+            let result = await FrameCapture.capture(display: display, screen: screen, source: source)
+            switch result {
+            case let .success(frame):
+                self.lastLook = (requestId, index, Date(), frame.fingerprint)
+                reply(["type": "frame", "request_id": requestId, "display": index,
+                       "width": frame.width, "height": frame.height,
+                       "png_base64": frame.png.base64EncodedString()])
+            case let .failure(failure):
+                reply(["type": "capture_failed", "request_id": requestId, "reason": failure.reason])
             }
         }
     }
@@ -260,7 +289,9 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         let screens = NSScreen.screens
         layout = DisplayLayout.fromCocoa(frames: screens.map(\.frame), scales: screens.map { Double($0.backingScaleFactor) })
         // The ask surface is Astrid's only window in --ask mode: no full-screen overlay.
-        scenes = askConfig != nil ? [] : zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
+        // In --ask mode the overlay exists from launch but stays hidden until an
+        // operator session shows the cursor Astrid (no panels appear mid-session).
+        scenes = zip(layout.displays, screens).map { OverlayScene(display: $0, cocoaFrame: $1.frame) }
         for scene in scenes { scene.addInk(ink, reduceMotion: true, now: CACurrentMediaTime()) }
     }
 
@@ -516,5 +547,98 @@ enum StdinReader {
         }
         thread.name = "astrid-presence-stdin"
         thread.start()
+    }
+}
+
+// MARK: - Operator (ADR 0038)
+
+extension PresenceController: OperatorHost {
+    /// The cursor Astrid takes over from the ask panel's mark, from where it was.
+    func operatorBegan(from mark: CGPoint) {
+        operating = true
+        motion.jump(to: mark)
+        player.enqueue(.show(at: nil))
+        // The user's app keeps focus, so clicks and typing land there.
+        AXElements.targetApp()?.activate()
+        // Reading on-screen controls and acting both need Accessibility; asks once.
+        _ = Injector.trusted()
+    }
+
+    func operatorPresent(_ fields: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: fields),
+              let line = String(data: data, encoding: .utf8) else { return }
+        do {
+            let event = try PresenceProtocol.parse(line: line)
+            // Only presentation reaches the overlay from the ask child.
+            switch event {
+            case .pointAt, .sketch, .clearInk, .say, .wave: break
+            default: throw PresenceProtocolError("operator may only present")
+            }
+            player.enqueue(event)
+        } catch let error as PresenceProtocolError {
+            Output.error("operator: \(error.message)", line: nil)
+        } catch {}
+    }
+
+    /// One frame plus the target app's Accessibility elements, read at the
+    /// same moment on a background queue.
+    func operatorCapture(requestId: String, display index: Int, reply: @escaping ([String: Any]) -> Void) {
+        guard PresenceProtocol.isRequestId(requestId), layout.displays.indices.contains(index) else {
+            return reply(["type": "capture_failed", "request_id": requestId, "reason": "display_unavailable"])
+        }
+        let display = layout.displays[index], app = AXElements.targetApp()
+        var elements: [[Any]]?
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            elements = AXElements.collect(display: display, app: app)
+            group.leave()
+        }
+        captureFrame(requestId: requestId, display: index) { frame in
+            group.notify(queue: .main) {
+                var frame = frame
+                if frame["type"] as? String == "frame", let elements, !elements.isEmpty { frame["elements"] = elements }
+                reply(frame)
+            }
+        }
+    }
+    /// "Do it": refuses unless the screen around the target still matches the
+    /// look the step was planned on, then posts exactly one action.
+    func operatorAct(_ fields: [String: Any], reply: @escaping (String) -> Void) {
+        guard let frame = fields["frame"] as? String, let index = (fields["display"] as? NSNumber)?.intValue,
+              let x = (fields["x"] as? NSNumber)?.doubleValue, let y = (fields["y"] as? NSNumber)?.doubleValue,
+              let raw = fields["action"] as? [String: Any], let action = try? OperatorAction.parse(raw),
+              layout.displays.indices.contains(index) else { return reply("invalid_action") }
+        let display = layout.displays[index]
+        let target = CGPoint(x: x, y: y)
+        guard target.x >= 0, target.y >= 0, target.x < display.frame.width, target.y < display.frame.height else {
+            return reply("invalid_action")
+        }
+        guard let look = lastLook, look.id == frame, look.display == index, Date().timeIntervalSince(look.at) < 120 else {
+            return reply("stale")
+        }
+        // Synthetic frames are not the real screen: never post input against them.
+        guard captureSource == .screen else { return reply("synthetic_capture_no_input") }
+        guard Injector.trusted() else { return reply("accessibility_permission_required") }
+        let check = "act-\(UUID().uuidString.prefix(8))"
+        captureFrame(requestId: check, display: index) { [weak self] result in
+            guard let self else { return }
+            guard result["type"] as? String == "frame", let fresh = self.lastLook, fresh.id == check,
+                  look.fingerprint.matches(fresh.fingerprint, around: target) else {
+                return reply("stale")
+            }
+            // The planning look stays the reference for this step.
+            self.lastLook = look
+            let global = CGPoint(x: display.frame.minX + target.x, y: display.frame.minY + target.y)
+            Injector.perform(action, at: global)
+            reply("done")
+        }
+    }
+
+    func operatorEnded() {
+        guard operating else { return }
+        operating = false
+        player.enqueue(contentsOf: [.clearInk, .hide])
+        lastLook = nil
     }
 }
