@@ -438,6 +438,15 @@ pub async fn serve(
             }
         });
     }
+    // Operator looks decode frames in a worker with a 2 s limit; start it once
+    // now so the first look doesn't pay for process start-up.
+    if operator.is_some()
+        && let Ok(exe) = std::env::current_exe()
+    {
+        tokio::spawn(async move {
+            astrid::computer_png::DecodeWorker::new(exe).warm_up().await;
+        });
+    }
     emit(json!({"type":"ready","model":model}));
     while let Some((ask, history)) = asks_rx.recv().await {
         let cancel = Cancellation::default();
