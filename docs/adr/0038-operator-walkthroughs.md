@@ -177,6 +177,23 @@ the host's reason was replaced by a generic stop message.
   grant, e.g. `tccutil reset ScreenCapture dev.astrid.presence`). A real signing
   identity in `ASTRID_SIGN_IDENTITY` keeps grants across rebuilds.
 
+## Amendment 2026-11-14: full-size frames through the request budget and Claude
+
+The next live try failed at `image_admission`: the default 512 KiB request
+byte ceiling counts the base64 frame (about 1 MB for a full screen). Look runs
+now use `look_budget()`, which is the default text budget plus 1.6 MB for one
+frame. The frame cap (1 MiB PNG) and the token budget are unchanged.
+
+Anthropic downscales images over about 1.15 MP (or 1568 px on the long edge),
+and the model then answers in the smaller image's pixels: a 1512×982 screen
+would be pointed at about 12% off. The Claude path now scales the frame itself
+(`claude_view`, area average; 1512×982 → 1330×864), tells the model that exact
+size, and maps the step's point back to display points. The OpenAI path keeps
+the 1x frame.
+
+A test now runs a real-size, near-cap 1512×982 frame through both providers;
+it reproduces the `image_admission` failure with the old budget.
+
 ## Alternatives considered
 
 - **(b) A time-boxed "watching" grant.** Fewer presses, but it is a standing

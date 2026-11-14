@@ -656,3 +656,189 @@ async fn a_failed_look_says_why_instead_of_computer_stopped() {
         assert_eq!(seen.lock().unwrap().len(), 1);
     }
 }
+
+/// A real-size, real-weight look: a 1512x982 frame with photo-like content
+/// (gradients and noise), quantized as the presence host does, close to the
+/// 1 MiB cap. Synthetic 320x200 frames hid every size limit on the way.
+fn screen_png() -> Vec<u8> {
+    let (w, h) = (1512u32, 982u32);
+    let mut seed: u64 = 11;
+    let mut rgb = Vec::with_capacity((w * h * 3) as usize);
+    for y in 0..h {
+        for x in 0..w {
+            for c in 0..3u32 {
+                seed = seed
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                let noise = (seed >> 61) as i32 - 4;
+                let base = ((x * (c + 1) + y * (3 - c)) % 256) as i32;
+                rgb.push(((base + noise).clamp(0, 255) as u8) & 0xF0);
+            }
+        }
+    }
+    let mut png_bytes = Vec::new();
+    {
+        let mut e = png::Encoder::new(&mut png_bytes, w, h);
+        e.set_color(png::ColorType::Rgb);
+        e.set_depth(png::BitDepth::Eight);
+        e.write_header().unwrap().write_image_data(&rgb).unwrap();
+    }
+    png_bytes
+}
+
+struct ScreenHost(Vec<u8>);
+#[async_trait]
+impl crate::presence::LookHost for ScreenHost {
+    async fn capture(&self, _: u32, _: &Cancellation) -> Result<Vec<u8>, String> {
+        Ok(self.0.clone())
+    }
+    async fn present(&self, _: Value) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+fn screen_tools(dir: &std::path::Path, frame: &[u8]) -> Tools {
+    Tools::new(Workspace::new(dir).unwrap(), Duration::from_secs(1))
+        .unwrap()
+        .with_computer(
+            Computer::local(
+                "test".into(),
+                0,
+                Arc::new(ScreenHost(frame.to_vec())),
+                Arc::new(DecodeWorker::inline()),
+            )
+            .unwrap(),
+        )
+}
+
+#[tokio::test]
+async fn a_full_size_real_screen_gets_through_on_both_providers() {
+    let frame = screen_png();
+    assert!(
+        (600_000..=crate::computer_png::MAX_PNG).contains(&frame.len()),
+        "fixture should be near the cap: {}",
+        frame.len()
+    );
+    let report = block(json!({"step":step(1, 1, 1400, "click", json!({"kind":"click"}))}));
+
+    // OpenAI path.
+    let (origin, seen) = mock_model(vec![report.clone()]).await;
+    let dir = tempfile::tempdir().unwrap();
+    let tools = screen_tools(dir.path(), &frame);
+    let provider = OpenAiProvider::with_endpoint(Arc::new(Auth), origin).unwrap();
+    let mut eyes = RuntimeEyes {
+        provider: &provider,
+        tools: &tools,
+        model: "gpt-5.6-sol".into(),
+    };
+    let ui = FakeUi {
+        choices: Mutex::new(vec![Choice::Look, Choice::Stop].into()),
+        ..FakeUi::default()
+    };
+    let outcome = walk(
+        "Like this video",
+        "gpt-5.6-sol",
+        0,
+        &mut eyes,
+        &ui,
+        &Cancellation::default(),
+    )
+    .await;
+    assert!(
+        matches!(outcome, Outcome::Stopped(_)),
+        "openai: {outcome:?}"
+    );
+    assert_eq!(
+        ui.cards.lock().unwrap()[1].step,
+        Some((1, 1)),
+        "openai reached step 1"
+    );
+    assert_eq!(seen.lock().unwrap().len(), 2);
+    // The production worker re-encodes frames; the result must stay in bounds.
+    assert!(
+        crate::computer_png::canonicalize(&frame)
+            .unwrap()
+            .bytes
+            .len()
+            <= crate::computer_png::MAX_PNG
+    );
+
+    // Claude Agent SDK path, through a fake bridge.
+    use crate::claude_code::{Bridge, ClaudeCodeProvider};
+    let dir = tempfile::tempdir().unwrap();
+    let log = dir.path().join("requests");
+    std::fs::create_dir(&log).unwrap();
+    // Claude answers in the scaled image's pixels (1330x864 for this screen).
+    let claude_report = block(json!({"step":step(1, 1, 1000, "click", json!({"kind":"click"}))}));
+    std::fs::write(
+        dir.path().join("report.json"),
+        json!({"type":"done","text":claude_report,"tool_calls":[]}).to_string(),
+    )
+    .unwrap();
+    let script = format!(
+        r#"n=$(ls {log} | wc -l | tr -d ' '); cat > {log}/$n.json
+if grep -q '"image":{{' {log}/$n.json; then cat {dir}/report.json; echo
+else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look","name":"look","arguments":"{{}}"}}]}}'; fi"#,
+        log = log.display(),
+        dir = dir.path().display()
+    );
+    let provider = ClaudeCodeProvider::new(
+        Bridge {
+            command: vec!["/bin/sh".into(), "-c".into(), script],
+        },
+        dir.path().to_path_buf(),
+    );
+    let tools = screen_tools(dir.path(), &frame);
+    let mut eyes = RuntimeEyes {
+        provider: &provider,
+        tools: &tools,
+        model: "claude-code/sonnet".into(),
+    };
+    let ui = FakeUi {
+        choices: Mutex::new(vec![Choice::Look, Choice::Stop].into()),
+        ..FakeUi::default()
+    };
+    let outcome = walk(
+        "Like this video",
+        "claude-code/sonnet",
+        0,
+        &mut eyes,
+        &ui,
+        &Cancellation::default(),
+    )
+    .await;
+    assert!(
+        matches!(outcome, Outcome::Stopped(_)),
+        "claude: {outcome:?}"
+    );
+    assert_eq!(
+        ui.cards.lock().unwrap()[1].step,
+        Some((1, 1)),
+        "claude reached step 1"
+    );
+    let sent: Value = serde_json::from_slice(&std::fs::read(log.join("1.json")).unwrap()).unwrap();
+    let text = sent["image"]["text"].as_str().unwrap();
+    assert!(
+        text.contains("1512x982") && text.contains("scaled to 1330x864"),
+        "{text}"
+    );
+    use base64::Engine;
+    let scaled = base64::engine::general_purpose::STANDARD
+        .decode(sent["image"]["data"].as_str().unwrap())
+        .unwrap();
+    let decoder = png::Decoder::new(std::io::Cursor::new(&scaled[..]));
+    let reader = decoder.read_info().unwrap();
+    assert_eq!((reader.info().width, reader.info().height), (1330, 864));
+    // Its point maps back to display points: 1000 * 1512 / 1330 = 1136.
+    let events = ui.events.lock().unwrap().clone();
+    assert!(
+        events.contains(
+            &json!({"v":1,"type":"point_at","x":1136,"y":22,"display":0,"cursor":"arrow_click"})
+        ),
+        "{events:?}"
+    );
+    assert_eq!(crate::claude_code::claude_view(1280, 800), (1280, 800));
+    // The bridge got the whole (scaled) frame, within its 8 MiB request limit.
+    let request = std::fs::metadata(log.join("1.json")).unwrap().len();
+    assert!(request > 200_000 && request < 8 * 1024 * 1024, "{request}");
+}

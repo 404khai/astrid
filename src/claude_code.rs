@@ -16,6 +16,77 @@ use crate::{
 };
 
 pub const PREFIX: &str = "claude-code/";
+/// Anthropic downscales images over about 1.15 megapixels (or 1568 px on the
+/// long edge) before the model sees them, and the model then answers in the
+/// smaller image's pixels. Looks are scaled to this size here instead, so the
+/// model is told the exact size it sees and its points map back exactly.
+const VIEW_PIXELS: f64 = 1_150_000.0;
+const VIEW_EDGE: f64 = 1568.0;
+
+/// The size Claude sees a `width`x`height` frame at.
+pub fn claude_view(width: u32, height: u32) -> (u32, u32) {
+    let (w, h) = (f64::from(width), f64::from(height));
+    let scale = (VIEW_PIXELS / (w * h))
+        .sqrt()
+        .min(VIEW_EDGE / w.max(h))
+        .min(1.0);
+    if scale >= 1.0 {
+        return (width, height);
+    }
+    (
+        ((w * scale).floor() as u32).max(1),
+        ((h * scale).floor() as u32).max(1),
+    )
+}
+
+/// Area-averages an 8-bit RGB/RGBA PNG down to `(w, h)` and re-encodes it as RGB.
+fn downscale_png(png_bytes: &[u8], (w, h): (u32, u32)) -> Result<Vec<u8>, String> {
+    let decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
+    let mut reader = decoder.read_info().map_err(|_| "frame decode failed")?;
+    let mut buffer = vec![0; reader.output_buffer_size().ok_or("frame too large")?];
+    let info = reader
+        .next_frame(&mut buffer)
+        .map_err(|_| "frame decode failed")?;
+    let channels = match (info.color_type, info.bit_depth) {
+        (png::ColorType::Rgb, png::BitDepth::Eight) => 3,
+        (png::ColorType::Rgba, png::BitDepth::Eight) => 4,
+        _ => return Err("unexpected frame format".into()),
+    };
+    let (sw, sh) = (info.width as usize, info.height as usize);
+    let (dw, dh) = (w as usize, h as usize);
+    let mut out = vec![0u8; dw * dh * 3];
+    for y in 0..dh {
+        let (y0, y1) = (y * sh / dh, ((y + 1) * sh / dh).max(y * sh / dh + 1));
+        for x in 0..dw {
+            let (x0, x1) = (x * sw / dw, ((x + 1) * sw / dw).max(x * sw / dw + 1));
+            let mut sum = [0u32; 3];
+            for sy in y0..y1 {
+                let row = sy * info.line_size;
+                for sx in x0..x1 {
+                    let i = row + sx * channels;
+                    for (c, total) in sum.iter_mut().enumerate() {
+                        *total += u32::from(buffer[i + c]);
+                    }
+                }
+            }
+            let n = ((y1 - y0) * (x1 - x0)) as u32;
+            for c in 0..3 {
+                out[(y * dw + x) * 3 + c] = (sum[c] / n) as u8;
+            }
+        }
+    }
+    let mut encoded = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut encoded, w, h);
+        encoder.set_color(png::ColorType::Rgb);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder
+            .write_header()
+            .and_then(|mut writer| writer.write_image_data(&out))
+            .map_err(|_| "frame encode failed")?;
+    }
+    Ok(encoded)
+}
 const MAX_LINE: u64 = 4 * 1024 * 1024;
 const TURN_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 /// ADR 0025's total visual attempt, from handing the frame to the bridge.
@@ -189,7 +260,26 @@ impl ClaudeCodeProvider {
         let data = url
             .strip_prefix("data:image/png;base64,")
             .ok_or_else(|| ModelError::Protocol("unexpected image encoding".into()))?;
-        body["image"] = json!({"media_type":"image/png","data":data,"text":image.frame_text()});
+        let (width, height) = image.geometry();
+        let view = claude_view(width, height);
+        let (data, text) = if view == (width, height) {
+            (data.to_owned(), image.frame_text())
+        } else {
+            use base64::Engine;
+            let engine = base64::engine::general_purpose::STANDARD;
+            let png = engine
+                .decode(data)
+                .map_err(|_| ModelError::Protocol("unexpected image encoding".into()))?;
+            let scaled = downscale_png(&png, view).map_err(ModelError::Provider)?;
+            let text = format!(
+                "{} This screenshot is scaled to {}x{} pixels: give every x, y in this image's pixels; Astrid maps them back to the {width}x{height} display.",
+                image.frame_text(),
+                view.0,
+                view.1
+            );
+            (engine.encode(scaled), text)
+        };
+        body["image"] = json!({"media_type":"image/png","data":data,"text":text});
         Ok(body)
     }
 

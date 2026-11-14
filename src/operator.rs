@@ -352,6 +352,17 @@ impl Walkthrough {
 /// The reply format for each look run.
 pub const OPERATOR_INSTRUCTIONS: &str = "Call `look` exactly once to see the screen now. Do not call point_at, sketch or say: Astrid points for you. Then reply with only one fenced code block tagged `operator` containing JSON: {\"verified\": true|false (only when a step is pending), \"reason\": short reason, and either \"step\": {\"index\": n, \"total\": planned steps (at most 8), \"instruction\": one short imperative sentence for the user, \"x\": int, \"y\": int (display points of this screenshot, the exact target), \"cursor\": one of click, press, tap, pointer, text, grab, select, crosshair, focus, zoom_in, zoom_out, pen, not_allowed, arrow, arrow_click (what the user should do there: click to click, text to type, grab to drag, zoom_in to look closer), \"action\": null or {\"kind\":\"click\"} | {\"kind\":\"type\",\"text\":...} | {\"kind\":\"key\",\"key\":\"enter\"|\"tab\"|\"escape\"|\"space\"|\"up\"|\"down\"|\"left\"|\"right\"} | {\"kind\":\"scroll\",\"direction\":\"up\"|\"down\",\"notches\":1-10} (what Astrid would do if the user says \"Do it\"; null when the user must do it themselves, e.g. passwords, payments, deleting or sending), \"check\": what the screen will show once the step is done} or \"finish\": one sentence saying the goal is done. Never put passwords or other secrets in type actions.";
 
+/// A look run's request budget: the default text budget, with room in the
+/// byte ceiling for one full frame (a PNG of at most 1 MiB is about 1.4 MB as
+/// base64). The 512 KiB default would refuse every real screen.
+pub fn look_budget() -> crate::context::ContextBudget {
+    let text = crate::context::ContextBudget::default();
+    crate::context::ContextBudget {
+        max_request_bytes: text.max_request_bytes + 1_600_000,
+        ..text
+    }
+}
+
 /// Approves exactly one ADR 0027 look per user press, and nothing else.
 struct PressedLook {
     armed: bool,
@@ -385,7 +396,7 @@ impl Eyes for RuntimeEyes<'_> {
         let config = RunConfig {
             routing: None,
             observability: None,
-            context_budget: Some(Default::default()),
+            context_budget: Some(look_budget()),
             model: self.model.clone(),
             task,
             max_model_calls: 3,
@@ -436,6 +447,24 @@ impl Eyes for RuntimeEyes<'_> {
                 _ => None,
             })
             .ok_or("Astrid didn't get a look at the screen")?;
+        // Claude sees a scaled frame and answers in its pixels; map back.
+        if self.model.starts_with(crate::claude_code::PREFIX) {
+            let (vw, vh) = crate::claude_code::claude_view(frame.width, frame.height);
+            let mut report = parse_report(
+                &result.final_text,
+                Frame {
+                    width: vw,
+                    height: vh,
+                },
+            )?;
+            if let Next::Step(step) = &mut report.next {
+                step.x = (u64::from(step.x) * u64::from(frame.width) / u64::from(vw))
+                    .min(u64::from(frame.width - 1)) as u32;
+                step.y = (u64::from(step.y) * u64::from(frame.height) / u64::from(vh))
+                    .min(u64::from(frame.height - 1)) as u32;
+            }
+            return Ok(report);
+        }
         parse_report(&result.final_text, frame)
     }
 }
