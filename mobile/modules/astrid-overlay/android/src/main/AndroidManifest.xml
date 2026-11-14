@@ -3,6 +3,12 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!-- Voice mode only: the mic is open while Astrid listens. -->
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <queries>
+    <intent><action android:name="android.speech.RecognitionService" /></intent>
+    <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+  </queries>
   <application>
     <service
       android:name="dev.astrid.overlay.OverlayService"

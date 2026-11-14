@@ -93,8 +93,10 @@ class OverlayService : Service() {
   private fun showBubble() {
     val manager = getSystemService(WindowManager::class.java)
     val density = resources.displayMetrics.density
-    val size = (72 * density).toInt()
-    val view = BubbleView(this).apply { contentDescription = "Ask Astrid" }
+    // A little bigger than a launcher icon, so the ring reads.
+    val sizeDp = 100
+    val size = (sizeDp * density).toInt()
+    val view = BubbleView(this, sizeDp).apply { contentDescription = "Ask Astrid" }
     params = WindowManager.LayoutParams(
       size, size,
       WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,

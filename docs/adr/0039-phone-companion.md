@@ -173,3 +173,29 @@ About on both apps, and the Astrid mark in the middle of the pairing QR.
   The copied `astrid://pair` link opens the phone app and pairs it. The link
   carries the same one-time, two-minute secret as the code, so it's only for
   sending to your own phone.
+
+## Amendment 2026-11-14: phone voice mode, sidebar
+
+The maintainer asked for a ChatGPT-style sidebar and a voice page on the phone.
+
+- **Sidebar.** A left button opens a sidebar with New chat, Diagrams, the Mac's
+  status, chats (searchable; hold one to restyle), and, at the bottom, the
+  blobs row (the same `blobs/` characters and web page as the desktop), a
+  Chat pill and Settings.
+- **Settings** are grouped: Mac, On screen, Themes (accent), Blobs, About.
+  Preferences stay on the phone.
+- **Voice page.** The waveform button opens a full-screen page with Astrid in
+  presence's voice ring (`web/voice.html`, built into the APK). What you say
+  is asked in the open chat (or a new one) after a 1.3 s pause, and the reply
+  is spoken with Android's text-to-speech, drawings included. Then she
+  listens again. There's mute, a text field, and close.
+- **Speech recognition.** Android's own recogniser, on-device when the phone
+  has it. Otherwise, and on phones whose on-device recogniser fails (such as
+  the maintainer's Tecno), it's the system's recogniser, asked to prefer
+  offline. That may send audio to its provider (here, Google), so unlike
+  presence (ADR 0034) on-device isn't guaranteed. The page says so when it
+  happens. Astrid itself saves and sends no audio; only the transcript is
+  asked.
+- **Edge wave.** Some phones draw overlay windows without the GPU, where the
+  AGSL shader throws. Those get the plain glow. This fixes the reported
+  "keeps stopping".

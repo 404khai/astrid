@@ -12,15 +12,24 @@ body,
 }
 .vo-ring {
   position: relative;
-  width: 200px;
-  height: 200px;
+  width: var(--vo-size, 200px);
+  height: var(--vo-size, 200px);
+}
+.vo-mark,
+.vo-mark:focus,
+.vo-mark:active {
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .vo-mark {
   position: absolute;
   inset: 50% auto auto 50%;
-  width: 64px;
-  height: 64px;
-  margin: -32px 0 0 -32px;
+  width: calc(var(--vo-size, 200px) * 0.32);
+  height: calc(var(--vo-size, 200px) * 0.32);
+  margin: calc(var(--vo-size, 200px) * -0.16) 0 0 calc(var(--vo-size, 200px) * -0.16);
   border: 0;
   border-radius: 32px;
   background: transparent;
@@ -30,6 +39,7 @@ body,
   padding: 0;
 }
 .vo-mark .astrid-logo {
-  width: 44px;
-  height: 36px;
+  /* At least 36 px wide, so the mark still reads in a small ring. */
+  width: max(calc(var(--vo-size, 200px) * 0.22), 36px);
+  height: max(calc(var(--vo-size, 200px) * 0.18), 29px);
 }

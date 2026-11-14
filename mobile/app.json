@@ -46,10 +46,8 @@
         "backgroundColor": "#0b0b10"
       },
       "permissions": [
-        "CAMERA"
-      ],
-      "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
+        "CAMERA",
+        "RECORD_AUDIO"
       ]
     },
     "scheme": "astrid"

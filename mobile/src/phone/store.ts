@@ -50,9 +50,27 @@ export type State = {
   /** The chat the overlay panel is in; a new one until its first ask. */
   panelChat: string | null;
   diagrams: Diagram[] | null;
+  prefs: Prefs;
+};
+
+/** The phone's own settings, kept on the phone. */
+export type Prefs = { accent: string; showBlobs: boolean; blobsShown: string[]; blob: string | null };
+export const accents: [string, string][] = [
+  ["Astrid", "#4459f9"],
+  ["Violet", "#8a5cff"],
+  ["Teal", "#00c2a8"],
+  ["Pink", "#e5487f"],
+  ["Orange", "#f07a2b"],
+];
+const defaultPrefs: Prefs = {
+  accent: "#4459f9",
+  showBlobs: true,
+  blobsShown: ["06-sunee.avatar.json", "08-cloudee.avatar.json", "03-citrus.avatar.json", "02-freddy.avatar.json", "07-kirby.avatar.json"],
+  blob: null,
 };
 
 const KEY = "astrid.pairing";
+const PREFS = "astrid.prefs";
 let state: State = {
   loaded: false,
   pairing: null,
@@ -64,6 +82,7 @@ let state: State = {
   live: null,
   panelChat: null,
   diagrams: null,
+  prefs: defaultPrefs,
 };
 const listeners = new Set<() => void>();
 let client: LinkClient | null = null;
@@ -102,7 +121,12 @@ export async function load() {
     const raw = await SecureStore.getItemAsync(KEY);
     if (raw) pairing = JSON.parse(raw);
   } catch {}
-  set({ loaded: true, pairing });
+  let prefs = defaultPrefs;
+  try {
+    const raw = await SecureStore.getItemAsync(PREFS);
+    if (raw) prefs = { ...defaultPrefs, ...JSON.parse(raw) };
+  } catch {}
+  set({ loaded: true, pairing, prefs });
   if (pairing) connect(pairing);
 }
 
@@ -139,6 +163,12 @@ export async function unpair() {
   client = null;
   await SecureStore.deleteItemAsync(KEY).catch(() => {});
   set({ pairing: null, chats: [], open: null, openId: null, live: null, status: "offline", panelChat: null });
+}
+
+export function setPrefs(change: Partial<Prefs>) {
+  const prefs = { ...state.prefs, ...change };
+  set({ prefs });
+  SecureStore.setItemAsync(PREFS, JSON.stringify(prefs)).catch(() => {});
 }
 
 export function reconnect() {

@@ -10,8 +10,20 @@ import expo.modules.kotlin.modules.ModuleDefinition
 class AstridOverlayModule : Module() {
   private val context get() = requireNotNull(appContext.reactContext)
 
+  private var voice: PhoneVoice? = null
+  private fun voice(): PhoneVoice = voice ?: PhoneVoice(context) { name, body -> sendEvent(name, body) }.also { voice = it }
+
   override fun definition() = ModuleDefinition {
     Name("AstridOverlay")
+
+    Events("onVoice")
+
+    /** Voice mode: start listening (events come as onVoice). */
+    Function("listen") { voice().listen() }
+    Function("stopListening") { voice?.stopListening() }
+    Function("say") { text: String -> voice().say(text.take(4000)) }
+    Function("hush") { voice?.hush() }
+    OnDestroy { voice?.shutdown() }
 
     Function("canDrawOverlays") { Settings.canDrawOverlays(context) }
 

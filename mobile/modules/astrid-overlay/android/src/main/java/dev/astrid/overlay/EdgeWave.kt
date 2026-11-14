@@ -61,7 +61,9 @@ class EdgeWave private constructor(context: Context, private val cornerDp: Doubl
     val source = source(width, height)
     val front = WaveFront(progress, source, width, height)
     val shader = shader
-    if (shader != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    // Some phones (Tecno's HiOS among them) draw overlay windows in software,
+    // where a RuntimeShader throws: they get the plain glow instead.
+    if (shader != null && canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       shader.setFloatUniform("scale", density)
       shader.setFloatUniform("size", width.toFloat(), height.toFloat())
       shader.setFloatUniform("origin", front.originX.toFloat(), front.originY.toFloat())
