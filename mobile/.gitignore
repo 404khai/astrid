@@ -5,3 +5,6 @@ ios/
 /android/
 modules/astrid-overlay/android/src/main/assets/astrid-canvas.html
 modules/*/android/build/
+modules/astrid-overlay/android/src/main/assets/astrid-voice.html
+modules/astrid-overlay/android/src/main/assets/astrid-blobs.html
+src/phone/blobs.generated.ts

@@ -15,6 +15,9 @@ import {
   Text,
   TextInput,
   View,
+  Animated,
+  Easing,
+  useWindowDimensions,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -22,9 +25,11 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { overlay } from "../modules/astrid-overlay";
 import { CanvasView } from "./phone/CanvasView";
 import { MaterialCommunityIcons as Icon } from "@expo/vector-icons";
+import { VoiceScreen } from "./phone/VoiceScreen";
+import { BlobsRow, allBlobs } from "./phone/WebPages";
 import { LiveMark, LiveView, Mark, MessageView, Pulse, StatusLine, colors } from "./phone/ui";
 import { chatColors, chatIcons, colorOf } from "./phone/style";
-import { ask, cancel, getState, load, loadDiagrams, openChat, pairFromCode, reconnect, style, unpair, useStore, type ChatRow, type Message, type Shape } from "./phone/store";
+import { accents, ask, cancel, getState, load, setPrefs, loadDiagrams, openChat, pairFromCode, reconnect, style, unpair, useStore, type ChatRow, type Message, type Shape } from "./phone/store";
 
 type IconName = keyof typeof Icon.glyphMap;
 
@@ -126,21 +131,23 @@ type Tab = "new" | "diagrams";
 
 function Main() {
   const openId = useStore((s) => s.openId);
-  const chats = useStore((s) => s.chats);
   const [tab, setTab] = useState<Tab>("new");
-  const [sheet, setSheet] = useState<"chats" | "settings" | null>(null);
+  const [drawer, setDrawer] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [voice, setVoice] = useState(false);
   const [acting, setActing] = useState<ChatRow | null>(null);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (acting) return setActing(null), true;
-      if (sheet) return setSheet(null), true;
+      if (settings) return setSettings(false), true;
+      if (drawer) return setDrawer(false), true;
       if (tab !== "new") return setTab("new"), true;
       if (openId) return openChat(null), true;
       return false;
     });
     return () => sub.remove();
-  }, [acting, sheet, tab, openId]);
+  }, [acting, settings, drawer, tab, openId]);
 
   // An ask from the overlay panel opens its chat here too.
   useEffect(() => {
@@ -151,30 +158,169 @@ function Main() {
     <View style={{ flex: 1 }}>
       {tab === "new" && !openId && <DotField />}
       <View style={styles.topBar}>
-        <RoundButton icon="cog-outline" label="Settings" onPress={() => setSheet("settings")} />
+        <RoundButton icon="menu" label="Open sidebar" onPress={() => setDrawer(true)} />
         <View style={styles.tabs}>
           <TabButton icon="pencil-outline" label="New" active={tab === "new"} onPress={() => (tab === "new" ? openChat(null) : setTab("new"))} />
           <TabButton icon="view-grid-outline" label="Diagrams" active={tab === "diagrams"} onPress={() => setTab("diagrams")} />
         </View>
-        <RoundButton icon="forum-outline" label="Chats" badge={chats.length} onPress={() => setSheet("chats")} />
+        <RoundButton icon="waveform" label="Talk to Astrid" onPress={() => setVoice(true)} />
       </View>
-      {tab === "new" ? <Conversation onAct={setActing} /> : <Diagrams />}
-      <Modal visible={sheet === "chats"} animationType="slide" onRequestClose={() => setSheet(null)}>
-        <ChatList
-          onClose={() => setSheet(null)}
-          onOpen={(id) => {
-            setSheet(null);
-            setTab("new");
-            openChat(id);
-          }}
-          onAct={setActing}
-        />
+      {tab === "new" ? <Conversation onAct={setActing} onVoice={() => setVoice(true)} /> : <Diagrams />}
+      <Sidebar
+        open={drawer}
+        onClose={() => setDrawer(false)}
+        onNew={() => {
+          setDrawer(false);
+          setTab("new");
+          openChat(null);
+        }}
+        onDiagrams={() => {
+          setDrawer(false);
+          setTab("diagrams");
+        }}
+        onOpen={(id) => {
+          setDrawer(false);
+          setTab("new");
+          openChat(id);
+        }}
+        onAct={setActing}
+        onSettings={() => setSettings(true)}
+      />
+      <Modal visible={settings} animationType="slide" onRequestClose={() => setSettings(false)}>
+        <Settings onClose={() => setSettings(false)} />
       </Modal>
-      <Modal visible={sheet === "settings"} animationType="slide" onRequestClose={() => setSheet(null)}>
-        <Settings onClose={() => setSheet(null)} />
-      </Modal>
+      <VoiceScreen
+        visible={voice}
+        onClose={() => setVoice(false)}
+        onMenu={() => {
+          setVoice(false);
+          setDrawer(true);
+        }}
+        onSettings={() => setSettings(true)}
+      />
       <ChatActions chat={acting} onClose={() => setActing(null)} />
     </View>
+  );
+}
+
+/** The sidebar, as ChatGPT's: Astrid and search at the top, the main places,
+ * your chats, and at the bottom the blobs, Settings and a New chat pill. */
+function Sidebar({
+  open,
+  onClose,
+  onNew,
+  onDiagrams,
+  onOpen,
+  onAct,
+  onSettings,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onNew: () => void;
+  onDiagrams: () => void;
+  onOpen: (id: string) => void;
+  onAct: (row: ChatRow) => void;
+  onSettings: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const panel = Math.min(width * 0.82, 360);
+  const slide = useRef(new Animated.Value(0)).current;
+  const [mounted, setMounted] = useState(open);
+  const chats = useStore((s) => s.chats);
+  const busy = useStore((s) => s.busy);
+  const working = useStore((s) => !!s.live && !s.live.finished);
+  const prefs = useStore((s) => s.prefs);
+  const status = useStore((s) => s.status);
+  const mac = useStore((s) => s.pairing?.mac ?? "Mac");
+  const [query, setQuery] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setMounted(true);
+    Animated.timing(slide, { toValue: open ? 1 : 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(({ finished }) => {
+      if (finished && !open) setMounted(false);
+    });
+  }, [open]);
+
+  if (!mounted) return null;
+  const shown = query ? chats.filter((c) => c.title.toLowerCase().includes(query.toLowerCase())) : chats;
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Animated.View style={[styles.drawerScrim, { opacity: slide }]}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close sidebar" />
+      </Animated.View>
+      <Animated.View style={[styles.drawer, { width: panel, transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [-panel, 0] }) }] }]}>
+        <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+          <View style={styles.drawerHead}>
+            {query === null ? (
+              <Text style={styles.drawerTitle}>Astrid</Text>
+            ) : (
+              <TextInput
+                style={styles.drawerSearch}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search chats"
+                placeholderTextColor={colors.faint}
+                autoFocus
+              />
+            )}
+            <Pressable style={styles.round} onPress={() => setQuery(query === null ? "" : null)} accessibilityLabel={query === null ? "Search chats" : "Close search"}>
+              <Icon name={query === null ? "magnify" : "close"} size={22} color={colors.text} />
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ paddingBottom: 16 }}>
+            {query === null && (
+              <>
+                <DrawerItem icon="pencil-outline" label="New chat" onPress={onNew} />
+                <DrawerItem icon="view-grid-outline" label="Diagrams" onPress={onDiagrams} />
+                <View style={styles.drawerStatus}>
+                  <StatusLine status={status} mac={mac} />
+                </View>
+                <Text style={styles.drawerSection}>Chats</Text>
+              </>
+            )}
+            {shown.map((c) => (
+              <Pressable
+                key={c.id}
+                style={({ pressed }) => [styles.drawerChat, pressed && { backgroundColor: "#2e2e33" }]}
+                onPress={() => onOpen(c.id)}
+                onLongPress={() => onAct(c)}
+                delayLongPress={300}
+              >
+                {c.icon || c.color ? <ChatIcon row={c} size={26} /> : null}
+                <Text style={styles.drawerChatText} numberOfLines={1}>
+                  {c.title}
+                </Text>
+                {busy === c.id && <Pulse />}
+              </Pressable>
+            ))}
+            {!shown.length && <Text style={[styles.rowPreview, { paddingHorizontal: 24 }]}>{query ? "No chats match." : "No chats yet."}</Text>}
+          </ScrollView>
+          {prefs.showBlobs && (
+            <View style={{ paddingHorizontal: 14 }}>
+              <BlobsRow shown={prefs.blobsShown} selected={prefs.blob} busy={working} onPick={(id) => setPrefs({ blob: id })} />
+            </View>
+          )}
+          <View style={styles.drawerFoot}>
+            <Pressable style={[styles.chatPill, { backgroundColor: prefs.accent }]} onPress={onNew} accessibilityRole="button">
+              <Icon name="pencil-outline" size={20} color="white" />
+              <Text style={styles.chatPillText}>Chat</Text>
+            </Pressable>
+            <Pressable style={styles.round} onPress={onSettings} accessibilityRole="button" accessibilityLabel="Settings">
+              <Icon name="cog-outline" size={22} color={colors.text} />
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </Animated.View>
+    </View>
+  );
+}
+
+function DrawerItem({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+  return (
+    <Pressable style={({ pressed }) => [styles.drawerItem, pressed && { backgroundColor: "#2e2e33" }]} onPress={onPress} accessibilityRole="button">
+      <Icon name={icon} size={24} color={colors.text} />
+      <Text style={styles.drawerItemText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -244,7 +390,7 @@ const ago = (iso: string) => {
 };
 
 /** A new chat (Astrid, recent chats and the composer) or the open one. */
-function Conversation({ onAct }: { onAct: (row: ChatRow) => void }) {
+function Conversation({ onAct, onVoice }: { onAct: (row: ChatRow) => void; onVoice: () => void }) {
   const open = useStore((s) => s.open);
   const openId = useStore((s) => s.openId);
   const chats = useStore((s) => s.chats);
@@ -326,6 +472,7 @@ function Conversation({ onAct }: { onAct: (row: ChatRow) => void }) {
           placeholder={status === "online" ? "Ask, draw, explain…" : "Waiting for your Mac…"}
           onNew={() => openChat(null)}
           onSend={(text) => ask(text, openId, "app")}
+          onVoice={onVoice}
           onStop={cancel}
         />
       </View>
@@ -341,6 +488,7 @@ function PillComposer({
   onNew,
   onSend,
   onStop,
+  onVoice,
 }: {
   busy: boolean;
   disabled: boolean;
@@ -348,9 +496,11 @@ function PillComposer({
   onNew: () => void;
   onSend: (text: string) => boolean;
   onStop: () => void;
+  onVoice: () => void;
 }) {
   const [text, setText] = useState("");
-  const ready = !!text.trim() && !disabled;
+  const accent = useStore((s) => s.prefs.accent);
+  const typing = !!text.trim();
   return (
     <View style={styles.pill}>
       <Pressable style={styles.pillSide} onPress={onNew} accessibilityRole="button" accessibilityLabel="New chat">
@@ -371,15 +521,20 @@ function PillComposer({
         <Pressable style={styles.pillSide} onPress={onStop} accessibilityRole="button" accessibilityLabel="Stop">
           <View style={styles.stopSquare} />
         </Pressable>
-      ) : (
+      ) : typing ? (
+        // Typing turns the waveform into Send.
         <Pressable
-          style={[styles.pillSide, ready && { backgroundColor: colors.blue }]}
-          disabled={!ready}
+          style={[styles.pillSide, { backgroundColor: accent }, disabled && { opacity: 0.4 }]}
+          disabled={disabled}
           onPress={() => onSend(text) && setText("")}
           accessibilityRole="button"
           accessibilityLabel="Send"
         >
-          <Icon name="arrow-up" size={22} color={ready ? "white" : colors.faint} />
+          <Icon name="arrow-up" size={22} color="white" />
+        </Pressable>
+      ) : (
+        <Pressable style={[styles.pillSide, { backgroundColor: accent }]} onPress={onVoice} accessibilityRole="button" accessibilityLabel="Talk to Astrid">
+          <Icon name="waveform" size={22} color="white" />
         </Pressable>
       )}
     </View>
@@ -435,44 +590,6 @@ function Diagrams() {
       />
       <DrawingModal shapes={shown} onClose={() => setShown(null)} />
     </>
-  );
-}
-
-function ChatList({ onClose, onOpen, onAct }: { onClose: () => void; onOpen: (id: string) => void; onAct: (row: ChatRow) => void }) {
-  const chats = useStore((s) => s.chats);
-  const busy = useStore((s) => s.busy);
-  return (
-    <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
-      <View style={styles.sheetHeader}>
-        <Text style={styles.sheetTitle}>Chats</Text>
-        <RoundButton icon="close" label="Close" onPress={onClose} />
-      </View>
-      <FlatList
-        data={chats}
-        keyExtractor={(c) => c.id}
-        ListEmptyComponent={<Text style={[styles.body, { marginTop: 40 }]}>No chats yet.</Text>}
-        renderItem={({ item }) => (
-          <Pressable
-            style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.card }]}
-            onPress={() => onOpen(item.id)}
-            onLongPress={() => onAct(item)}
-            delayLongPress={300}
-          >
-            <ChatIcon row={item} />
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={styles.rowTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <Text style={styles.rowPreview} numberOfLines={1}>
-                {item.preview}
-              </Text>
-            </View>
-            {busy === item.id ? <Pulse /> : <Text style={styles.recentTime}>{ago(item.updated)}</Text>}
-          </Pressable>
-        )}
-      />
-      <Text style={[styles.rowPreview, { textAlign: "center", padding: 10 }]}>Hold a chat to rename it or change its icon.</Text>
-    </SafeAreaView>
   );
 }
 
@@ -538,55 +655,140 @@ function ChatActions({ chat, onClose }: { chat: ChatRow | null; onClose: () => v
 
 const appVersion: string = require("../app.json").expo.version;
 
-/** Settings, as on the desktop: connection, Astrid on screen, the paired Mac, About. */
+type SettingsPage = "home" | "mac" | "screen" | "themes" | "blobs" | "about";
+const settingsPages: { id: Exclude<SettingsPage, "home">; label: string; icon: IconName; tint: string }[] = [
+  { id: "mac", label: "Mac", icon: "laptop", tint: "#4459f9" },
+  { id: "screen", label: "On screen", icon: "gesture-tap-button", tint: "#00a88f" },
+  { id: "themes", label: "Themes", icon: "palette-outline", tint: "#e5487f" },
+  { id: "blobs", label: "Blobs", icon: "emoticon-outline", tint: "#e8a400" },
+  { id: "about", label: "About", icon: "information-outline", tint: "#6b6b78" },
+];
+
+/** Settings, grouped as on the desktop: Mac, On screen, Themes, Blobs, About. */
 function Settings({ onClose }: { onClose: () => void }) {
+  const [page, setPage] = useState<SettingsPage>("home");
   const status = useStore((s) => s.status);
   const problem = useStore((s) => s.problem);
   const pairing = useStore((s) => s.pairing);
+  const prefs = useStore((s) => s.prefs);
   const mac = pairing?.mac ?? "Mac";
+  const title = page === "home" ? "Settings" : settingsPages.find((p) => p.id === page)!.label;
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (page === "home") return false;
+      setPage("home");
+      return true;
+    });
+    return () => sub.remove();
+  }, [page]);
+
   return (
     <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
       <View style={styles.sheetHeader}>
-        <Text style={styles.sheetTitle}>Settings</Text>
+        {page !== "home" ? <RoundButton icon="chevron-left" label="Back" onPress={() => setPage("home")} /> : <View style={{ width: 50 }} />}
+        <Text style={styles.sheetTitle}>{title}</Text>
         <RoundButton icon="close" label="Close" onPress={onClose} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 8, paddingBottom: 40 }}>
-        <Text style={styles.section}>Mac</Text>
-        <View style={styles.group}>
-          <StatusLine status={status} mac={mac} problem={problem} />
-          <Text style={styles.rowPreview}>Reaches {pairing?.hosts.join(", ")} on port {pairing?.port}. Asks run on your Mac, and your chats stay there.</Text>
-          <Pressable style={styles.secondary} onPress={reconnect} accessibilityRole="button">
-            <Text style={styles.secondaryText}>Reconnect</Text>
-          </Pressable>
-        </View>
-        <Text style={styles.section}>On screen</Text>
-        <OverlayCard />
-        <Text style={styles.section}>Pairing</Text>
-        <View style={styles.group}>
-          <Text style={styles.rowPreview}>To pair another Mac, unpair this one first. You can also revoke this phone in Astrid › Settings › Phone on your Mac.</Text>
-          <Pressable
-            style={[styles.secondary, { backgroundColor: "#2a1416" }]}
-            onPress={() => {
-              onClose();
-              overlay?.stop();
-              unpair();
-            }}
-            accessibilityRole="button"
-          >
-            <Text style={[styles.secondaryText, { color: colors.red }]}>Unpair {mac}</Text>
-          </Pressable>
-        </View>
-        <Text style={styles.section}>About</Text>
-        <View style={[styles.group, { alignItems: "center", gap: 10, paddingVertical: 22 }]}>
-          <LiveMark size={60} />
-          <Text style={styles.title}>Astrid</Text>
-          <Text style={styles.rowPreview}>Version {appVersion}</Text>
-          <Text style={styles.body}>
-            A personal agent that sketches, points and walks you through things. This phone holds no model keys and saves no chats: it only
-            keeps the key that pairs it with your Mac.
-          </Text>
-          <Text style={[styles.rowPreview, { textAlign: "center" }]}>The intro wave is from Distortion Waves by Jakub Antalik (MIT).</Text>
-        </View>
+      <ScrollView contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}>
+        {page === "home" && (
+          <View style={styles.group}>
+            {settingsPages.map((p, i) => (
+              <Pressable key={p.id} onPress={() => setPage(p.id)} style={[styles.settingsRow, i > 0 && styles.settingsDivider]} accessibilityRole="button">
+                <View style={[styles.settingsTile, { backgroundColor: p.tint }]}>
+                  <Icon name={p.icon} size={18} color="white" />
+                </View>
+                <Text style={styles.settingsLabel}>{p.label}</Text>
+                <Icon name="chevron-right" size={22} color={colors.faint} />
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {page === "mac" && (
+          <>
+            <View style={styles.group}>
+              <StatusLine status={status} mac={mac} problem={problem} />
+              <Text style={styles.rowPreview}>Reaches {pairing?.hosts.join(", ")} on port {pairing?.port}. Asks run on your Mac, and your chats stay there.</Text>
+              <Pressable style={styles.secondary} onPress={reconnect} accessibilityRole="button">
+                <Text style={styles.secondaryText}>Reconnect</Text>
+              </Pressable>
+            </View>
+            <View style={styles.group}>
+              <Text style={styles.rowPreview}>To pair another Mac, unpair this one first. You can also revoke this phone in Astrid › Settings › Phone on your Mac.</Text>
+              <Pressable
+                style={[styles.secondary, { backgroundColor: "#2a1416" }]}
+                onPress={() => {
+                  onClose();
+                  overlay?.stop();
+                  unpair();
+                }}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.secondaryText, { color: colors.red }]}>Unpair {mac}</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
+        {page === "screen" && <OverlayCard />}
+        {page === "themes" && (
+          <View style={styles.group}>
+            <Text style={styles.rowTitle}>Accent</Text>
+            <Text style={styles.rowPreview}>The colour of Send, the voice button and the Chat pill.</Text>
+            <View style={styles.wrap}>
+              {accents.map(([name, hex]) => (
+                <Pressable key={name} onPress={() => setPrefs({ accent: hex })} style={styles.accentChoice} accessibilityLabel={name}>
+                  <View style={[styles.swatch, { backgroundColor: hex }, prefs.accent === hex && { borderColor: colors.text }]} />
+                  <Text style={styles.recentTime}>{name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+        {page === "blobs" && (
+          <>
+            <View style={[styles.group, { flexDirection: "row", alignItems: "center" }]}>
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={styles.rowTitle}>Show blobs in the sidebar</Text>
+                <Text style={styles.rowPreview}>Little bots above Settings. Tap one to pick it; it reacts while Astrid works.</Text>
+              </View>
+              <Switch value={prefs.showBlobs} onValueChange={(on) => setPrefs({ showBlobs: on })} trackColor={{ true: prefs.accent, false: "#33333d" }} thumbColor="#fff" />
+            </View>
+            <Text style={styles.section}>In the row ({prefs.blobsShown.length} of 5)</Text>
+            <View style={styles.group}>
+              {allBlobs.map((b, i) => {
+                const on = prefs.blobsShown.includes(b.id);
+                return (
+                  <View key={b.id} style={[styles.settingsRow, i > 0 && styles.settingsDivider]}>
+                    <Text style={[styles.settingsLabel, { marginLeft: 0 }]}>{b.name}</Text>
+                    <Switch
+                      value={on}
+                      disabled={!on && prefs.blobsShown.length >= 5}
+                      onValueChange={(next) => setPrefs({ blobsShown: next ? [...prefs.blobsShown, b.id] : prefs.blobsShown.filter((id) => id !== b.id) })}
+                      trackColor={{ true: prefs.accent, false: "#33333d" }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={[styles.rowPreview, { paddingHorizontal: 4 }]}>The bots are from Bible Strong Avatar Lab (AGPL-3.0).</Text>
+          </>
+        )}
+        {page === "about" && (
+          <View style={[styles.group, { alignItems: "center", gap: 10, paddingVertical: 22 }]}>
+            <LiveMark size={60} />
+            <Text style={styles.title}>Astrid</Text>
+            <Text style={styles.rowPreview}>Version {appVersion}</Text>
+            <Text style={styles.body}>
+              A personal agent that sketches, points and walks you through things. This phone holds no model keys and saves no chats: it only keeps
+              the key that pairs it with your Mac, and your settings.
+            </Text>
+            <Text style={[styles.rowPreview, { textAlign: "center" }]}>
+              Astrid is MIT licensed. The intro wave is from Distortion Waves by Jakub Antalik (MIT); the blobs are from Bible Strong Avatar Lab
+              (AGPL-3.0).
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -648,6 +850,25 @@ function OverlayCard() {
 }
 
 const styles = StyleSheet.create({
+  drawerScrim: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,.55)" },
+  drawer: { position: "absolute", top: 0, bottom: 0, left: 0, backgroundColor: "#212124" },
+  drawerHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: 24, paddingRight: 14, paddingVertical: 10 },
+  drawerTitle: { color: colors.text, fontSize: 26, fontWeight: "700" },
+  drawerSearch: { flex: 1, color: colors.text, fontSize: 18, marginRight: 10 },
+  drawerItem: { flexDirection: "row", alignItems: "center", gap: 18, paddingHorizontal: 24, height: 54 },
+  drawerItemText: { color: colors.text, fontSize: 18, fontWeight: "500" },
+  drawerStatus: { paddingHorizontal: 24, paddingVertical: 10 },
+  drawerSection: { color: colors.text, fontSize: 17, fontWeight: "600", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 6 },
+  drawerChat: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 24, height: 50 },
+  drawerChatText: { flex: 1, color: colors.text, fontSize: 17 },
+  drawerFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 6, paddingBottom: 12 },
+  chatPill: { flexDirection: "row", alignItems: "center", gap: 10, height: 52, borderRadius: 26, paddingHorizontal: 24 },
+  chatPillText: { color: "white", fontSize: 18, fontWeight: "600" },
+  settingsRow: { flexDirection: "row", alignItems: "center", gap: 14, minHeight: 50 },
+  settingsDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
+  settingsTile: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  settingsLabel: { flex: 1, color: colors.text, fontSize: 17 },
+  accentChoice: { alignItems: "center", gap: 6 },
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6 },
   round: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#24242b", alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth, borderColor: "#3a3a44" },
   badgeDot: { position: "absolute", top: -2, right: -2, minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },

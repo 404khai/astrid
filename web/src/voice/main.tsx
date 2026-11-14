@@ -48,6 +48,10 @@ class HostAnalyser {
 }
 
 const analyser = new HostAnalyser();
+// ?size=N draws the ring N px wide (the phone's floating bubble is small);
+// the mark scales with it.
+const size = Math.max(48, Math.min(400, Number(new URLSearchParams(location.search).get("size")) || 200));
+document.documentElement.style.setProperty("--vo-size", `${size}px`);
 
 function Orb() {
   const [state, setState] = useState<State>("idle");
@@ -69,7 +73,7 @@ function Orb() {
   const expression = state === "speaking" ? "composing" : state === "processing" ? "solving" : state === "idle" ? "idle" : "listening";
   return (
     <div className="vo-ring">
-      <VoiceRing size={200} theme="dark" state={state} analyser={analyser as unknown as AnalyserNode} paused={reduced} />
+      <VoiceRing size={size} theme="dark" state={state} analyser={analyser as unknown as AnalyserNode} paused={reduced} />
       <button
         type="button"
         className="vo-mark"

@@ -1,72 +1,45 @@
 package dev.astrid.overlay
 
-import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.SweepGradient
-import android.view.animation.LinearInterpolator
+import android.view.MotionEvent
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import android.widget.ImageView
-import kotlin.math.sin
 
 /**
- * The floating bubble: Astrid's mark with no disc behind it, inside her
- * voice ring, rings in her palette that slowly turn and breathe, as the
- * presence and desktop rings do.
+ * The floating bubble: Astrid's mark in presence's voice ring, the same page
+ * (`web/voice.html`, built into the APK) as the voice screen and the desktop,
+ * drawn at the bubble's size on a transparent background. The bubble keeps
+ * every touch for itself, so dragging and tapping work as before.
  */
-class BubbleView(context: Context) : FrameLayout(context) {
-  private val density = resources.displayMetrics.density
-  private val colors = intArrayOf(
-    Color.rgb(68, 89, 249), Color.rgb(0, 247, 213), Color.rgb(138, 92, 255), Color.rgb(229, 72, 127), Color.rgb(68, 89, 249),
-  )
-  private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-  private val turn = Matrix()
-  private var time = 0f
-  private val clock = ValueAnimator.ofFloat(0f, 1f).apply {
-    duration = 1000
-    repeatCount = ValueAnimator.INFINITE
-    interpolator = LinearInterpolator()
-    addUpdateListener {
-      time += 1f / 60f
-      invalidate()
+@SuppressLint("SetJavaScriptEnabled", "ViewConstructor")
+class BubbleView(context: Context, sizeDp: Int) : FrameLayout(context) {
+  private val web = WebView(context).apply {
+    setBackgroundColor(Color.TRANSPARENT)
+    isVerticalScrollBarEnabled = false
+    isHorizontalScrollBarEnabled = false
+    overScrollMode = OVER_SCROLL_NEVER
+    settings.javaScriptEnabled = true
+    settings.allowFileAccess = true
+    settings.setSupportMultipleWindows(false)
+    // Only the ring page; nothing else loads.
+    webViewClient = object : WebViewClient() {
+      override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) = true
     }
+    loadUrl("file:///android_asset/astrid-voice.html?size=$sizeDp")
   }
 
   init {
-    setWillNotDraw(false)
-    val mark = ImageView(context).apply { setImageResource(R.drawable.astrid_mark) }
-    val inset = (16 * density).toInt()
-    addView(mark, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT).apply { setMargins(inset, inset, inset, inset) })
+    addView(web, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
   }
 
-  override fun onAttachedToWindow() {
-    super.onAttachedToWindow()
-    clock.start()
-  }
+  override fun onInterceptTouchEvent(ev: MotionEvent): Boolean = true
 
   override fun onDetachedFromWindow() {
-    clock.cancel()
+    web.destroy()
     super.onDetachedFromWindow()
-  }
-
-  override fun onDraw(canvas: Canvas) {
-    val cx = width / 2f
-    val cy = height / 2f
-    val gradient = SweepGradient(cx, cy, colors, null)
-    turn.setRotate(time * 40f, cx, cy)
-    gradient.setLocalMatrix(turn)
-    ring.shader = gradient
-    val base = minOf(cx, cy) - 4 * density
-    val breath = 0.5f + 0.5f * sin(time * 2.2f)
-    for (i in 0 until 3) {
-      ring.strokeWidth = (2.2f - i * 0.6f) * density
-      ring.alpha = ((0.95f - i * 0.28f) * 255).toInt()
-      val r = base * (0.86f + i * 0.07f + breath * 0.05f * (i + 1))
-      canvas.drawCircle(cx, cy, minOf(r, base), ring)
-    }
-    super.onDraw(canvas)
   }
 }
