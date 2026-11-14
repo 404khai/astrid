@@ -22,6 +22,9 @@ final class AppSettings: ObservableObject {
     @Published var blob: String? { didSet { defaults.set(blob, forKey: "blobs.selected") } }
     /// Which bots show in the row, in order (file names).
     @Published var blobsShown: [String] { didSet { defaults.set(blobsShown, forKey: "blobs.shown") } }
+    /// Mock blob groups (cosmetic), newest first, and the blobs being picked.
+    @Published var groups: [BlobGroup] { didSet { defaults.set(BlobGroups.encode(groups), forKey: "blobs.groups") } }
+    @Published var blobsPicked: [String] { didSet { defaults.set(blobsPicked, forKey: "blobs.picked") } }
     /// Not stored: whether the settings sheet is open.
     @Published var showSettings = false
 
@@ -46,6 +49,8 @@ final class AppSettings: ObservableObject {
         showBlobs = defaults.object(forKey: "blobs.show") as? Bool ?? true
         blob = defaults.string(forKey: "blobs.selected")
         blobsShown = defaults.stringArray(forKey: "blobs.shown") ?? Blobs.defaults
+        groups = BlobGroups.decode(defaults.data(forKey: "blobs.groups"))
+        blobsPicked = defaults.stringArray(forKey: "blobs.picked") ?? []
         storedModel = defaults.string(forKey: "ask.model") ?? "claude-code/sonnet"
         let mail = defaults.string(forKey: "ask.mail") ?? "gmail"
         storedMail = Self.mailSources.contains(mail) ? mail : "gmail"

@@ -246,3 +246,21 @@ final class SVGPathTests: XCTestCase {
         XCTAssertEqual(SVGPath.parse("M1 1 L2"), [.move(1, 1)])
     }
 }
+
+final class BlobGroupTests: XCTestCase {
+    func testDefaultNamesComeFromMembers() {
+        XCTAssertEqual(BlobGroups.defaultName([]), "New group")
+        XCTAssertEqual(BlobGroups.defaultName(["Sunee"]), "Sunee")
+        XCTAssertEqual(BlobGroups.defaultName(["Sunee", "Kirby"]), "Sunee & Kirby")
+        XCTAssertEqual(BlobGroups.defaultName(["Sunee", "Kirby", "Cubee", "Nova"]), "Sunee, Kirby +2")
+    }
+
+    func testGroupsRoundTripAndDropEmptyOrBadData() {
+        let group = BlobGroup(name: "Launch week", members: ["06-sunee.avatar.json", "07-kirby.avatar.json"])
+        let empty = BlobGroup(name: "Nobody", members: [])
+        XCTAssertEqual(BlobGroups.decode(BlobGroups.encode([group, empty])), [group])
+        XCTAssertEqual(BlobGroups.decode(Data("nope".utf8)), [])
+        XCTAssertEqual(BlobGroups.decode(nil), [])
+        XCTAssertEqual(BlobGroup(name: "x", members: Array(repeating: "a", count: 30)).members.count, BlobGroups.maxMembers)
+    }
+}

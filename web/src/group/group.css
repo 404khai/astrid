@@ -1,0 +1,321 @@
+/* Blob groups (desktop, cosmetic). Colours come from the app's theme. */
+:root {
+  --content: #141416;
+  --text: #ededf0;
+  --secondary: #9a9aa2;
+  --accent: #6575ff;
+  --bubble: #262b4d;
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  font: 400 14px/20px var(--sans);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+html[data-mode="cluster"],
+html[data-mode="cluster"] body,
+html[data-mode="cluster"] #root {
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.blob {
+  display: inline-grid;
+  place-items: center;
+  cursor: default;
+}
+
+/* ─── Cluster: blobs overlapping in a dark circle ─── */
+.cluster {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #2a2a2e, #161618 70%);
+  box-shadow: inset 0 0 0 1px #ffffff12;
+}
+.cluster-slot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+.cluster-slot.n1.s0 { left: 15%; top: 15%; }
+.cluster-slot.n2.s0 { left: 8%; top: 24%; z-index: 1; }
+.cluster-slot.n2.s1 { right: 8%; top: 22%; }
+.cluster-slot.n3.s0 { left: 6%; top: 12%; z-index: 2; }
+.cluster-slot.n3.s1 { right: 6%; top: 18%; z-index: 1; }
+.cluster-slot.n3.s2 { left: 26%; bottom: 4%; }
+
+/* ─── Picker ─── */
+.picker {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.picker-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.picker-title {
+  display: grid;
+  min-width: 0;
+}
+.picker-title strong {
+  font-weight: 500;
+  font-size: 16px;
+}
+.picker-title span {
+  color: var(--secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-grid {
+  flex: 1;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+  align-content: start;
+}
+.pick {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--secondary);
+  font: 500 11px/14px var(--sans);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.pick span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pick:hover { background: #ffffff0a; }
+.pick.on {
+  background: #ffffff12;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.picker-make {
+  display: flex;
+  gap: 8px;
+}
+.picker-make input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 99px;
+  background: #ffffff10;
+  box-shadow: inset 0 0 0 1px #ffffff14;
+  color: var(--text);
+  font: 400 13px var(--sans);
+  outline: none;
+}
+.picker-make input:focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.picker-make button {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--accent);
+  color: white;
+  font: 500 13px var(--sans);
+  cursor: pointer;
+}
+.picker-make button:disabled { opacity: 0.4; cursor: default; }
+
+/* ─── Chat ─── */
+.chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chat-top {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  height: 92px;
+  /* Messages slide out of sight under the mark, not behind it. */
+  background: linear-gradient(var(--content) 72%, transparent);
+}
+.chat-name {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  background: #ffffff0d;
+  box-shadow: inset 0 0 0 1px #ffffff17;
+  font-weight: 500;
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-center {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.chat-logo {
+  width: 54px;
+  height: 44px;
+  display: grid;
+}
+.chat-logo .astrid-logo { width: 100%; height: 100%; }
+.chat-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 3px 3px;
+  border-radius: 99px;
+  background: #ffffff0d;
+  box-shadow: inset 0 0 0 1px #ffffff17;
+  font-size: 13px;
+  color: var(--text);
+}
+.lines {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 820px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+.line {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.line .face { flex: none; margin-top: 2px; }
+.said { display: grid; gap: 4px; min-width: 0; max-width: 78%; }
+.who { font-size: 12px; color: var(--secondary); padding-left: 4px; }
+.bubble {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 20px;
+  background: #ffffff0d;
+  box-shadow: inset 0 0 0 1px #ffffff12;
+  line-height: 21px;
+}
+.mention { color: var(--accent); font-weight: 500; }
+time { font-size: 11px; color: var(--secondary); padding-left: 4px; }
+.line.you {
+  flex-direction: column;
+  align-items: flex-end;
+}
+.line.you .bubble {
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  max-width: 70%;
+}
+.typing {
+  display: inline-flex;
+  gap: 5px;
+  padding: 14px 16px;
+}
+.typing i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--secondary);
+  animation: typing 1.2s ease-in-out infinite;
+}
+.typing i:nth-child(2) { animation-delay: 0.15s; }
+.typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .typing i { animation: none; }
+}
+
+.card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: #ffffff0b;
+  box-shadow: inset 0 0 0 1px #ffffff14;
+  display: grid;
+  gap: 12px;
+  min-width: 340px;
+}
+.card strong { font-weight: 500; }
+.card-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.card-head div { display: grid; }
+.card-head span { color: var(--secondary); font-size: 12px; }
+.ring { width: 64px; height: 64px; flex: none; transform: rotate(-90deg); }
+.ring text { transform: rotate(90deg); transform-origin: 40px 40px; fill: var(--text); font: 500 15px var(--mono); }
+.ring-bg { fill: none; stroke: #ffffff14; stroke-width: 8; }
+.ring-fg { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray 0.6s; }
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bars li { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 10px; font-size: 12px; }
+.bar-who { display: inline-flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; }
+.bar { height: 7px; border-radius: 99px; background: #ffffff12; overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #00f7d5)); }
+.bar-n { font-family: var(--mono); color: var(--secondary); text-align: right; }
+.spark { width: 100%; height: 84px; }
+.spark-fill { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
+.spark-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.spark-dot { fill: var(--text); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 3px 10px; border-radius: 99px; font-size: 12px; background: #ffffff0f; }
+.chip.ok { color: #6fdc9b; }
+.chip.wait { color: #f7c600; }
+.chip.block { color: #ff7a7a; }
+
+.chat-compose {
+  margin: 8px auto 16px;
+  width: min(760px, calc(100% - 56px));
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 6px 0 18px;
+  border-radius: 99px;
+  background: #ffffff0d;
+  box-shadow: inset 0 0 0 1px #ffffff17;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--secondary);
+}
+.chat-compose .send {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: white;
+}

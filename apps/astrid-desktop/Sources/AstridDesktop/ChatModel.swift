@@ -63,7 +63,7 @@ final class ChatModel: ObservableObject {
     /// The drawing open in the modal, if any.
     @Published var openDiagram: DiagramItem?
 
-    enum Page { case chat, diagrams }
+    enum Page: Equatable { case chat, diagrams, group(UUID) }
     @Published private(set) var live: LiveReply?
     @Published private(set) var saveError: String?
     /// Replies whose drawing should stream in rather than appear at once.
