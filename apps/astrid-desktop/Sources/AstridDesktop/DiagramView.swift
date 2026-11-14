@@ -12,6 +12,8 @@ struct DiagramView: NSViewRepresentable {
     var shapes: [JSONValue]
     var animate: Bool
     var finished: Bool
+    /// False for a thumbnail: clicks fall through to whatever is behind it.
+    var interactive = true
 
     func makeCoordinator() -> Coordinator { Coordinator(animate: animate) }
 
@@ -19,7 +21,8 @@ struct DiagramView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.setURLSchemeHandler(UIFiles(root: ui), forURLScheme: "astrid-ui")
         configuration.userContentController.add(WeakHandler(context.coordinator), name: "astrid")
-        let web = WKWebView(frame: .zero, configuration: configuration)
+        let web = PassthroughWebView(frame: .zero, configuration: configuration)
+        web.interactive = interactive
         web.setValue(false, forKey: "drawsBackground")
         web.setAccessibilityLabel(shapes.first { $0["shape"]?.string == "title" }?["text"]?.string ?? "Astrid's drawing")
         context.coordinator.web = web
@@ -87,6 +90,15 @@ struct DiagramView: NSViewRepresentable {
             guard let data = try? JSONSerialization.data(withJSONObject: object), let json = String(data: data, encoding: .utf8) else { return }
             web?.evaluateJavaScript("window.astrid && window.astrid.receive(\(json))")
         }
+    }
+}
+
+/// A web view that can step out of hit testing, so a thumbnail's clicks reach
+/// the SwiftUI button around it.
+final class PassthroughWebView: WKWebView {
+    var interactive = true
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        interactive ? super.hitTest(point) : nil
     }
 }
 

@@ -8,8 +8,10 @@ import SwiftUI
 /// way: it slides in from the left and slides back out. Opened (docked), it
 /// pushes the card over; peeking (pointer on the left edge while closed), it
 /// slides in the same way inside the card's box, over the card's content,
-/// and the card stays put. The
-/// window buttons show only on a docked sidebar wide enough to hold them.
+/// and the card stays put. The window buttons show only on a docked sidebar
+/// wide enough to hold them. The sidebar toggle and new-chat buttons always
+/// sit at the start of the card's header, open or closed; a peek draws the
+/// same pair in the same spot over the header.
 struct RootView: View {
     @ObservedObject var model: ChatModel
     @ObservedObject var settings: AppSettings
@@ -22,14 +24,18 @@ struct RootView: View {
 
     /// One motion for opening, closing, peeking and un-peeking.
     static let slide = Animation.smooth(duration: 0.3)
+    /// Height of the fixed button pair; its centre is on the window buttons'.
+    static let row: CGFloat = 34
 
     var body: some View {
         let palette = Palette(spec: settings.theme(dark: scheme == .dark))
         let docked = settings.sidebarShown
         let visible = docked || peeking
         let width = settings.sidebarWidth
+        // Docked, the sidebar's top is left to the window buttons.
+        let lightsRow = lights.centerY + Self.row / 2 + 7
         ZStack(alignment: .leading) {
-            ContentCard(model: model, settings: settings)
+            ContentCard(model: model, settings: settings, peeking: peeking)
                 .padding(.vertical, 8)
                 .padding(.trailing, 8)
                 .padding(.leading, docked ? width : 8)
@@ -49,8 +55,7 @@ struct RootView: View {
             // (same 8 pt margins, the card's rounded left corners), so the
             // sidebar stays within the card's bounds and never covers the
             // window margins.
-            Sidebar(model: model, settings: settings, peeking: !docked,
-                    lights: settings.trafficLightsVisible ? lights : TrafficLights(maxX: nil, centerY: lights.centerY - (docked ? 0 : 8)))
+            Sidebar(model: model, settings: settings, peeking: !docked, topInset: docked ? lightsRow : 0)
                 .frame(width: width)
                 .frame(maxHeight: .infinity)
                 // Docked, the window's own tinted material shows through. Over
@@ -75,6 +80,13 @@ struct RootView: View {
                 .accessibilityHidden(!visible)
                 .onHover { inside in if !docked { setPeek(inside) } }
         }
+        .overlay {
+            if let item = model.openDiagram {
+                DiagramModal(model: model, item: item)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            }
+        }
+        .animation(.smooth(duration: 0.25), value: model.openDiagram?.id)
         .background { palette.sidebar.opacity(palette.spec.sidebarOpacity) }
         .background(WindowChrome(trafficLights: settings.trafficLightsVisible, measured: $lights))
         .ignoresSafeArea()
@@ -89,7 +101,12 @@ struct RootView: View {
                 .presentationBackground(palette.content)
         }
         // Docking from a peek keeps the sidebar where it is; only the card moves.
-        .onChange(of: settings.sidebarShown) { _, shown in if shown { peeking = false } }
+        .onChange(of: settings.sidebarShown) { _, shown in
+            if shown && peeking { Haptics.settle() }
+            if shown { peeking = false }
+        }
+        // Haptics along the slide, settling at full width.
+        .onChange(of: visible) { _, nowVisible in Haptics.slide(opening: nowVisible) }
         // Debug: ASTRID_DESKTOP_PEEK=1 holds a closed sidebar peeking.
         .onAppear {
             if pinnedPeek {
@@ -134,7 +151,14 @@ struct ResizeHandle: View {
                     .onChanged { value in
                         let base = start ?? width
                         start = base
-                        width = min(max(base + value.translation.width, AppSettings.sidebarMin), AppSettings.sidebarMax)
+                        let next = min(max(base + value.translation.width, AppSettings.sidebarMin), AppSettings.sidebarMax)
+                        // A detent every 20 pt; a firmer bump at either end.
+                        if (next == AppSettings.sidebarMax || next == AppSettings.sidebarMin) && next != width {
+                            Haptics.settle()
+                        } else if Int(next / 20) != Int(width / 20) {
+                            Haptics.tick()
+                        }
+                        width = next
                     }
                     .onEnded { _ in start = nil }
             )
@@ -203,39 +227,36 @@ struct GlassCircle: View {
 struct Sidebar: View {
     @ObservedObject var model: ChatModel
     @ObservedObject var settings: AppSettings
-    /// Shown as Arc-style peek over the content; its toggle docks it.
+    /// Peeking over the card: the header's button pair is drawn again in the
+    /// same spot, so the toggle can dock the sidebar.
     var peeking = false
-    /// The window buttons, when they show on this sidebar.
-    var lights = TrafficLights()
+    /// Room left at the top for the window buttons when docked.
+    var topInset: CGFloat
     @Environment(\.palette) private var palette
-
-    /// Height of the top row; its centre sits on the window buttons' centre.
-    private let row: CGFloat = 34
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Radian's top row: the toggle on the left (after the window
-            // buttons when they show), new chat on the right, all on the
-            // window buttons' centre line.
-            HStack(spacing: 8) {
-                if let maxX = lights.maxX { Color.clear.frame(width: max(0, maxX - 12 + 8)) }
-                GlassCircle(symbol: "sidebar.left", help: peeking ? "Keep Sidebar Open (⌃⌘S)" : "Hide Sidebar (⌃⌘S)") { settings.sidebarShown = peeking }
-                Spacer()
-                GlassCircle(symbol: "square.and.pencil", help: "New Chat (⌘N)") { model.newChat() }
+            if peeking {
+                // Same place as in the card header: 16 pt in, 50 pt tall.
+                HStack {
+                    SidebarButtons(model: model, settings: settings, peeking: true)
+                    Spacer()
+                }
+                .padding(.leading, 4)
+                .frame(height: 50)
+                .padding(.bottom, -6)
             }
-            .frame(height: row)
-            .padding(.top, max(0, lights.centerY - row / 2))
-
             SearchPill(query: $model.query) { settings.showSettings = true }
 
             VStack(spacing: 2) {
                 SidebarRow(symbol: "plus", title: "New Chat", selected: false) { model.newChat() }
+                SidebarRow(symbol: "square.grid.2x2", title: "Diagrams", selected: model.page == .diagrams) { model.page = .diagrams }
                 Divider().opacity(0.5).padding(.vertical, 4)
                 ScrollView {
                     LazyVStack(spacing: 2) {
                         ForEach(model.visibleChats) { chat in
                             SidebarRow(symbol: chat.messages.contains { $0.diagram != nil } ? "scribble.variable" : "bubble.left",
-                                       title: chat.title, selected: chat.id == model.selection) { model.selection = chat.id }
+                                       title: chat.title, selected: model.page == .chat && chat.id == model.selection) { model.show(chat: chat.id) }
                                 .help(chat.updated.formatted(.relative(presentation: .named)))
                         }
                         if model.visibleChats.isEmpty {
@@ -252,8 +273,7 @@ struct Sidebar: View {
             }
 
             HStack {
-                AstridMark(ui: model.config.ui, size: 18)
-                    .foregroundStyle(palette.sidebarText)
+                AstridLogoMark(size: 21)
                     .frame(width: 38, height: 38)
                     .glassEffect(.regular, in: .circle)
                     .accessibilityHidden(true)
@@ -263,7 +283,26 @@ struct Sidebar: View {
             .padding(.bottom, 12)
         }
         .padding(.horizontal, 12)
+        .padding(.top, topInset)
         .foregroundStyle(palette.sidebarText)
+    }
+}
+
+/// The sidebar toggle and new chat, side by side in one fixed spot whatever
+/// the sidebar is doing. The toggle opens a closed sidebar, docks a peeking
+/// one and closes a docked one.
+struct SidebarButtons: View {
+    @ObservedObject var model: ChatModel
+    @ObservedObject var settings: AppSettings
+    var peeking: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            GlassCircle(symbol: "sidebar.left", help: settings.sidebarShown ? "Hide Sidebar (⌃⌘S)" : peeking ? "Keep Sidebar Open (⌃⌘S)" : "Show Sidebar (⌃⌘S)") {
+                settings.sidebarShown.toggle()
+            }
+            GlassCircle(symbol: "square.and.pencil", help: "New Chat (⌘N)") { model.newChat() }
+        }
     }
 }
 
@@ -345,24 +384,30 @@ struct SidebarRow: View {
 struct ContentCard: View {
     @ObservedObject var model: ChatModel
     @ObservedObject var settings: AppSettings
+    var peeking = false
     @Environment(\.palette) private var palette
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                if !settings.sidebarShown {
-                    // The window buttons are hidden while the sidebar is closed.
-                    GlassCircle(symbol: "sidebar.left", help: "Show Sidebar (⌃⌘S)") { settings.sidebarShown = true }
-                    GlassCircle(symbol: "square.and.pencil", help: "New Chat (⌘N)") { model.newChat() }
-                }
-                Text(model.selected?.title ?? "New Chat")
+                // The toggle and new chat, in the same spot open or closed.
+                SidebarButtons(model: model, settings: settings, peeking: peeking)
+                Text(model.page == .diagrams ? "Diagrams" : model.selected?.title ?? "New Chat")
                     .font(.headline)
                     .lineLimit(1)
+                if model.page == .diagrams {
+                    Text("\(model.diagrams.count)")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(palette.secondary)
+                }
                 Spacer()
             }
             .padding(.horizontal, 16)
             .frame(height: 50)
-            ThreadView(model: model)
+            switch model.page {
+            case .chat: ThreadView(model: model)
+            case .diagrams: DiagramsView(model: model)
+            }
         }
         .foregroundStyle(palette.text)
         .background(palette.content)
@@ -434,8 +479,7 @@ struct EmptyThread: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            AstridMark(ui: ui, size: 54)
-                .foregroundStyle(palette.secondary)
+            AstridLogoMark(size: 64)
             Text("Ask Astrid")
                 .font(.title2.weight(.semibold))
             Text("Each chat keeps what you sent, Astrid's replies\nand the drawings she made.")

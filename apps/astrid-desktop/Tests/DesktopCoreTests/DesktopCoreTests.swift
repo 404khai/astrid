@@ -207,3 +207,42 @@ final class ChatSearchTests: XCTestCase {
         XCTAssertEqual(ChatSearch.filter([pump, inbox], query: "pump reply"), [])
     }
 }
+
+final class GalleryTests: XCTestCase {
+    private let shape: JSONValue = .object(["shape": .string("rect"), "x": .number(1)])
+
+    func testDiagramsAreCollectedNewestFirstWithTitles() {
+        var older = ChatSession(first: ChatMessage(role: .user, text: "draw a pump", at: Date(timeIntervalSince1970: 10)))
+        older.append(ChatMessage(role: .astrid, text: "Pump", diagram: [.object(["shape": .string("title"), "text": .string("Water pump")]), shape], at: Date(timeIntervalSince1970: 11)))
+        older.append(ChatMessage(role: .astrid, text: "no drawing", at: Date(timeIntervalSince1970: 12)))
+        var newer = ChatSession(first: ChatMessage(role: .user, text: "sketch a valve", at: Date(timeIntervalSince1970: 20)))
+        newer.append(ChatMessage(role: .astrid, text: "Valve", diagram: [shape], at: Date(timeIntervalSince1970: 21)))
+        newer.append(ChatMessage(role: .astrid, text: "empty", diagram: [], at: Date(timeIntervalSince1970: 22)))
+
+        let items = ChatGallery.diagrams(in: [older, newer])
+        XCTAssertEqual(items.map(\.title), ["Sketch a valve", "Water pump"])
+        XCTAssertEqual(items.map(\.chatID), [newer.id, older.id])
+        XCTAssertEqual(items.last?.chatTitle, "Draw a pump")
+        XCTAssertEqual(items.first?.shapes, [shape])
+        XCTAssertEqual(ChatGallery.diagrams(in: []), [])
+    }
+}
+
+final class SVGPathTests: XCTestCase {
+    func testTheMarksPathsParseToClosedOutlinesInsideTheViewBox() {
+        let top = "M19.9531 2.8951H17.7133C17.3275 2.8951 16.9572 2.7432 16.6826 2.4721L14.607 0.4231C14.3324 0.152 13.9621 0 13.5762 0H6.4269V5.5524C0 5.5775 0.0219 5.5931 0.0501 5.5931Z"
+        let commands = SVGPath.parse(top)
+        XCTAssertEqual(commands.first, .move(19.9531, 2.8951))
+        XCTAssertEqual(commands[1], .line(17.7133, 2.8951))
+        XCTAssertEqual(commands[2], .cubic(17.3275, 2.8951, 16.9572, 2.7432, 16.6826, 2.4721))
+        XCTAssertEqual(commands[5], .line(6.4269, 0))
+        XCTAssertEqual(commands[6], .line(6.4269, 5.5524))
+        XCTAssertEqual(commands.last, .close)
+    }
+
+    func testNegativeNumbersAndUnknownCommandsStopSafely() {
+        XCTAssertEqual(SVGPath.parse("M1-2L3,4"), [.move(1, -2), .line(3, 4)])
+        XCTAssertEqual(SVGPath.parse("M1 1 A2 2 0 0 1 3 3"), [.move(1, 1)])
+        XCTAssertEqual(SVGPath.parse("M1 1 L2"), [.move(1, 1)])
+    }
+}
