@@ -38,14 +38,21 @@ PLIST
 # set. With a real signing identity in ASTRID_SIGN_IDENTITY (an Apple
 # Development certificate, or a self-signed code-signing one), grants survive
 # rebuilds.
-if [ -n "${ASTRID_SIGN_IDENTITY:-}" ]; then
+# A private self-signed identity in its own keychain (~/.astrid/signing, made
+# once by scripts/signing-identity.sh) gives a stable designated requirement
+# (identifier + certificate), so grants survive rebuilds.
+DEV_KEYCHAIN="$HOME/.astrid/signing/astrid-dev.keychain-db"
+if [ -z "${ASTRID_SIGN_IDENTITY:-}" ] && [ -f "$DEV_KEYCHAIN" ]; then
+  security unlock-keychain -p "$(cat "$HOME/.astrid/signing/keychain.pass")" "$DEV_KEYCHAIN"
+  codesign --force --sign "Astrid Presence Dev" --keychain "$DEV_KEYCHAIN" --identifier dev.astrid.presence "$APP" >/dev/null
+elif [ -n "${ASTRID_SIGN_IDENTITY:-}" ]; then
   codesign --force --sign "$ASTRID_SIGN_IDENTITY" --identifier dev.astrid.presence "$APP" >/dev/null
 else
   codesign --force --sign - --identifier dev.astrid.presence "$APP" >/dev/null
 fi
 echo "$APP"
 NEW_HASH=$(codesign -d -r- "$APP" 2>&1 | sed -n 's/.*cdhash H"\([0-9a-f]*\)".*/\1/p' || true)
-if [ -z "${ASTRID_SIGN_IDENTITY:-}" ] && [ -n "$OLD_HASH" ] && [ "$OLD_HASH" != "$NEW_HASH" ]; then
+if [ -z "${ASTRID_SIGN_IDENTITY:-}" ] && [ ! -f "$DEV_KEYCHAIN" ] && [ -n "$OLD_HASH" ] && [ "$OLD_HASH" != "$NEW_HASH" ]; then
   echo "note: the code changed, so macOS needs the grants again:" >&2
   echo "  tccutil reset ScreenCapture dev.astrid.presence; tccutil reset Accessibility dev.astrid.presence" >&2
 fi
