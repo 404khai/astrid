@@ -147,6 +147,30 @@ maintainer asked for a full desktop app on that same native stack, with macOS
    - **Storage.** Preferences live in the app's UserDefaults domain. They carry
      no new authority: mail stays read-only with an approval for every call.
 
+9. **Diagrams page, haptics and the coloured mark (amended 2026-11-14).** The
+   maintainer asked for "a tab for diagrams ... all the diagrams in a grid
+   format ... open them in a modal", haptics as the sidebar opens, closes and
+   expands, the coloured Astrid logo, and for the toggle and new-chat buttons
+   to keep the place they have when the sidebar is closed.
+   - **Buttons:** the toggle and new chat sit at the start of the chat card's
+     header in every state. The docked sidebar's top row holds only the window
+     buttons, and a peek draws the same pair in the same spot over the header.
+   - **Diagrams:** a Diagrams row under New Chat shows every saved drawing,
+     newest first (`ChatGallery`), as a grid of replayed thumbnails. Their web
+     views take no clicks, so the whole tile opens the drawing.
+   - **Modal:** clicking a thumbnail opens the drawing in an interactive modal
+     with Open Chat. Clicking outside, Esc or × closes it. Nothing new is
+     stored; it reads the same chat files.
+   - **Haptics:** these use `NSHapticFeedbackManager` and only work on Force
+     Touch trackpads.
+     - **Opening and closing** gives taps along the 0.3 s slide, then a firmer
+       bump when the sidebar reaches full width. Closing ends on a light tap.
+     - **Docking a peek** gives a firm bump.
+     - **Dragging the edge** gives a detent every 20 pt and a firm bump at the
+       minimum and maximum width.
+   - **Coloured mark:** drawn natively from the web logo's paths and gradient,
+     on the new-chat page and in the sidebar.
+
 ## Alternatives considered
 
 - **A new executable target in `apps/presence-mac`.** It would raise presence

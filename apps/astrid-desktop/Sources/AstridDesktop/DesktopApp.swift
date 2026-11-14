@@ -67,6 +67,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.model?.send()
             }
         }
+        // Debug: ASTRID_DESKTOP_PAGE=diagrams opens the Diagrams page, and
+        // ASTRID_DESKTOP_OPEN_DIAGRAM=1 also opens the newest one in the modal.
+        if environment["ASTRID_DESKTOP_PAGE"] == "diagrams" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                guard let model = self?.model else { return }
+                model.page = .diagrams
+                if environment["ASTRID_DESKTOP_OPEN_DIAGRAM"] != nil { model.openDiagram = model.diagrams.first }
+            }
+        }
         // Debug: ASTRID_DESKTOP_SETTINGS=1 opens Settings once the window is up.
         if environment["ASTRID_DESKTOP_SETTINGS"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.settings?.showSettings = true }

@@ -41,6 +41,12 @@ final class ChatModel: ObservableObject {
     @Published var draft = ""
     /// The sidebar's search text.
     @Published var query = ""
+    /// What the main content shows: a chat, or every saved drawing.
+    @Published var page: Page = .chat
+    /// The drawing open in the modal, if any.
+    @Published var openDiagram: DiagramItem?
+
+    enum Page { case chat, diagrams }
     @Published private(set) var live: LiveReply?
     @Published private(set) var saveError: String?
     /// Replies whose drawing should stream in rather than appear at once.
@@ -92,7 +98,16 @@ final class ChatModel: ObservableObject {
 
     func newChat() {
         selection = nil
+        page = .chat
     }
+
+    func show(chat id: UUID) {
+        selection = id
+        page = .chat
+    }
+
+    /// Every saved drawing, newest first.
+    var diagrams: [DiagramItem] { ChatGallery.diagrams(in: chats) }
 
     func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)

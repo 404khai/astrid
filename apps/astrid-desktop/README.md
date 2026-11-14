@@ -17,6 +17,10 @@ Settings follows Rex: General (model, mail source) and Themes, with four
 light and four dark themes that colour the sidebar and the chat, and System,
 Light or Dark appearance.
 
+**Diagrams**, under New Chat, shows every drawing Astrid has made as a grid; click one
+to open it in a modal (Esc closes it). On a Force Touch trackpad the sidebar
+ticks as it opens, closes and resizes.
+
 It is separate from Astrid Presence (`apps/presence-mac`). Closing the window,
 quitting the app or removing it from the Dock never affects presence.
 
@@ -29,7 +33,7 @@ Requires **macOS 26+**, because it uses the Liquid Glass SwiftUI APIs.
   && open apps/astrid-desktop/.build/Astrid.app
 
 cd apps/astrid-desktop
-swift build && swift test        # 19 deterministic tests (store, titles, child protocol, themes, search)
+swift build && swift test        # 22 deterministic tests (store, titles, child protocol, themes, search, gallery, logo paths)
 .build/debug/astrid-desktop --help
 ```
 
@@ -44,6 +48,8 @@ swift build && swift test        # 19 deterministic tests (store, titles, child 
   (`--chats DIR` to use another folder).
 - **Debug.** `ASTRID_DESKTOP_SNAPSHOT=/path.png` saves the app's own window
   (not the screen) and prints its window number. `ASTRID_DESKTOP_ASK="text"`
-  sends one ask at launch. `ASTRID_DESKTOP_PEEK=1` starts with a closed sidebar peeking. `ASTRID_DESKTOP_SETTINGS=1` opens Settings
+  sends one ask at launch. `ASTRID_DESKTOP_PEEK=1` starts with a closed sidebar peeking.
+  `ASTRID_DESKTOP_PAGE=diagrams` opens Diagrams (`ASTRID_DESKTOP_OPEN_DIAGRAM=1` also opens
+  the newest in the modal). `ASTRID_DESKTOP_SETTINGS=1` opens Settings
   (`ASTRID_DESKTOP_SETTINGS_PAGE=themes` for that page). `ASTRID_DESKTOP_CLOSE_AFTER=seconds` closes the
   window as its close button would.
