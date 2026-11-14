@@ -453,7 +453,7 @@ fn look_failure(messages: &[Message]) -> Option<String> {
         _ => None,
     })?;
     Some(match failure.as_str() {
-        "screen_recording_permission_required" => "Astrid Presence can't see the screen yet. Turn it on in System Settings → Privacy & Security → Screen Recording, then quit Astrid Presence from its menu-bar icon and open it again (macOS applies the grant on relaunch).".into(),
+        "screen_recording_permission_required" => "Astrid Presence can't see the screen yet. In System Settings → Privacy & Security → Screen Recording, turn it on (if it's already on, remove it with − and add it again: a rebuilt app needs a fresh grant), then quit Astrid Presence from its menu-bar icon and open it again.".into(),
         "frame_png_exceeds_1mib" => "Your screen was too detailed to send within the 1 MiB frame limit, even simplified. Try again with fewer busy windows or a plainer wallpaper.".into(),
         "display_exceeds_frame_limits" => "That display is larger than 2560 points on a side, which looks don't support yet.".into(),
         "display_unavailable" => "That display isn't connected.".into(),

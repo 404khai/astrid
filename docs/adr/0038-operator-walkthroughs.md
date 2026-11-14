@@ -169,9 +169,13 @@ the host's reason was replaced by a generic stop message.
   `frame_png_exceeds_1mib`, ...) is kept in the look result and shown to the
   user as an actionable sentence, never as `computer_stopped`.
 - **Permission.** The host tries ScreenCaptureKit before trusting the permission
-  preflight (which can lag a fresh grant), and the bundle gets a designated
-  requirement on `dev.astrid.presence`, so ad-hoc rebuilds no longer invalidate
-  Screen Recording and Accessibility grants.
+  preflight (which can lag a fresh grant). A first attempt to keep grants across
+  rebuilds with an identifier-only designated requirement failed: tccd logged
+  "Failed to match existing code requirement" because TCC does not honour such a
+  requirement on ad-hoc code. Ad-hoc signing therefore stays matched by exact
+  code hash (stable when the code is unchanged; a code change needs a fresh
+  grant, e.g. `tccutil reset ScreenCapture dev.astrid.presence`). A real signing
+  identity in `ASTRID_SIGN_IDENTITY` keeps grants across rebuilds.
 
 ## Alternatives considered
 

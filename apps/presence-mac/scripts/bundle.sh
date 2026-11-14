@@ -2,8 +2,7 @@
 # Builds "Astrid Presence.app" so macOS's Screen Recording grant belongs to
 # Astrid's presence host (ADR 0027), not to the terminal that launches it.
 # The runtime starts the bundle through LaunchServices (`open`) so TCC
-# attributes capture to this app. Ad-hoc signed: rebuilding changes the code
-# signature, and macOS may ask for the grant again.
+# attributes capture to this app. See the signing note at the end.
 set -eu
 cd "$(dirname "$0")/.."
 swift build -c release
@@ -30,14 +29,17 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
-# Ad-hoc signing gives every build a new code hash, and macOS ties Screen
-# Recording / Accessibility grants to the signature, so each rebuild would lose
-# them. A designated requirement on the bundle id keeps grants across rebuilds.
-# Set ASTRID_SIGN_IDENTITY to a real signing identity to use that instead.
+# Screen Recording and Accessibility grants are tied to the code signature.
+# Ad-hoc signing is matched by exact code hash: the grant survives re-running
+# this script on unchanged code, but a code change needs the grant again
+# (`tccutil reset ScreenCapture dev.astrid.presence`, then relaunch). TCC does
+# not honour a custom identifier-only requirement on ad-hoc code, so none is
+# set. With a real signing identity in ASTRID_SIGN_IDENTITY (an Apple
+# Development certificate, or a self-signed code-signing one), grants survive
+# rebuilds.
 if [ -n "${ASTRID_SIGN_IDENTITY:-}" ]; then
-  codesign --force --sign "$ASTRID_SIGN_IDENTITY" "$APP" >/dev/null
+  codesign --force --sign "$ASTRID_SIGN_IDENTITY" --identifier dev.astrid.presence "$APP" >/dev/null
 else
-  codesign --force --sign - --identifier dev.astrid.presence \
-    -r='designated => identifier "dev.astrid.presence"' "$APP" >/dev/null
+  codesign --force --sign - --identifier dev.astrid.presence "$APP" >/dev/null
 fi
 echo "$APP"
