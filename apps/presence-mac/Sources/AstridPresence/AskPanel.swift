@@ -235,7 +235,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                     listening = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.wakeListener?.resume() }
                 }
-        speaker.shutdown()
+                // Keep the voice warm: Astrid usually answers right after you
+                // stop talking, and a cold start costs several seconds.
+                speaker.prepare()
             }
         case "speak":
             if let text = body["text"] as? String { speaker.say(String(text.prefix(4000))) }
@@ -474,6 +476,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         pointerTimer?.invalidate()
         wakeListener?.stop()
         voice.stop()
+        speaker.shutdown()
         child?.terminate()
     }
 }

@@ -1,4 +1,5 @@
 import AVFoundation
+import PresenceCore
 
 /// V2-03 (ADR 0035): Astrid's spoken replies. Text goes to the local
 /// `astrid-voice` process (Kokoro-82M on MLX), which streams PCM back one
@@ -41,7 +42,8 @@ final class Speaker {
     }
 
     func say(_ text: String) {
-        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // "Nov 25" is said "November 25", "2pm" "2 PM" (written text is unchanged).
+        let text = SpokenText.expand(text.trimmingCharacters(in: .whitespacesAndNewlines))
         guard !text.isEmpty else { return onSpeaking(false) }
         stop()
         current += 1

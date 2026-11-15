@@ -76,7 +76,7 @@ fn times_parse_format_and_read_aloud() {
         Time::parse("2026-12-01T09:00:00-08:00")
             .unwrap()
             .day_phrase(&now),
-        "on Tuesday, Dec 1"
+        "on Tuesday, December 1"
     );
     assert!(now_line(&now).contains("Monday"));
     for bad in [
@@ -333,7 +333,7 @@ async fn moving_to_next_week_names_the_day() {
         .unwrap();
     assert_eq!(
         next_wednesday.question.as_deref(),
-        Some("Can I move your 3pm Design review to 3pm on Wednesday, Nov 25?")
+        Some("Can I move your 3pm Design review to 3pm on Wednesday, November 25?")
     );
 }
 

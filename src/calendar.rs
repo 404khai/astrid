@@ -170,7 +170,18 @@ impl Time {
     /// "today", "tomorrow", "on Tuesday" (within a week), else "on Nov 20".
     pub fn day_phrase(&self, now: &Time) -> String {
         const MONTHS: [&str; 12] = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
         ];
         let today = Time::at(now.secs, self.offset_min).day();
         match self.day() - today {
