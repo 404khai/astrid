@@ -8,6 +8,9 @@
 //!         | {"type":"canvas","event":"begin"|"shape"|"end",..} (ADR 0036)
 //!         | {"type":"error","message":..} | {"type":"done","outcome":..}
 //!
+//! "remember that ...", "forget ..." and "what do you remember?" are answered
+//! from Astrid's memory (ADR 0040) without a model call.
+//!
 //! An ask starting with `/operator` runs a guided walkthrough instead (ADR
 //! 0038); its extra messages are listed in `operator_bridge`.
 use crate::presence_canvas::{CANVAS_INSTRUCTIONS, CanvasStream};
@@ -81,7 +84,17 @@ pub fn history_from(value: &Value) -> Vec<Turn> {
 /// then the ask and the surface's instructions. With no history this is the
 /// same task the presence ask panel has always sent.
 pub fn compose_task(ask: &str, history: &[Turn]) -> String {
-    let mut task = String::new();
+    // ADR 0040: what the user asked Astrid to remember, as context first. An
+    // unreadable memory file adds nothing rather than failing the ask.
+    let remembered = crate::memory::Memory::load(&crate::memory::default_path())
+        .map(|m| m.context())
+        .unwrap_or_default();
+    compose_task_with(ask, history, &remembered)
+}
+
+/// `compose_task` with the memory context given (empty for none).
+pub fn compose_task_with(ask: &str, history: &[Turn], remembered: &str) -> String {
+    let mut task = remembered.to_owned();
     if !history.is_empty() {
         task.push_str("Earlier in this conversation (context only):\n");
         for turn in history {
@@ -454,6 +467,26 @@ pub async fn serve(
     while let Some((ask, history)) = asks_rx.recv().await {
         let cancel = Cancellation::default();
         *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = Some(cancel.clone());
+        // ADR 0040: "remember that ...", "forget ...", "what do you remember?"
+        // are handled here, with no model call.
+        if let Some(request) = crate::memory::request(&ask) {
+            let path = crate::memory::default_path();
+            match crate::memory::apply(&path, &request, crate::memory::now()) {
+                Ok(text) => {
+                    emit(json!({"type":"answer","text":text,"brief":null,"canvas":false}));
+                    emit(json!({"type":"done","outcome":"completed"}));
+                }
+                Err(error) => {
+                    emit(
+                        json!({"type":"error","message":format!("Astrid's memory file couldn't be read or written ({error}).")}),
+                    );
+                    emit(json!({"type":"done","outcome":"failed"}));
+                }
+            }
+            emit(json!({"type":"state","state":"idle","label":"Ready"}));
+            *cancel_slot.lock().unwrap_or_else(|e| e.into_inner()) = None;
+            continue;
+        }
         let routed = operator_goal(&ask)
             .map(str::to_owned)
             .or_else(|| operator.as_ref().and_then(|_| screen_task(&ask)));

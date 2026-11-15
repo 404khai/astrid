@@ -953,6 +953,9 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
 #[test]
 fn confirm_steps_ask_like_a_person() {
     assert_eq!(ask_first("Click Send."), "Can I go ahead and click Send?");
-    assert_eq!(ask_first("Delete the draft"), "Can I go ahead and delete the draft?");
+    assert_eq!(
+        ask_first("Delete the draft"),
+        "Can I go ahead and delete the draft?"
+    );
     assert_eq!(ask_first("  "), "Can I go ahead?");
 }

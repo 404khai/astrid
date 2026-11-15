@@ -24,6 +24,7 @@ mod console;
 #[path = "instabox_cli.rs"]
 mod instabox;
 mod logo;
+mod memory;
 mod operator_bridge;
 mod presence_ask;
 mod presence_canvas;
@@ -301,6 +302,45 @@ enum BatchCommand {
 }
 
 #[derive(Subcommand)]
+enum MemoryCommand {
+    /// List what Astrid remembers, with ids.
+    List,
+    /// Remember a fact.
+    Add { text: Vec<String> },
+    /// Forget one fact by id.
+    Forget { id: u32 },
+    /// Forget everything.
+    Clear,
+}
+
+fn memory_command(command: MemoryCommand) -> Result<(), Box<dyn std::error::Error>> {
+    let path = memory::default_path();
+    let mut store = memory::Memory::load(&path)?;
+    match command {
+        MemoryCommand::List => {
+            for fact in store.facts() {
+                println!("{:>4}  {}", fact.id, fact.text);
+            }
+            if store.facts().is_empty() {
+                println!("Astrid isn't remembering anything. ({})", path.display());
+            }
+            return Ok(());
+        }
+        MemoryCommand::Add { text } => match store.add(&text.join(" "), memory::now()) {
+            Some(id) => println!("Remembered ({id})."),
+            None => return Err("nothing to remember".into()),
+        },
+        MemoryCommand::Forget { id } => match store.forget_id(id) {
+            Some(fact) => println!("Forgotten: {}", fact.text),
+            None => return Err(format!("no fact {id}").into()),
+        },
+        MemoryCommand::Clear => println!("Forgot {} facts.", store.clear()),
+    }
+    store.save(&path)?;
+    Ok(())
+}
+
+#[derive(Subcommand)]
 enum Commands {
     /// OpenCode Go key and models for opencode/* models (ADR 0031).
     Opencode {
@@ -311,6 +351,11 @@ enum Commands {
     Claude {
         #[command(subcommand)]
         command: ClaudeCommand,
+    },
+    /// What you've asked Astrid to remember (ADR 0040), kept on this Mac.
+    Memory {
+        #[command(subcommand)]
+        command: MemoryCommand,
     },
     /// JSON-lines ask surface for the presence app (ADR 0033).
     #[command(hide = true)]
@@ -1036,6 +1081,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     });
     let command = match cli.command {
         Some(Commands::Instabox { command }) => return instabox::run(command).await,
+        Some(Commands::Memory { command }) => return memory_command(command),
         Some(Commands::PresenceAsk {
             model,
             mail_source,
@@ -1084,6 +1130,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Mail { command } => return mail_command(command).await,
         Commands::PresenceAsk { .. } => unreachable!("handled before provider setup"),
         Commands::Claude { command } => return claude_command(command),
+        Commands::Memory { command } => return memory_command(command),
         Commands::Opencode { command } => return opencode_command(command).await,
         Commands::Batch {
             command:
