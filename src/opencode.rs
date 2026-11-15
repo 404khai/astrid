@@ -111,10 +111,10 @@ impl ApiKey {
     }
     /// `OPENCODE_API_KEY`, else the Keychain item from `astrid opencode login`.
     pub fn load() -> Result<Self, String> {
-        if let Ok(key) = std::env::var("OPENCODE_API_KEY") {
-            if !key.trim().is_empty() {
-                return Self::new(key);
-            }
+        if let Ok(key) = std::env::var("OPENCODE_API_KEY")
+            && !key.trim().is_empty()
+        {
+            return Self::new(key);
         }
         crate::keychain::read(SERVICE)?
             .map(Self::new)

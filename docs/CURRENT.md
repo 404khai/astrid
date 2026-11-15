@@ -1,3 +1,40 @@
+# Calendar, reminders and proactive nudges — 2026-11-15
+
+Maintainer: work on two features in parallel with graft, one graft each:
+Calendar and Reminders through EventKit, and proactive nudges with a clear
+interruption rule; conservative calls recorded as the agent's, pending review;
+one PR on `feat/calendar-and-nudges`, not merged. Grafts `calendar-reminders`
+and `proactive-nudges` from main `57e1e4e5`; the second was rebased onto the
+first after two keep-both conflicts (`bundle.sh` plist keys, `presence.css`).
+
+- [ADR 0041](adr/0041-calendar-and-reminders.md): the presence host owns
+  EventKit (`EventKitCalendar`, validated by PresenceCore `CalendarService`);
+  `presence-ask --calendar` asks it over the existing pipes. Tools
+  `calendar_agenda`, `reminder_create`, `event_move`. Reads unprompted; writes
+  are one spoken question (Go ahead / Stop, voice-answerable) and reach the host
+  only after Go ahead. No deletes; one occurrence per move; freshness by start;
+  home reminders from the user's own contact card, else ask for a time. The
+  model sees short ids and bounded fields, never notes, attendees or links.
+- [ADR 0042](adr/0042-proactive-nudges.md): resident host (`--resident --ask`)
+  nudges, each off until turned on in desktop Settings → Nudges
+  (`nudges.json`). Pure `Interruption` rule (quiet hours, Focus/DND, lock,
+  sharing, call, full screen, typing, busy; 20 min gap, 8/day). Bubble by the
+  mark, spoken only if opted in and Focus known off; nothing happens without a
+  yes. `astrid nudge-mail` is a header-only check amending ADR 0028 for this.
+- Also: a presence-ask test no longer reads the real memory file; a flaky Gmail
+  PKCE test no longer matches its random challenge; six clippy 1.96 lints in
+  `anthropic.rs`, `opencode.rs` and `mail.rs` fixed so strict clippy passes.
+
+**Validation (combined tree):** `cargo fmt --check` and `cargo clippy
+--all-targets -- -D warnings` pass; `cargo test` **447 passed, 0 failed, 1
+ignored**; presence-mac `swift test` **57 passed**; astrid-desktop `swift test`
+**41 passed** and builds; presence web `tsc` and build pass. All deterministic:
+fake calendar host, fake EventKit source, mock Responses server; no live
+calendar, reminders, contacts, mail, Focus or model call. **Pending maintainer:**
+macOS grants, live asks, the bubble on screen, signal accuracy.
+
+---
+
 # V2-01 presence on the Mac — 2026-11-11
 
 Maintainer: "let's start with V2-01 ... the overlay of astrid's logo, plus cursor

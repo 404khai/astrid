@@ -43,6 +43,13 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     /// ADR 0038: while operator runs the panel's mark rides with the cursor
     /// tip and talks to you from there.
     private(set) var following = false
+    /// ADR 0042: nudges wait while an ask runs or the panel is open.
+    private var asking = false
+    private var expanded = false
+    var busy: Bool { asking || following || expanded }
+    /// Astrid itself holds the microphone (push-to-talk or the wake word).
+    var micActive: Bool { listening || wakeListener != nil }
+    weak var nudges: NudgeController?
     /// Writes to the runtime child, off the main thread (frames are large).
     private let childWrites = DispatchQueue(label: "dev.astrid.presence.ask-writes")
     private let panel: AskPanel
@@ -205,6 +212,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 anchor = NSPoint(x: frame.midX, y: frame.minY)
             }
         case "expanded":
+            expanded = body["expanded"] as? Bool == true
             if body["expanded"] as? Bool == true {
                 speaker.prepare()
                 NSApp.activate(ignoringOtherApps: true)
@@ -234,7 +242,12 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         case "speak-stop":
             speaker.stop()
         case "ask", "approve", "cancel":
+            if type == "ask" { asking = true }
             forward(body)
+        case "nudge-choice":
+            if let id = body["id"] as? String, let choice = body["choice"] as? String {
+                nudges?.answer(id: id, choice: choice)
+            }
         case "choice":
             // ADR 0038: a button on the operator box.
             if let id = body["id"] as? NSNumber, let choice = body["choice"] as? String {
@@ -396,6 +409,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             deliver(["type": "operator-card-clear", "id": object["id"] ?? 0])
             return
         case "done":
+            asking = false
             if following {
                 following = false
                 host?.operatorEnded()
@@ -412,6 +426,25 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         if ["state", "done"].contains(type ?? ""), canvas.isVisible { canvas.deliver(object, near: anchor) }
         deliver(object)
     }
+
+    // MARK: Nudges (ADR 0042)
+
+    /// A short bubble beside the mark; spoken only when the rule said so.
+    func showNudge(_ nudge: Nudge, spoken: Bool) {
+        deliver(["type": "nudge", "id": nudge.id, "text": nudge.text, "speak": spoken,
+                 "buttons": nudge.buttons.map { ["id": $0.id, "label": $0.label] }])
+    }
+
+    func clearNudge(id: String) {
+        deliver(["type": "nudge-clear", "id": id])
+    }
+
+    /// A nudge's yes: the page asks this exactly as if it had been typed.
+    func askFromNudge(_ text: String) {
+        deliver(["type": "nudge-ask", "text": String(text.prefix(500))])
+    }
+
+    var astridURL: URL { config.astrid }
 
     private func deliver(_ object: Any) {
         guard let data = try? JSONSerialization.data(withJSONObject: object), let json = String(data: data, encoding: .utf8) else { return }

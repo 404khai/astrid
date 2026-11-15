@@ -122,6 +122,14 @@ module (bubble, see-through ask panel, AGSL edge wave), and the live canvas in a
 LAN-only, opt-in, sealed WebSocket link; QR secret one-time/2 min; revocable per-phone keys; phone asks run on the Mac
 without mail and sync into its chat store. No cloud relay, public bind, daemon or iOS overlay. PR, no merge.
 
+**Calendar and nudges 2026-11-15.** Maintainer: "Work on two Astrid features in parallel, using
+graft ... calendar-reminders ... proactive-nudges ... Make conservative calls, record them in the ADRs as
+\"agent's call pending maintainer review\", and don't stop to ask ... open one PR ... do not merge".
+[ADR 0041](docs/adr/0041-calendar-and-reminders.md) (EventKit in the presence host; writes asked in words,
+no deletes) and [ADR 0042](docs/adr/0042-proactive-nudges.md) (opt-in nudges under an explicit
+interruption rule; never act without a yes; header-only mail checks amend ADR 0028). Both are the agent's
+calls pending review. Branch `feat/calendar-and-nudges` from main `57e1e4e5`. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.

@@ -21,6 +21,8 @@ let package = Package(
         .executableTarget(name: "AstridDesktop", dependencies: [
             "DesktopCore",
             .product(name: "AstridWebUI", package: "presence-mac"),
+            // ADR 0042: the nudge settings file is the presence host's format.
+            .product(name: "PresenceCore", package: "presence-mac"),
         ]),
         .testTarget(name: "DesktopCoreTests", dependencies: ["DesktopCore"]),
     ]

@@ -75,6 +75,25 @@ synthetic` no input is ever posted.
   && open "apps/presence-mac/.build/Astrid Presence.app" --args --ask
 ```
 
+## Calendar and Reminders (ADR 0041)
+
+Ask "What's my day?", "remind me to water the plants when I get home" or
+"move my 3pm to 4", typed or spoken. Reading needs no prompt; anything that
+changes your calendar is asked first ("Can I move your 3pm Design review to
+4pm?") with **Go ahead** / **Stop**, out loud too, and you can answer by voice.
+Nothing is ever deleted. macOS asks for Calendars and Reminders access the
+first time (Contacts only for "when I get home", which uses the home address on
+your own card). `--ask-calendar off` turns it off.
+
+## Nudges (ADR 0042)
+
+With `--resident --ask`, Astrid can bring things up unasked: a morning brief,
+a meeting about to start ("want me to open the link?") and new important mail.
+Each is off until you turn it on in the desktop app's **Settings → Nudges**. A
+nudge is a short bubble by the mark, never a sound; it waits during quiet
+hours, Focus/Do Not Disturb, calls, screen sharing, full-screen apps and while
+you type, and does nothing until you press its yes.
+
 ## Protocol v1 in one screen
 
 One JSON object per line, `#` lines are comments in scripts. Coordinates are

@@ -25,6 +25,7 @@ mod console;
 mod instabox;
 mod logo;
 mod memory;
+mod nudge_mail;
 mod operator_bridge;
 mod presence_ask;
 mod presence_canvas;
@@ -375,6 +376,16 @@ enum Commands {
         /// Calendar and Reminders through the presence app's EventKit (ADR 0041).
         #[arg(long)]
         calendar: bool,
+    },
+    /// Header-only check for new important mail, for the presence host's
+    /// opt-in nudge (ADR 0042). Prints one JSON line; no model is called.
+    #[command(hide = true)]
+    NudgeMail {
+        #[arg(long, value_parser = ["apple", "gmail"])]
+        source: String,
+        /// A sender whose new mail counts as important (repeatable).
+        #[arg(long, num_args = 1)]
+        sender: Vec<String>,
     },
     /// Gmail sign-in for read-only mail search (ADR 0028).
     Mail {
@@ -1123,6 +1134,14 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             return presence_ask::serve(provider, tools, model, Some(operator), calendar).await;
         }
         Some(Commands::Mail { command }) => return mail_command(command).await,
+        Some(Commands::NudgeMail { source, sender }) => {
+            let result = match mail_tools(&source) {
+                Ok(mail) => nudge_mail::check(&mail, &source, &sender).await,
+                Err(error) => serde_json::json!({"error": error.to_string()}),
+            };
+            println!("{result}");
+            return Ok(());
+        }
         Some(Commands::Claude { command }) => return claude_command(command),
         Some(Commands::Opencode { command }) => return opencode_command(command).await,
         Some(command) => command,
@@ -1132,7 +1151,9 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         Commands::Instabox { command } => return instabox::run(command).await,
         Commands::Mail { command } => return mail_command(command).await,
-        Commands::PresenceAsk { .. } => unreachable!("handled before provider setup"),
+        Commands::PresenceAsk { .. } | Commands::NudgeMail { .. } => {
+            unreachable!("handled before provider setup")
+        }
         Commands::Claude { command } => return claude_command(command),
         Commands::Memory { command } => return memory_command(command),
         Commands::Opencode { command } => return opencode_command(command).await,

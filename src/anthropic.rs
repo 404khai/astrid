@@ -56,10 +56,10 @@ impl ApiKey {
     /// `ANTHROPIC_API_KEY` from the environment, else the Keychain item from
     /// `astrid claude login`. Never reads .env files.
     pub fn load() -> Result<Self, String> {
-        if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
-            if !key.trim().is_empty() {
-                return Self::new(key);
-            }
+        if let Ok(key) = std::env::var("ANTHROPIC_API_KEY")
+            && !key.trim().is_empty()
+        {
+            return Self::new(key);
         }
         keychain::read()?.map(Self::new).transpose()?.ok_or_else(|| {
             "no Claude API key: run `astrid claude login` (Console API key) or set ANTHROPIC_API_KEY".into()

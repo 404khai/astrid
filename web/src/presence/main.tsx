@@ -147,6 +147,11 @@ function App() {
   const opCardRef = useRef<OpCard | null>(null);
   opCardRef.current = opCard;
   const [opHint, setOpHint] = useState<string | null>(null);
+  // ADR 0042: a nudge Astrid brought up unasked, waiting for yes or not now.
+  type NudgeBubble = { id: string; text: string; speak: boolean; buttons: { id: string; label: string }[] };
+  const [nudge, setNudge] = useState<NudgeBubble | null>(null);
+  const nudgeRef = useRef<NudgeBubble | null>(null);
+  nudgeRef.current = nudge;
   const voice = useVoice((heard, final) => {
     // While a step card waits, what you say answers it ("do it", "show me", "done").
     if (opCardRef.current) {
@@ -221,6 +226,20 @@ function App() {
         case "error":
           setError(m.message);
           if (modeRef.current === "voice") speak(m.message);
+          break;
+        case "nudge":
+          setNudge({ id: m.id, text: m.text, speak: m.speak, buttons: m.buttons });
+          if (m.speak) speak(m.text);
+          break;
+        case "nudge-clear":
+          setNudge((n) => (n && n.id === m.id ? null : n));
+          break;
+        case "nudge-ask":
+          // The nudge's yes: asked exactly as the bubble said, spoken back only
+          // if the nudge itself was spoken.
+          setNudge(null);
+          setOpen(true);
+          submitRef.current(m.text, nudgeRef.current?.speak ?? false);
           break;
         case "wake":
           // Hands-free: Astrid comes up in voice mode. "Hey Astrid, <ask>"
@@ -334,11 +353,11 @@ function App() {
     return () => removeEventListener("keydown", key);
   }, [asking, voice.listening, speaking, mode]);
 
-  const submit = (said?: string) => {
+  const submit = (said?: string, voiced?: boolean) => {
     const ask = (said ?? text).trim();
     if (!ask || asking) return;
     askRef.current = ask;
-    askedByVoice.current = modeRef.current === "voice" || said !== undefined || dictated.current;
+    askedByVoice.current = voiced ?? (modeRef.current === "voice" || said !== undefined || dictated.current);
     dictated.current = false;
     if (speaking) send({ type: "speak-stop" });
     setAsking(ask);
@@ -436,9 +455,31 @@ function App() {
     );
   }
 
+  const answerNudge = (bubble: NudgeBubble, choice: string) => {
+    send({ type: "nudge-choice", id: bubble.id, choice });
+    if (choice !== "yes") setNudge(null);
+  };
+
   if (!open) {
     return (
-      <div className="pr-root pr-collapsed" ref={root}>
+      <div className={`pr-root pr-collapsed${nudge ? " pr-nudging" : ""}`} ref={root}>
+        {nudge && (
+          <div className="pr-nudge" role="status" aria-live="polite">
+            <p>{nudge.text}</p>
+            <div className="pr-op-actions">
+              {nudge.buttons.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={b.id === "yes" ? "pr-btn" : "pr-btn pr-btn-ghost"}
+                  onClick={() => answerNudge(nudge, b.id)}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <button
           type="button"
           className="pr-mark"

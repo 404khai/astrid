@@ -25,6 +25,9 @@ OPTIONS
   --resident       Stay in the menu bar and own timers/alarms (ADR 0029), saved in
                    ~/Library/Application Support/Astrid/timers.json.
   --timers-file PATH  Use another timers file (testing).
+                   With --ask too, the resident host brings things up unasked
+                   (ADR 0042) for the nudges turned on in the desktop app's
+                   Settings → Nudges (all off by default).
   --ask            Show only the Astrid mark in the bottom-right corner; click it to
                    ask (ADR 0033). Answers come from `astrid presence-ask`.
   --wake           With --ask: listen for "hey Astrid", "yo Astrid" or "Astrid" and
@@ -206,6 +209,9 @@ if let path = ProcessInfo.processInfo.environment["ASTRID_WAVE_FRAMES"] {
         fail("intro wave frames: \(error)")
     }
 }
+
+// ADR 0042: nudges read the same EventKit calendar as the ask (ADR 0041).
+if askCalendar { NudgeController.makeCalendar = { EventKitCalendar() } }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)

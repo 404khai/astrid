@@ -29,6 +29,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>NSCalendarsFullAccessUsageDescription</key><string>Astrid reads your calendar to answer "what's my day?" and moves an event only after you say go ahead.</string>
   <key>NSRemindersFullAccessUsageDescription</key><string>Astrid reads your reminders and adds one only after you say go ahead.</string>
   <key>NSContactsUsageDescription</key><string>Astrid reads only the home address on your own contact card, for "remind me when I get home".</string>
+  <key>NSFocusStatusUsageDescription</key><string>Astrid stays quiet while a Focus or Do Not Disturb is on, before bringing anything up.</string>
   <key>NSSpeechRecognitionUsageDescription</key><string>Astrid turns what you say into text on this Mac, without sending audio anywhere.</string>
 </dict>
 </plist>

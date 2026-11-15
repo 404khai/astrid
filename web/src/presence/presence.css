@@ -572,3 +572,22 @@ button {
   gap: 10px;
   padding: 4px 0 2px;
 }
+/* ADR 0042: a nudge's short bubble beside the collapsed mark. */
+.pr-collapsed.pr-nudging {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.pr-nudge {
+  max-width: 280px;
+  padding: 12px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: #151515;
+  box-shadow: inset 0 0 0 1px #2a2a2a, 0 6px 18px #0008;
+  color: #f2f2f2;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.pr-nudge p {
+  margin: 0 0 10px;
+}

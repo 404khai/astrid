@@ -1,5 +1,6 @@
 import AppKit
 import DesktopCore
+import PresenceCore
 import SwiftUI
 
 /// Settings, after the maintainer's Rex app: a searchable list of pages on
@@ -17,6 +18,7 @@ struct SettingsView: View {
         case general = "General"
         case themes = "Themes"
         case memory = "Memory"
+        case nudges = "Nudges"
         case phone = "Phone"
         case blobs = "Blobs"
         case about = "About"
@@ -27,6 +29,7 @@ struct SettingsView: View {
             case .general: "gearshape.fill"
             case .themes: "paintpalette.fill"
             case .memory: "brain.head.profile"
+            case .nudges: "bell.badge.fill"
             case .phone: "iphone.gen3"
             case .blobs: "face.smiling"
             case .about: "info.circle.fill"
@@ -37,6 +40,7 @@ struct SettingsView: View {
             case .general: [Color(white: 0.62), Color(white: 0.42)]
             case .themes: [.orange, .pink, .purple, .blue]
             case .memory: [Color(red: 1, green: 0.55, blue: 0.75), Color(red: 0.7, green: 0.3, blue: 0.95)]
+            case .nudges: [Color(red: 1, green: 0.75, blue: 0.2), Color(red: 1, green: 0.45, blue: 0.1)]
             case .phone: [Color(red: 0.4, green: 0.46, blue: 1), Color(red: 0.1, green: 0.2, blue: 0.93)]
             case .blobs: [Color(white: 0.2), Color(white: 0.12)]
             case .about: [Color(red: 0, green: 0.85, blue: 0.75), Color(red: 0.1, green: 0.5, blue: 0.9)]
@@ -48,6 +52,7 @@ struct SettingsView: View {
             case .general: "general model mail gmail apple chats folder"
             case .themes: "themes appearance light dark colors sidebar"
             case .memory: "memory remember forget facts about me delete personal"
+            case .nudges: "nudges proactive morning brief meeting reminder important email quiet hours focus speak"
             case .phone: "phone android pair qr code link sync devices revoke"
             case .blobs: "blobs bots avatars characters sidebar row"
             case .about: "about version privacy credits"
@@ -125,6 +130,7 @@ struct SettingsView: View {
                         case .general: GeneralPage(model: model, settings: settings)
                         case .themes: ThemesPage(settings: settings)
                         case .memory: MemoryPage()
+                        case .nudges: NudgesPage()
                         case .phone: PhonePage()
                         case .blobs: BlobsPage(settings: settings)
                         case .about: AboutPage()
@@ -540,6 +546,112 @@ struct MemoryPage: View {
     private func change(_ action: () throws -> Void) {
         do { try action() } catch { problem = "Couldn't update Astrid's memory: \(error.localizedDescription)" }
         reload()
+    }
+}
+
+/// ADR 0042: which things Astrid may bring up unasked. Everything is off
+/// until turned on here. The resident presence host reads the same file.
+struct NudgesPage: View {
+    @Environment(\.palette) private var palette
+    @State private var settings = NudgeSettings()
+    @State private var problem: String?
+    @State private var senders = ""
+    private let url = NudgeSettings.defaultURL
+
+    private func toggle(_ kind: NudgeKind) -> Binding<Bool> {
+        Binding(get: { settings.isOn(kind) }, set: { settings.set(kind, $0); save() })
+    }
+
+    private func time(_ keyPath: WritableKeyPath<NudgeSettings, Int>) -> Binding<Date> {
+        Binding(
+            get: { Calendar.current.startOfDay(for: Date()).addingTimeInterval(TimeInterval(settings[keyPath: keyPath] * 60)) },
+            set: {
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                settings[keyPath: keyPath] = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+                save()
+            })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionTitle(title: "Nudges")
+            SettingsGroup {
+                Text("Astrid can bring things up without being asked: a short bubble by its mark, never a sound. It waits during a Focus or Do Not Disturb, calls, screen sharing, full-screen apps, quiet hours and while you type, shows at most one every 20 minutes, and never does anything until you say yes. Needs the presence app running with --resident --ask.")
+                    .font(.caption)
+                    .foregroundStyle(palette.secondary)
+                if let problem { Text(problem).font(.caption).foregroundStyle(.red) }
+            }
+            SectionTitle(title: "What Astrid may bring up")
+            SettingsGroup {
+                Toggle(isOn: toggle(.morningBrief)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Morning brief")
+                        Text("Once each morning: how your day looks, and whether you want the brief.").font(.caption).foregroundStyle(palette.secondary)
+                    }
+                }
+                DatePicker("Around", selection: time(\.morningAt), displayedComponents: .hourAndMinute)
+                    .disabled(!settings.isOn(.morningBrief))
+                Divider()
+                Toggle(isOn: toggle(.meetingSoon)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Meetings about to start")
+                        Text("\"Design review starts in 10 minutes. Want me to open the link?\"").font(.caption).foregroundStyle(palette.secondary)
+                    }
+                }
+                Stepper("\(settings.meetingLeadMinutes) minutes before", value: Binding(
+                    get: { settings.meetingLeadMinutes },
+                    set: { settings.meetingLeadMinutes = $0; save() }), in: 1...30)
+                    .disabled(!settings.isOn(.meetingSoon))
+                Divider()
+                Toggle(isOn: toggle(.importantMail)) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Important email")
+                        Text("Checks every 10 minutes for new mail Gmail marks important, or from the senders below. Only the sender and subject are read for this, on this Mac; nothing goes to a model until you say \"read it\".").font(.caption).foregroundStyle(palette.secondary)
+                    }
+                }
+                Picker("Check", selection: Binding(get: { settings.mailSource ?? "gmail" }, set: { settings.mailSource = $0; save() })) {
+                    Text("Gmail").tag("gmail")
+                    Text("Apple Mail (listed senders only)").tag("apple")
+                }
+                .disabled(!settings.isOn(.importantMail))
+                TextField("Important senders, comma separated", text: $senders)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit {
+                        settings.importantSenders = senders.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                        save()
+                    }
+                    .disabled(!settings.isOn(.importantMail))
+            }
+            SectionTitle(title: "How")
+            SettingsGroup {
+                Toggle(isOn: Binding(get: { settings.speak }, set: { settings.speak = $0; save() })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Say nudges out loud")
+                        Text("Only when Astrid can tell no Focus is on.").font(.caption).foregroundStyle(palette.secondary)
+                    }
+                }
+                DatePicker("Quiet from", selection: time(\.quietStart), displayedComponents: .hourAndMinute)
+                DatePicker("Until", selection: time(\.quietEnd), displayedComponents: .hourAndMinute)
+            }
+        }
+        .onAppear(perform: reload)
+    }
+
+    private func reload() {
+        if let loaded = NudgeSettings.load(from: url) {
+            settings = loaded
+            senders = loaded.importantSenders.joined(separator: ", ")
+            problem = nil
+        } else {
+            problem = "The nudges file couldn't be read, so every nudge is off and nothing was changed."
+        }
+    }
+
+    private func save() {
+        // Never overwrite a file that couldn't be read.
+        guard NudgeSettings.load(from: url) != nil else { return reload() }
+        if settings.isOn(.importantMail), settings.mailSource == nil { settings.mailSource = "gmail" }
+        do { try settings.save(to: url) } catch { problem = "Couldn't save nudges: \(error.localizedDescription)" }
     }
 }
 
