@@ -19,6 +19,8 @@ struct AskConfig {
     /// The `astrid-voice` executable (ADR 0035); nil uses macOS's built-in voice.
     var voiceCommand: URL?
     var voiceName = "af_heart"
+    /// Wake word ("hey Astrid"): an always-on, on-device listener. Off unless `--wake`.
+    var wake = false
     /// ADR 0038: the `/operator` image model (nil: the runtime's default).
     var operatorModel: String?
 }
@@ -56,6 +58,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var pointerTimer: Timer?
     private var lastPointer = NSPoint(x: -1, y: -1)
     private let voice = VoiceInput()
+    private var wakeListener: WakeListener?
+    /// True while push-to-talk holds the microphone (the wake word is paused).
+    private var listening = false
     private var hotkey: Hotkey?
     private var dragTimer: Timer?
     private let speaker: Speaker
@@ -102,9 +107,20 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             message["source"] = "speaker"
             self?.deliver(message)
         }
-        speaker.onSpeaking = { [weak self] on in self?.deliver(["type": "speaking", "on": on]) }
+        speaker.onSpeaking = { [weak self] on in
+            // Astrid's own voice must not wake her.
+            if on { self?.wakeListener?.pause() } else { self?.wakeListener?.resume() }
+            self?.deliver(["type": "speaking", "on": on])
+        }
         voice.onTranscript = { [weak self] text, final in self?.deliver(["type": "transcript", "text": text, "final": final]) }
         voice.onError = { [weak self] message in self?.deliver(["type": "voice-error", "message": message]) }
+        if config.wake {
+            let listener = WakeListener()
+            listener.onWake = { [weak self] rest in self?.deliver(["type": "wake", "text": String(rest.prefix(4000))]) }
+            listener.onError = { [weak self] message in self?.deliver(["type": "voice-error", "message": message]) }
+            listener.start()
+            wakeListener = listener
+        }
         // Hold ⌥Space anywhere to talk; the page opens itself and drives the mic.
         hotkey = Hotkey { [weak self] down in self?.deliver(["type": "hotkey", "down": down]) }
     }
@@ -194,11 +210,17 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             // Talking over Astrid interrupts her (barge-in).
             if canvas.isVisible { canvas.deliver(["type": "listening", "on": body["on"] as? Bool == true], near: anchor) }
             if body["on"] as? Bool == true {
+                // One user of the microphone at a time: push-to-talk wins.
+                if !listening { listening = true; wakeListener?.pause() }
                 speaker.stop()
                 speaker.prepare()
                 voice.start()
             } else {
                 voice.stop()
+                if listening {
+                    listening = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.wakeListener?.resume() }
+                }
         speaker.shutdown()
             }
         case "speak":
@@ -397,6 +419,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
 
     func stop() {
         pointerTimer?.invalidate()
+        wakeListener?.stop()
         voice.stop()
         child?.terminate()
     }

@@ -38,3 +38,22 @@ TTS/speaking state, barge-in, a configurable hotkey, and trace latency
 spans. Voice direction ([VoicePositionKit](https://libraries.dev/voice-position))
 is iOS-only and needs an iPhone's stereo mics. It feeds `VoiceRing`'s `direction`
 prop and belongs with the phone companion (V2-06).
+
+## Amendment 2026-11-15: wake word (opt-in)
+
+The maintainer asked for a wake word, "either hey astrid, Astrid, Yo astrid", to
+make Astrid more "jarvis, baymax". This relaxes push-to-talk **only when the user
+starts presence with `--wake`**. It is the agent's call, pending review.
+
+- **Opt-in, visible.** It is off by default. With `--wake` the microphone stays
+  open (macOS shows its microphone indicator) and `WakeListener` runs on-device
+  recognition only (`requiresOnDeviceRecognition`, no fallback to Apple's
+  servers). Recognition tasks renew every 50 s.
+- **What leaves the listener.** Only the words after "hey Astrid", "yo Astrid" or
+  "Astrid" (`WakeWord.match`, on word boundaries, with a few common
+  mis-hearings). After a 1.2 s pause they go to the page as a voice ask. The
+  name alone opens voice mode and listens. Audio and other transcripts are
+  never stored, logged or sent.
+- **One microphone user.** The listener pauses while push-to-talk holds the mic
+  and while Astrid speaks, so its own voice never wakes it. A waiting operator
+  card is left to its own voice answers.

@@ -16,6 +16,7 @@ struct SettingsView: View {
     enum Page: String, CaseIterable, Identifiable {
         case general = "General"
         case themes = "Themes"
+        case memory = "Memory"
         case phone = "Phone"
         case blobs = "Blobs"
         case about = "About"
@@ -25,6 +26,7 @@ struct SettingsView: View {
             switch self {
             case .general: "gearshape.fill"
             case .themes: "paintpalette.fill"
+            case .memory: "brain.head.profile"
             case .phone: "iphone.gen3"
             case .blobs: "face.smiling"
             case .about: "info.circle.fill"
@@ -34,6 +36,7 @@ struct SettingsView: View {
             switch self {
             case .general: [Color(white: 0.62), Color(white: 0.42)]
             case .themes: [.orange, .pink, .purple, .blue]
+            case .memory: [Color(red: 1, green: 0.55, blue: 0.75), Color(red: 0.7, green: 0.3, blue: 0.95)]
             case .phone: [Color(red: 0.4, green: 0.46, blue: 1), Color(red: 0.1, green: 0.2, blue: 0.93)]
             case .blobs: [Color(white: 0.2), Color(white: 0.12)]
             case .about: [Color(red: 0, green: 0.85, blue: 0.75), Color(red: 0.1, green: 0.5, blue: 0.9)]
@@ -44,6 +47,7 @@ struct SettingsView: View {
             switch self {
             case .general: "general model mail gmail apple chats folder"
             case .themes: "themes appearance light dark colors sidebar"
+            case .memory: "memory remember forget facts about me delete personal"
             case .phone: "phone android pair qr code link sync devices revoke"
             case .blobs: "blobs bots avatars characters sidebar row"
             case .about: "about version privacy credits"
@@ -120,6 +124,7 @@ struct SettingsView: View {
                         switch page {
                         case .general: GeneralPage(model: model, settings: settings)
                         case .themes: ThemesPage(settings: settings)
+                        case .memory: MemoryPage()
                         case .phone: PhonePage()
                         case .blobs: BlobsPage(settings: settings)
                         case .about: AboutPage()
@@ -472,6 +477,72 @@ struct AboutPage: View {
 
 /// Pairing a phone (ADR 0039): the link's switch, a two-minute QR code, and
 /// the phones paired with this Mac, each one revocable.
+/// ADR 0040: what Astrid remembers about you, newest first, each with Delete.
+struct MemoryPage: View {
+    @Environment(\.palette) private var palette
+    @State private var facts: [MemoryFact] = []
+    @State private var problem: String?
+    @State private var confirmClear = false
+    private let store = MemoryStore()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionTitle(title: "Memory", note: facts.isEmpty ? nil : "\(facts.count)")
+            SettingsGroup {
+                Text("Astrid keeps only what you ask it to: say \"remember that …\" to add, \"forget …\" to remove. It's stored on this Mac and shared with the model as context when you ask something.")
+                    .font(.caption)
+                    .foregroundStyle(palette.secondary)
+                if let problem { Text(problem).font(.caption).foregroundStyle(.red) }
+            }
+            SectionTitle(title: "What Astrid remembers")
+            SettingsGroup {
+                if facts.isEmpty {
+                    Text("Nothing yet.").foregroundStyle(palette.secondary)
+                }
+                ForEach(facts) { fact in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(fact.text).textSelection(.enabled)
+                            Text(fact.date.formatted(.relative(presentation: .named)))
+                                .font(.caption)
+                                .foregroundStyle(palette.secondary)
+                        }
+                        Spacer()
+                        Button("Delete", role: .destructive) { change { try store.delete(fact.id) } }
+                            .buttonStyle(.glass)
+                            .accessibilityLabel("Delete \(fact.text)")
+                    }
+                    if fact.id != facts.last?.id { Divider() }
+                }
+            }
+            if !facts.isEmpty {
+                HStack {
+                    Spacer()
+                    Button("Forget Everything", role: .destructive) { confirmClear = true }.buttonStyle(.glass)
+                }
+                .confirmationDialog("Forget everything Astrid remembers?", isPresented: $confirmClear) {
+                    Button("Forget \(facts.count) Things", role: .destructive) { change { try store.deleteAll() } }
+                }
+            }
+        }
+        .onAppear(perform: reload)
+    }
+
+    private func reload() {
+        do {
+            facts = try store.load()
+            problem = nil
+        } catch {
+            problem = "Astrid's memory file couldn't be read, so nothing was changed."
+        }
+    }
+
+    private func change(_ action: () throws -> Void) {
+        do { try action() } catch { problem = "Couldn't update Astrid's memory: \(error.localizedDescription)" }
+        reload()
+    }
+}
+
 struct PhonePage: View {
     @EnvironmentObject private var link: PhoneLink
     @Environment(\.palette) private var palette

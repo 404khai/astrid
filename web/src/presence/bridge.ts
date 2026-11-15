@@ -18,6 +18,8 @@ export type Incoming =
   | { type: "voice"; sampleRate: number; time: string; freq: string; source?: "speaker" }
   | { type: "speaking"; on: boolean }
   | { type: "hotkey"; down: boolean }
+  // "hey Astrid ...": the words after the wake phrase ("" for just the name).
+  | { type: "wake"; text: string }
   | { type: "transcript"; text: string; final: boolean }
   | { type: "voice-error"; message: string }
   | { type: "canvas-open"; on: boolean }

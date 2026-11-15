@@ -222,6 +222,17 @@ function App() {
           setError(m.message);
           if (modeRef.current === "voice") speak(m.message);
           break;
+        case "wake":
+          // Hands-free: Astrid comes up in voice mode. "Hey Astrid, <ask>"
+          // asks straight away; just the name listens for the ask. An ask or
+          // a waiting card already in progress is left alone.
+          if (opCardRef.current) break;
+          setOpen(true);
+          setMode("voice");
+          modeRef.current = "voice";
+          if (m.text.trim()) submitRef.current(m.text);
+          else if (!voiceRef.current.listening) voiceRef.current.start();
+          break;
         case "hotkey":
           if (modeRef.current === "voice") {
             // In voice mode ⌥Space interrupts Astrid, or sends what you've said.

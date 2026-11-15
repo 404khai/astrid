@@ -27,6 +27,9 @@ OPTIONS
   --timers-file PATH  Use another timers file (testing).
   --ask            Show only the Astrid mark in the bottom-right corner; click it to
                    ask (ADR 0033). Answers come from `astrid presence-ask`.
+  --wake           With --ask: listen for "hey Astrid", "yo Astrid" or "Astrid" and
+                   start a voice ask hands-free. The mic stays open; speech is
+                   recognised on this Mac only and never stored.
   --ask-model M    Model for --ask (default claude-code/sonnet).
   --operator-model M  Image model for operator walkthroughs (ADR 0038):
                    claude-code/sonnet (default), claude-code/opus or gpt-5.6-sol/terra/luna.
@@ -63,6 +66,7 @@ var timersURL = TimerStore.defaultURL
 var snapshotDirectory: URL?
 var captureSource = CaptureSource.screen
 var askMode = false
+var wake = false
 var askModel = "claude-code/sonnet"
 var askMail: String? = "gmail"
 var askVoice = "af_heart"
@@ -124,6 +128,8 @@ while let argument = arguments.popFirst() {
         timersURL = URL(fileURLWithPath: path)
     case "--ask":
         askMode = true
+    case "--wake":
+        wake = true
     case "--ask-model":
         guard let value = arguments.popFirst() else { fail("--ask-model needs a model") }
         askModel = value
@@ -179,6 +185,7 @@ if askMode {
     }
     let voiceCommand = voiceCommandPath.map { URL(fileURLWithPath: $0) } ?? repoFile("apps/astrid-voice/.venv/bin/astrid-voice")
     askConfig = AskConfig(ui: ui, astrid: astrid, model: askModel, mail: askMail, voiceCommand: voiceCommand, voiceName: askVoice, operatorModel: operatorModel)
+    askConfig?.wake = wake
     // The ask surface replaces the scripted demo; Astrid waits in the corner.
     if sourceCount == 0 { source = .script([]) }
 }
