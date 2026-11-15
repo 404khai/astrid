@@ -1,168 +1,49 @@
-import { useEffect, useRef, useState } from "react";
-import { RuneIcon } from "runeicons-react";
+import { useState } from "react";
 import { AstridLogo } from "./components/AstridLogo";
-import { AstridHome } from "./components/AstridHome";
 import { BrandLink } from "./components/BrandMenu";
 import { Bento } from "./components/Bento";
 import { DnaExplainer } from "./components/DnaExplainer";
 import { Everyday } from "./components/Everyday";
-import { HeroScreen } from "./components/HeroScreen";
-import { LaptopMockupCard } from "./components/LaptopMockup";
 import { SpatialStack } from "./components/SpatialStack";
+import { Action, Footer, Navigation, SectionTitle, Icon, doc, gameplan, repo } from "./components/SiteChrome";
 import { VerseText } from "./components/VerseText";
 
-/** Section headings print in VerseText; "\n" keeps the designed line breaks. */
-function SectionTitle({ id, text }: { id?: string; text: string }) {
+/** The Mac app in three real screenshots, stacked like windows; pick one to bring it forward. */
+const shots = [
+  { src: "/hero/connections.webp", label: "Phone", alt: "Astrid for Mac: a QR code to connect a phone to this Mac" },
+  { src: "/hero/spatial-voice.webp", label: "Voice + canvas", alt: "Astrid for Mac in voice mode, drawing an isometric circuit board while it thinks" },
+  { src: "/hero/diagrams.webp", label: "Diagrams", alt: "Astrid for Mac: a grid of diagrams it drew, from an HTTP request to the human heart" },
+];
+function HeroShots() {
+  const [front, setFront] = useState(1);
   return (
-    <div className="h2" role="heading" aria-level={2} id={id}>
-      <VerseText text={text} tone="dark" idle={false} seed={text.length * 31} />
-    </div>
-  );
-}
-
-const repo = "https://github.com/404khai/astrid";
-const doc = (path: string) => `${repo}/blob/main/${path}`;
-const gameplan = `${repo}/blob/v2/docs/plans/v2-gameplan.md`;
-function Icon({ name = "arrow-right" }: { name?: string }) {
-  return (
-    <span className="icon" aria-hidden="true">
-      <RuneIcon name={`arrows-${name}`} size={20} />
-    </span>
-  );
-}
-function Action({
-  children,
-  href,
-  secondary = false,
-}: {
-  children: React.ReactNode;
-  href: string;
-  secondary?: boolean;
-}) {
-  return (
-    <a className={`action ${secondary ? "secondary" : ""}`} href={href}>
-      {children}
-      <Icon name={secondary ? "arrow-right" : "arrow-up-right"} />
-    </a>
-  );
-}
-function Navigation() {
-  const [open, setOpen] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const mobileMenu = useRef<HTMLDivElement>(null);
-  const mobileTrigger = useRef<HTMLButtonElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open && !mobileOpen) return;
-    const outside = (event: PointerEvent) => {
-      if (!menu.current?.contains(event.target as Node)) setOpen(false);
-      if (!mobileMenu.current?.contains(event.target as Node))
-        setMobileOpen(false);
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        if (mobileOpen) {
-          setMobileOpen(false);
-          mobileTrigger.current?.focus();
-        } else trigger.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", outside);
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("pointerdown", outside);
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open, mobileOpen]);
-  return (
-    <header className="navbar">
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-      <div className="mobile-menu" ref={mobileMenu}>
-        <button
-          className="mobile-nav-box"
-          ref={mobileTrigger}
-          aria-expanded={mobileOpen}
-          aria-controls="mobile-links"
-          onClick={() => setMobileOpen(!mobileOpen)}
-        >
-          Menu
-          <Icon name="chevron-down" />
-        </button>
-        {mobileOpen && (
-          <nav
-            className="mobile-dropdown"
-            id="mobile-links"
-            aria-label="Mobile navigation"
-          >
-            {[
-              ["See it work", "#demo"],
-              ["How it helps", "#help"],
-              ["Spatial", "#spatial"],
-              ["Gameplan", "#gameplan"],
-              ["Docs", "/docs.html"],
-              ["Build notes", doc("docs/development.md")],
-              ["Contributing", doc("AGENTS.md")],
-              ["Issues", `${repo}/issues`],
-            ].map(([label, href]) => (
-              <a key={label} href={href} onClick={() => setMobileOpen(false)}>
-                {label}
-                <Icon />
-              </a>
-            ))}
-          </nav>
-        )}
+    <div className="hero-shots">
+      <div className="hero-shots-stage">
+        {shots.map((shot, index) => {
+          const slot = index === front ? "front" : (index - front + shots.length) % shots.length === 1 ? "right" : "left";
+          return (
+            <button
+              key={shot.src}
+              type="button"
+              className={`hero-shot hero-shot-${slot}`}
+              onClick={() => setFront(index)}
+              aria-label={`Show ${shot.label}`}
+              aria-pressed={index === front}
+              tabIndex={index === front ? -1 : 0}
+            >
+              <img src={shot.src} alt={shot.alt} width={1600} height={1290} loading={index === 1 ? "eager" : "lazy"} />
+            </button>
+          );
+        })}
       </div>
-      <nav className="nav-box nav-left" aria-label="Sections">
-        <a href="#help">How it helps</a>
-        <a href="#spatial">Spatial</a>
-        <a href="#gameplan">Gameplan</a>
-      </nav>
-      <BrandLink className="brand" href="#" label="Astrid home">
-        <AstridLogo animated tracking />
-      </BrandLink>
-      <a className="mobile-nav-box mobile-github" href={repo}>
-        GitHub
-        <Icon name="arrow-up-right" />
-      </a>
-      <nav className="nav-box nav-right" aria-label="Project">
-        <a href="/docs.html">Docs</a>
-        <a href={repo}>GitHub</a>
-        <div className="more" ref={menu}>
-          <button
-            ref={trigger}
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            aria-controls="more-links"
-          >
-            More
-            <Icon name="chevron-down" />
+      <div className="hero-shots-tabs" role="group" aria-label="Screenshots">
+        {shots.map((shot, index) => (
+          <button key={shot.label} type="button" aria-pressed={index === front} onClick={() => setFront(index)}>
+            {shot.label}
           </button>
-          {open && (
-            <div className="dropdown" id="more-links">
-              <a
-                href={doc("docs/development.md")}
-                onClick={() => setOpen(false)}
-              >
-                Build notes
-                <Icon />
-              </a>
-              <a href={doc("AGENTS.md")} onClick={() => setOpen(false)}>
-                Contributing
-                <Icon />
-              </a>
-              <a href={`${repo}/issues`} onClick={() => setOpen(false)}>
-                Issues
-                <Icon />
-              </a>
-            </div>
-          )}
-        </div>
-      </nav>
-    </header>
+        ))}
+      </div>
+    </div>
   );
 }
 function DemoVisual() {
@@ -187,17 +68,15 @@ function DemoVisual() {
         <rect x="1238" y="172" width="20" height="20" fill="#4459F9" />
       </svg>
       <p className="demo-note demo-note-left">
-        <span className="eyebrow">01 / LOOK</span>
-        <strong>You ask. It looks once.</strong>
-        <small>One frame of Preview, seen only because you asked.</small>
+        <span className="eyebrow">01 / ASK</span>
+        <strong>Talk to it.</strong>
+        <small>Voice mode answers out loud and draws as it explains.</small>
       </p>
-      <LaptopMockupCard variant="titanium">
-        <HeroScreen />
-      </LaptopMockupCard>
+      <HeroShots />
       <p className="demo-note demo-note-right">
-        <span className="eyebrow">02 / EXPLAIN</span>
-        <strong>Then it shows you.</strong>
-        <small>An engine built from page 4, walked through part by part.</small>
+        <span className="eyebrow">02 / KEEP</span>
+        <strong>Every drawing stays.</strong>
+        <small>Chats and diagrams live in the Mac app, ready to revisit.</small>
       </p>
       <p className="loop-caption">
         LOOK <span>→</span> POINT <span>→</span> SKETCH <span>→</span> EXPLAIN{" "}
@@ -308,7 +187,17 @@ export function App() {
               </p>
             </div>
           </div>
-          <AstridHome />
+          <div className="home-stage">
+            <figure className="home-shot">
+              <img
+                src="/hero/chat.webp"
+                alt="Astrid for Mac: a new chat, with past chats, diagrams and blobs in the sidebar"
+                width={1600}
+                height={1287}
+                loading="lazy"
+              />
+            </figure>
+          </div>
         </section>
         <section
           className="section philosophy"

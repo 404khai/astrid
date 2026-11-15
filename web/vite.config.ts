@@ -6,7 +6,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // Two pages: the homepage and the docs (overview, brand, components).
-      input: { main: "index.html", docs: "docs.html" },
+      input: { main: "index.html", docs: "docs.html", changelog: "changelog.html" },
     },
   },
 });

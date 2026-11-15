@@ -3973,3 +3973,122 @@ kbd {
   }
 }
 
+
+/* Hero: three real screenshots of the Mac app, stacked like windows. Each image is
+ * shown whole at its own aspect ratio, never cropped or zoomed; the windows behind
+ * are only offset and dimmed. */
+.hero-shots {
+  position: relative;
+  z-index: 1;
+  width: min(780px, 56%);
+  margin-top: 28px;
+  display: grid;
+  gap: 24px;
+  justify-items: center;
+}
+.hero-shots-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1600 / 1290;
+}
+.hero-shot {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 30px 80px #000c, 0 0 0 1px #ffffff14;
+  transition:
+    transform 0.6s cubic-bezier(0.65, 0, 0.25, 1),
+    opacity 0.6s ease,
+    filter 0.6s ease;
+}
+.hero-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.hero-shot-front {
+  z-index: 3;
+  cursor: default;
+}
+.hero-shot-left,
+.hero-shot-right {
+  z-index: 1;
+  opacity: 0.55;
+  filter: saturate(0.7) brightness(0.7);
+}
+.hero-shot-left {
+  transform: translate(-11%, -5%);
+}
+.hero-shot-right {
+  transform: translate(11%, -5%);
+}
+.hero-shot-left:hover,
+.hero-shot-right:hover,
+.hero-shot-left:focus-visible,
+.hero-shot-right:focus-visible {
+  opacity: 0.8;
+  filter: none;
+}
+.hero-shots-tabs {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  background: #101010;
+}
+.hero-shots-tabs button {
+  padding: 10px 18px;
+  font: 400 12px/18px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hero-shots-tabs button[aria-pressed="true"] {
+  color: #fff;
+  background: var(--button);
+}
+@media (max-width: 950px) {
+  .hero-shots {
+    width: 92%;
+  }
+  .hero-shot-left {
+    transform: translate(-6%, -5%);
+  }
+  .hero-shot-right {
+    transform: translate(6%, -5%);
+  }
+}
+@media (max-width: 650px) {
+  .hero-shots {
+    width: 100%;
+  }
+  .hero-shot-left,
+  .hero-shot-right {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .hero-shots-tabs button {
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-shot {
+    transition: none;
+  }
+}
+
+/* Home base: a real screenshot of the Mac app, shown whole. */
+.home-shot {
+  position: relative;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+.home-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 30px 80px #000c, 0 0 0 1px #ffffff14;
+}
