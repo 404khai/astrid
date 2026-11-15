@@ -640,3 +640,22 @@ final class FrameEncodingTests: XCTestCase {
         XCTAssertEqual(FrameEncoding.rgb(rgba, width: 2, height: 1, bytesPerRow: 8, bits: 8), [0, 255, 128, 255, 0, 17])
     }
 }
+
+final class WakeWordTests: XCTestCase {
+    func testFindsEachWakePhraseAndWhatFollows() {
+        XCTAssertEqual(WakeWord.match("Hey Astrid, what's on my calendar?")?.rest, "what's on my calendar")
+        XCTAssertEqual(WakeWord.match("yo Astrid post this")?.rest, "post this")
+        XCTAssertEqual(WakeWord.match("Astrid")?.rest, "")
+        XCTAssertEqual(WakeWord.match("so anyway astrid turn on dark mode")?.rest, "turn on dark mode")
+        XCTAssertEqual(WakeWord.match("hey Astrud open mail")?.rest, "open mail")
+    }
+
+    func testIgnoresOtherWordsAndOldHits() {
+        XCTAssertNil(WakeWord.match("Astridine is a name"))
+        XCTAssertNil(WakeWord.match("I was talking to my friend"))
+        XCTAssertNil(WakeWord.match(""))
+        let first = WakeWord.match("hey astrid stop")!
+        XCTAssertNil(WakeWord.match("hey astrid stop", from: first.end))
+        XCTAssertEqual(WakeWord.match("hey astrid stop. Astrid go", from: first.end)?.rest, "go")
+    }
+}
