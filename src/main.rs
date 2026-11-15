@@ -25,6 +25,7 @@ mod console;
 mod instabox;
 mod logo;
 mod memory;
+mod nudge_mail;
 mod operator_bridge;
 mod presence_ask;
 mod presence_canvas;
@@ -372,6 +373,19 @@ enum Commands {
         /// Display operator looks at (0 = the display with the menu bar).
         #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=15))]
         operator_display: u32,
+        /// Calendar and Reminders through the presence app's EventKit (ADR 0041).
+        #[arg(long)]
+        calendar: bool,
+    },
+    /// Header-only check for new important mail, for the presence host's
+    /// opt-in nudge (ADR 0042). Prints one JSON line; no model is called.
+    #[command(hide = true)]
+    NudgeMail {
+        #[arg(long, value_parser = ["apple", "gmail"])]
+        source: String,
+        /// A sender whose new mail counts as important (repeatable).
+        #[arg(long, num_args = 1)]
+        sender: Vec<String>,
     },
     /// Gmail sign-in for read-only mail search (ADR 0028).
     Mail {
@@ -1087,6 +1101,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             mail_source,
             operator_model,
             operator_display,
+            calendar,
         }) => {
             let workspace = presence_ask::workspace()?;
             let mut tools = Tools::new(workspace, Duration::from_secs(1))?;
@@ -1116,9 +1131,17 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 model: operator_model,
                 display: operator_display,
             };
-            return presence_ask::serve(provider, tools, model, Some(operator)).await;
+            return presence_ask::serve(provider, tools, model, Some(operator), calendar).await;
         }
         Some(Commands::Mail { command }) => return mail_command(command).await,
+        Some(Commands::NudgeMail { source, sender }) => {
+            let result = match mail_tools(&source) {
+                Ok(mail) => nudge_mail::check(&mail, &source, &sender).await,
+                Err(error) => serde_json::json!({"error": error.to_string()}),
+            };
+            println!("{result}");
+            return Ok(());
+        }
         Some(Commands::Claude { command }) => return claude_command(command),
         Some(Commands::Opencode { command }) => return opencode_command(command).await,
         Some(command) => command,
@@ -1128,7 +1151,9 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         Commands::Instabox { command } => return instabox::run(command).await,
         Commands::Mail { command } => return mail_command(command).await,
-        Commands::PresenceAsk { .. } => unreachable!("handled before provider setup"),
+        Commands::PresenceAsk { .. } | Commands::NudgeMail { .. } => {
+            unreachable!("handled before provider setup")
+        }
         Commands::Claude { command } => return claude_command(command),
         Commands::Memory { command } => return memory_command(command),
         Commands::Opencode { command } => return opencode_command(command).await,

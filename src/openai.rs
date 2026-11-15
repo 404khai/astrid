@@ -181,6 +181,9 @@ impl OpenAiProvider {
         if !mail.is_empty() {
             definitions.extend(crate::mail::definitions(&mail));
         }
+        if request.options.calendar {
+            definitions.extend(crate::calendar::definitions());
+        }
         let mut body = json!({"model":request.model,"instructions":request.instructions,"input":input,
             "store":false,"stream":true,"include":["reasoning.encrypted_content"],
             "tools":[{"type":"namespace","name":"astrid","description":"Astrid workspace tools", "tools":definitions}]});

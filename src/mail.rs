@@ -228,7 +228,7 @@ impl Finder for Spotlight {
         let words: Vec<String> = query
             .split_whitespace()
             .take(8)
-            .map(|w| w.replace('\\', "").replace('"', "").replace('*', ""))
+            .map(|w| w.replace(['\\', '"', '*'], ""))
             .filter(|w| !w.is_empty())
             .map(|w| format!("kMDItemTextContent == \"*{w}*\"cd"))
             .collect();
@@ -384,7 +384,7 @@ fn split_headers(text: &str) -> (Vec<(String, String)>, &str) {
         .or_else(|| text.find("\n\n").map(|i| (i, 2)));
     let (head, body) = match split {
         Some((i, n)) => (&text[..i], &text[i + n..]),
-        None => (text.as_ref(), ""),
+        None => (text, ""),
     };
     let mut headers: Vec<(String, String)> = vec![];
     for line in head.lines() {
@@ -737,10 +737,9 @@ impl Gmail {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone()
+            && std::time::Instant::now() < expires
         {
-            if std::time::Instant::now() < expires {
-                return Ok(token);
-            }
+            return Ok(token);
         }
         let response = self
             .http
@@ -765,10 +764,10 @@ impl Gmail {
             .as_str()
             .ok_or("invalid token response")?
             .to_owned();
-        if let Some(scope) = body["scope"].as_str() {
-            if scope.split_whitespace().any(|s| s != GMAIL_SCOPE) {
-                return Err("token carries scopes beyond gmail.readonly; refusing".into());
-            }
+        if let Some(scope) = body["scope"].as_str()
+            && scope.split_whitespace().any(|s| s != GMAIL_SCOPE)
+        {
+            return Err("token carries scopes beyond gmail.readonly; refusing".into());
         }
         let ttl = body["expires_in"]
             .as_u64()

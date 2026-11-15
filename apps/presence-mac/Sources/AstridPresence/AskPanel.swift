@@ -1,5 +1,6 @@
 import AppKit
 import AstridWebUI
+import PresenceCore
 import WebKit
 
 /// ADR 0033: the presence app's ask surface. A small floating panel in the
@@ -23,6 +24,8 @@ struct AskConfig {
     var wake = false
     /// ADR 0038: the `/operator` image model (nil: the runtime's default).
     var operatorModel: String?
+    /// ADR 0041: Calendar and Reminders through EventKit (`--ask-calendar off` turns it off).
+    var calendar = true
 }
 
 /// What the operator (ADR 0038) needs from the presence app.
@@ -40,6 +43,13 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     /// ADR 0038: while operator runs the panel's mark rides with the cursor
     /// tip and talks to you from there.
     private(set) var following = false
+    /// ADR 0042: nudges wait while an ask runs or the panel is open.
+    private var asking = false
+    private var expanded = false
+    var busy: Bool { asking || following || expanded }
+    /// Astrid itself holds the microphone (push-to-talk or the wake word).
+    var micActive: Bool { listening || wakeListener != nil }
+    weak var nudges: NudgeController?
     /// Writes to the runtime child, off the main thread (frames are large).
     private let childWrites = DispatchQueue(label: "dev.astrid.presence.ask-writes")
     private let panel: AskPanel
@@ -64,6 +74,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var hotkey: Hotkey?
     private var dragTimer: Timer?
     private let speaker: Speaker
+    /// ADR 0041: EventKit calls block, so they run one at a time off the main thread.
+    private let calendarQueue = DispatchQueue(label: "dev.astrid.presence.calendar")
+    private lazy var calendar = CalendarService(source: EventKitCalendar())
     /// ADR 0036: the live canvas, created on the first drawing.
     private lazy var canvas: CanvasController = {
         let canvas = CanvasController(page: config.ui.deletingLastPathComponent().appendingPathComponent("canvas.html"))
@@ -199,6 +212,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 anchor = NSPoint(x: frame.midX, y: frame.minY)
             }
         case "expanded":
+            expanded = body["expanded"] as? Bool == true
             if body["expanded"] as? Bool == true {
                 speaker.prepare()
                 NSApp.activate(ignoringOtherApps: true)
@@ -221,14 +235,21 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                     listening = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.wakeListener?.resume() }
                 }
-        speaker.shutdown()
+                // Keep the voice warm: Astrid usually answers right after you
+                // stop talking, and a cold start costs several seconds.
+                speaker.prepare()
             }
         case "speak":
             if let text = body["text"] as? String { speaker.say(String(text.prefix(4000))) }
         case "speak-stop":
             speaker.stop()
         case "ask", "approve", "cancel":
+            if type == "ask" { asking = true }
             forward(body)
+        case "nudge-choice":
+            if let id = body["id"] as? String, let choice = body["choice"] as? String {
+                nudges?.answer(id: id, choice: choice)
+            }
         case "choice":
             // ADR 0038: a button on the operator box.
             if let id = body["id"] as? NSNumber, let choice = body["choice"] as? String {
@@ -238,8 +259,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             // ADR 0038 voice: an answer to the operator card on screen.
             if let text = body["text"] as? String { send(["type": "utterance", "text": String(text.prefix(500))]) }
         case "open":
-            // Only Gmail message links, opened in the user's browser.
-            if let text = body["url"] as? String, let url = URL(string: text), url.scheme == "https", url.host == "mail.google.com" {
+            // Gmail messages and (ADR 0041) Google Calendar days, in the browser.
+            if let text = body["url"] as? String, let url = URL(string: text), url.scheme == "https",
+               url.host == "mail.google.com" || GoogleCalendarLink.isAllowed(url) {
                 NSWorkspace.shared.open(url)
             }
         default:
@@ -293,6 +315,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         var arguments = ["presence-ask", "--model", config.model]
         if let operatorModel = config.operatorModel { arguments += ["--operator-model", operatorModel] }
         if let mail = config.mail { arguments += ["--mail-source", mail] }
+        if config.calendar { arguments.append("--calendar") }
         process.arguments = arguments
         let input = Pipe(), output = Pipe()
         process.standardInput = input
@@ -350,6 +373,18 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
                 self?.send(["type": "acted", "request_id": id, "outcome": outcome])
             }
             return
+        case "calendar":
+            // ADR 0041: only the ask child's calendar requests, answered by EventKit.
+            guard config.calendar else {
+                send(["type": "calendar_result", "request_id": object["request_id"] ?? "", "ok": false, "reason": "calendar_access_denied"])
+                return
+            }
+            let service = calendar
+            calendarQueue.async { [weak self] in
+                let reply = service.handle(object)
+                DispatchQueue.main.async { self?.send(reply) }
+            }
+            return
         case "operator":
             // The cursor tip takes over the pointing; the mark rides with it.
             if object["on"] as? Bool == true {
@@ -377,6 +412,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             deliver(["type": "operator-card-clear", "id": object["id"] ?? 0])
             return
         case "done":
+            asking = false
             if following {
                 following = false
                 host?.operatorEnded()
@@ -393,6 +429,25 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         if ["state", "done"].contains(type ?? ""), canvas.isVisible { canvas.deliver(object, near: anchor) }
         deliver(object)
     }
+
+    // MARK: Nudges (ADR 0042)
+
+    /// A short bubble beside the mark; spoken only when the rule said so.
+    func showNudge(_ nudge: Nudge, spoken: Bool) {
+        deliver(["type": "nudge", "id": nudge.id, "text": nudge.text, "speak": spoken,
+                 "buttons": nudge.buttons.map { ["id": $0.id, "label": $0.label] }])
+    }
+
+    func clearNudge(id: String) {
+        deliver(["type": "nudge-clear", "id": id])
+    }
+
+    /// A nudge's yes: the page asks this exactly as if it had been typed.
+    func askFromNudge(_ text: String) {
+        deliver(["type": "nudge-ask", "text": String(text.prefix(500))])
+    }
+
+    var astridURL: URL { config.astrid }
 
     private func deliver(_ object: Any) {
         guard let data = try? JSONSerialization.data(withJSONObject: object), let json = String(data: data, encoding: .utf8) else { return }
@@ -421,6 +476,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         pointerTimer?.invalidate()
         wakeListener?.stop()
         voice.stop()
+        speaker.shutdown()
         child?.terminate()
     }
 }

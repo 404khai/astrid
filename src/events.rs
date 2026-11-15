@@ -127,6 +127,7 @@ pub enum EventKind {
     },
     /// ADR 0027: presentation-only tools (point_at, sketch, say) inject no
     /// input and need no approval; validated against the current look frame.
+    /// ADR 0041 calendar reads (calendar_agenda) are allowed the same way.
     PresentationAllowed,
     PermissionRequested {
         command: String,
@@ -917,6 +918,9 @@ impl ExecutionState {
                                         | "look"
                                         | "mail_search"
                                         | "mail_read"
+                                        | "reminder_create"
+                                        | "event_create"
+                                        | "event_move"
                                 )
                                 && !self.cancellation_acknowledged,
                         )?;
@@ -936,7 +940,10 @@ impl ExecutionState {
                         require(
                             t.status == Status::Pending
                                 && t.permission.is_none()
-                                && matches!(t.call.name.as_str(), "point_at" | "sketch" | "say")
+                                && matches!(
+                                    t.call.name.as_str(),
+                                    "point_at" | "sketch" | "say" | "calendar_agenda"
+                                )
                                 && !self.cancellation_acknowledged,
                         )?;
                         t.permission = Some(PermissionAction::Allow);

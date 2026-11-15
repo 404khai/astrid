@@ -1,3 +1,4 @@
+import gmailIcon from "./gmail-icon.svg";
 import { StrictMode, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource/space-grotesk/latin-400.css";
@@ -147,6 +148,13 @@ function App() {
   const opCardRef = useRef<OpCard | null>(null);
   opCardRef.current = opCard;
   const [opHint, setOpHint] = useState<string | null>(null);
+  // ADR 0042: a nudge Astrid brought up unasked, waiting for yes or not now.
+  type NudgeBubble = { id: string; text: string; speak: boolean; buttons: { id: string; label: string }[] };
+  const [nudge, setNudge] = useState<NudgeBubble | null>(null);
+  // ADR 0041: the event just added or moved, as a card that opens Google Calendar.
+  const [calendarEvent, setCalendarEvent] = useState<CalendarEventCard | null>(null);
+  const nudgeRef = useRef<NudgeBubble | null>(null);
+  nudgeRef.current = nudge;
   const voice = useVoice((heard, final) => {
     // While a step card waits, what you say answers it ("do it", "show me", "done").
     if (opCardRef.current) {
@@ -221,6 +229,23 @@ function App() {
         case "error":
           setError(m.message);
           if (modeRef.current === "voice") speak(m.message);
+          break;
+        case "calendar-event":
+          setCalendarEvent({ title: m.title, start: m.start, end: m.end, calendar: m.calendar, account: m.account, url: m.url });
+          break;
+        case "nudge":
+          setNudge({ id: m.id, text: m.text, speak: m.speak, buttons: m.buttons });
+          if (m.speak) speak(m.text);
+          break;
+        case "nudge-clear":
+          setNudge((n) => (n && n.id === m.id ? null : n));
+          break;
+        case "nudge-ask":
+          // The nudge's yes: asked exactly as the bubble said, spoken back only
+          // if the nudge itself was spoken.
+          setNudge(null);
+          setOpen(true);
+          submitRef.current(m.text, nudgeRef.current?.speak ?? false);
           break;
         case "wake":
           // Hands-free: Astrid comes up in voice mode. "Hey Astrid, <ask>"
@@ -334,15 +359,16 @@ function App() {
     return () => removeEventListener("keydown", key);
   }, [asking, voice.listening, speaking, mode]);
 
-  const submit = (said?: string) => {
+  const submit = (said?: string, voiced?: boolean) => {
     const ask = (said ?? text).trim();
     if (!ask || asking) return;
     askRef.current = ask;
-    askedByVoice.current = modeRef.current === "voice" || said !== undefined || dictated.current;
+    askedByVoice.current = voiced ?? (modeRef.current === "voice" || said !== undefined || dictated.current);
     dictated.current = false;
     if (speaking) send({ type: "speak-stop" });
     setAsking(ask);
     setAnswer(null);
+    setCalendarEvent(null);
     setError(null);
     setText("");
     setState({ state: "working", label: "Thinking" });
@@ -363,11 +389,32 @@ function App() {
   const label = approval ? "Waiting for you" : state.label;
   const busy = asking !== null;
 
+  const choose = (card: OpCard, choice: string) => {
+    send({ type: "choice", id: card.id, choice });
+    setOpCard(null);
+  };
+  // ADR 0041: a calendar write's question ("Can I move your 3pm ...?") in the
+  // panel itself, with the buttons it offers; voice answers it too.
+  const question = opCard && !operating && (
+    <div className="pr-question" aria-live="polite">
+      <p className="pr-op-text">{opCard.text}</p>
+      <div className="pr-op-actions">
+        {opCard.buttons.map((b, i) => (
+          <button
+            key={b.id}
+            type="button"
+            className={i === 0 && b.id !== "stop" ? "pr-btn" : "pr-btn pr-btn-ghost"}
+            onClick={() => choose(opCard, b.id)}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+      {opHint && <small className="pr-op-hint">{opHint}</small>}
+    </div>
+  );
+
   if (operating) {
-    const choose = (card: OpCard, choice: string) => {
-      send({ type: "choice", id: card.id, choice });
-      setOpCard(null);
-    };
     // One Astrid: this mark rides beside the cursor tip and talks from here.
     // It reacts to its own voice and to yours while it waits on an answer.
     // No orb: its face and the ring's motion show the agent state, and the
@@ -415,9 +462,31 @@ function App() {
     );
   }
 
+  const answerNudge = (bubble: NudgeBubble, choice: string) => {
+    send({ type: "nudge-choice", id: bubble.id, choice });
+    if (choice !== "yes") setNudge(null);
+  };
+
   if (!open) {
     return (
-      <div className="pr-root pr-collapsed" ref={root}>
+      <div className={`pr-root pr-collapsed${nudge ? " pr-nudging" : ""}`} ref={root}>
+        {nudge && (
+          <div className="pr-nudge" role="status" aria-live="polite">
+            <p>{nudge.text}</p>
+            <div className="pr-op-actions">
+              {nudge.buttons.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={b.id === "yes" ? "pr-btn" : "pr-btn pr-btn-ghost"}
+                  onClick={() => answerNudge(nudge, b.id)}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <button
           type="button"
           className="pr-mark"
@@ -444,10 +513,12 @@ function App() {
             : voice.error ?? "";
     return (
       <div className="pr-root pr-voice" ref={root}>
-        {(approval || error || (answer && !canvasOpen)) && (
+        {(approval || error || question || calendarEvent || (answer && !canvasOpen)) && (
           <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
             <Liquid.Item transition="smooth">
               <div className="pr-card" aria-live="polite">
+                {question}
+                {calendarEvent && !busy && <EventCard event={calendarEvent} />}
                 {approval && <ApprovalCard approval={approval} onDecide={decide} />}
                 {error && !busy && !approval && <p className="pr-error">{error}</p>}
                 {answer && !busy && !approval && !canvasOpen && (
@@ -493,7 +564,7 @@ function App() {
             </div>
           </Liquid.Item>
         )}
-        {(busy || answer || error) && !voice.listening && (!canvasOpen || approval || error) && (
+        {(busy || answer || error || calendarEvent) && !voice.listening && (!canvasOpen || approval || error) && (
           <Liquid.Item transition="smooth">
             <div className="pr-card" aria-live="polite">
               {busy && (
@@ -504,9 +575,8 @@ function App() {
                 </div>
               )}
               {busy && <p className="pr-ask">“{asking}”</p>}
-              {busy && opCard && (
-                <p className="pr-ask">{opHint ?? `Say ${opCard.buttons.map((b) => `“${b.label}”`).join(" or ")}, or use the card.`}</p>
-              )}
+              {question}
+              {calendarEvent && !busy && <EventCard event={calendarEvent} />}
               {approval && <ApprovalCard approval={approval} onDecide={decide} />}
               {error && !busy && <p className="pr-error">{error}</p>}
               {answer && !busy && !canvasOpen && (
@@ -743,6 +813,53 @@ function VoiceHalo({
         </span>
       )}
     </div>
+  );
+}
+
+type CalendarEventCard = {
+  title: string;
+  start: string;
+  end: string;
+  calendar: string | null;
+  account: string | null;
+  url: string | null;
+};
+
+/** "Fri, Nov 20 · 2–5 PM", in the user's own time zone. */
+function when(start: string, end: string) {
+  const a = new Date(start);
+  const b = new Date(end);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "";
+  const day = a.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${day} · ${time(a)} – ${time(b)}`;
+}
+
+/** ADR 0041: the event Astrid just added or moved. A Google event opens its
+ * day in Google Calendar in the browser. */
+function EventCard({ event }: { event: CalendarEventCard }) {
+  const google = event.account === "google" && event.url;
+  const body = (
+    <>
+      {google && <img className="pr-event-icon" src={gmailIcon} alt="" />}
+      <span className="pr-event-text">
+        <strong>{event.title}</strong>
+        <span>{when(event.start, event.end)}</span>
+        {event.calendar && <small>{google ? "Google Calendar" : event.calendar}</small>}
+      </span>
+    </>
+  );
+  return google ? (
+    <button
+      type="button"
+      className="pr-event"
+      title="Open in Google Calendar"
+      onClick={() => send({ type: "open", url: event.url! })}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="pr-event">{body}</div>
   );
 }
 

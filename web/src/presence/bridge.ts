@@ -34,12 +34,27 @@ export type Incoming =
       buttons: { id: string; label: string }[];
     }
   | { type: "operator-card-clear"; id: number }
-  | { type: "heard"; text: string; choice: string | null };
+  | { type: "heard"; text: string; choice: string | null }
+  // ADR 0042 nudges: a bubble beside the mark, its removal, and a yes that asks.
+  | { type: "nudge"; id: string; text: string; speak: boolean; buttons: { id: string; label: string }[] }
+  | { type: "nudge-clear"; id: string }
+  | { type: "nudge-ask"; text: string }
+  // ADR 0041: an event the user just added or moved, with its Google Calendar day.
+  | {
+      type: "calendar-event";
+      title: string;
+      start: string;
+      end: string;
+      calendar: string | null;
+      account: string | null;
+      url: string | null;
+    };
 
 export type Outgoing =
   | { type: "ask"; text: string }
   | { type: "utterance"; text: string }
   | { type: "choice"; id: number; choice: string }
+  | { type: "nudge-choice"; id: string; choice: string }
   | { type: "approve"; id: number; approve: boolean }
   | { type: "cancel" }
   | { type: "listen"; on: boolean }

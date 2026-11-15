@@ -111,7 +111,7 @@ pub fn compose_task_with(ask: &str, history: &[Turn], remembered: &str) -> Strin
 
 /// ADR 0038: lets the ask model hand screen tasks to operator, so the user can
 /// just say what they want ("turn on dark mode") without `/operator`.
-pub const OPERATOR_HINT: &str = "Decide this first. If the user wants to get something done on their Mac's screen (change a setting, use an app or a website, click, open, subscribe or unsubscribe, find a button or menu), reply with only one fenced code block tagged `operator-start` containing JSON {\"goal\": the task as one short imperative sentence}, and nothing else: no brief, no mail tools. Words like \"this\", \"here\", \"this page\", \"this tab\", \"this channel\" or \"this video\" mean what is on their screen right now. Astrid then asks to look at their screen and walks them through it step by step. Only questions about their email use the mail tools; answer everything else normally.";
+pub const OPERATOR_HINT: &str = "Decide this first. If the user wants to get something done on their Mac's screen (change a setting, use an app or a website, click, open, subscribe or unsubscribe, find a button or menu), reply with only one fenced code block tagged `operator-start` containing JSON {\"goal\": the task as one short imperative sentence}, and nothing else: no brief, no mail tools. Words like \"this\", \"here\", \"this page\", \"this tab\", \"this channel\" or \"this video\" mean what is on their screen right now. Astrid then asks to look at their screen and walks them through it step by step. Only questions about their email use the mail tools. Their day, calendar events and reminders (\"what's my day\", \"remind me ...\", \"move my 3pm\") are not screen tasks: use the calendar tools when they are available. Answer everything else normally.";
 
 /// Clear on-screen requests go straight to operator, with no model call and
 /// no chance of being read as an email question. Conservative: anything about
@@ -201,7 +201,7 @@ pub fn operator_request(reply: &str) -> Option<String> {
 }
 
 /// Asks the model to finish with a machine-readable brief the UI renders.
-pub const BRIEF_INSTRUCTIONS: &str = "You are answering inside Astrid's on-screen ask panel. Use the mail tools when the question is about email. Keep it short and concrete. Unless you are drawing on the canvas, end your reply with exactly one fenced code block tagged `brief` containing JSON: {\"title\": short headline, \"summary\": one sentence, \"todos\": [{\"text\": action the user should take, \"source\": n}], \"updates\": [{\"text\": what happened, \"source\": n}], \"sources\": [{\"id\": n, \"kind\": \"gmail\" or \"apple\", \"from\": sender name, \"subject\": subject, \"date\": short date, \"message_id\": id from mail_search}]}. Number sources from 1; omit empty lists; every todo and update cites a source when one exists. Do not invent emails.";
+pub const BRIEF_INSTRUCTIONS: &str = "You are answering inside Astrid's on-screen ask panel. Use the mail tools when the question is about email, and the calendar tools for the user's day, events and reminders (a calendar source is {\"kind\": \"calendar\", \"subject\": event title, \"date\": its time}). Keep it short and concrete. Unless you are drawing on the canvas, end your reply with exactly one fenced code block tagged `brief` containing JSON: {\"title\": short headline, \"summary\": one sentence, \"todos\": [{\"text\": action the user should take, \"source\": n}], \"updates\": [{\"text\": what happened, \"source\": n}], \"sources\": [{\"id\": n, \"kind\": \"gmail\" or \"apple\", \"from\": sender name, \"subject\": subject, \"date\": short date, \"message_id\": id from mail_search}]}. Number sources from 1; omit empty lists; every todo and update cites a source when one exists. Do not invent emails.";
 
 fn emit(value: Value) {
     let mut out = io::stdout().lock();
@@ -215,10 +215,16 @@ type Pending = Arc<Mutex<HashMap<u64, tokio::sync::oneshot::Sender<bool>>>>;
 struct UiApprovals {
     pending: Pending,
     next: u64,
+    /// ADR 0041: calendar writes are asked as a spoken Go ahead / Stop card.
+    bridge: Arc<crate::operator_bridge::Bridge>,
+    cancel: Cancellation,
 }
 #[async_trait]
 impl PermissionHandler for UiApprovals {
     async fn decide(&mut self, request: &PermissionRequest) -> io::Result<bool> {
+        if let Some(question) = calendar_question(&request.command) {
+            return Ok(self.bridge.confirm(&question, &self.cancel).await);
+        }
         self.next += 1;
         let id = self.next;
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -256,6 +262,14 @@ impl PermissionHandler for UiApprovals {
     }
 }
 
+/// The question of a calendar write's permission prompt (ADR 0041), if it is one.
+pub fn calendar_question(command: &str) -> Option<String> {
+    let detail: Value = serde_json::from_str(command).ok()?;
+    (detail["capability"] == "calendar.write")
+        .then(|| detail["question"].as_str().map(str::to_owned))
+        .flatten()
+}
+
 /// Extracts the trailing ```brief JSON block, if the model produced one.
 pub fn split_brief(text: &str) -> (String, Option<Value>) {
     let Some(start) = text.rfind("```brief") else {
@@ -279,6 +293,10 @@ fn state_for(kind: &EventKind) -> Option<(&'static str, String)> {
         EventKind::ToolCallRequested { call } => Some(match call.name.as_str() {
             "mail_search" => ("searching", "Searching mail".into()),
             "mail_read" => ("weaving", "Reading an email".into()),
+            "calendar_agenda" => ("searching", "Checking your calendar".into()),
+            "reminder_create" | "event_create" | "event_move" => {
+                ("weaving", "Updating your calendar".into())
+            }
             _ => ("searching", "Looking".into()),
         }),
         EventKind::PermissionRequested { .. } => Some(("listening", "Waiting for you".into())),
@@ -382,9 +400,16 @@ pub async fn serve(
     tools: Tools,
     model: String,
     operator: Option<OperatorSetup>,
+    calendar: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let pending: Pending = Arc::default();
     let bridge = Arc::new(crate::operator_bridge::Bridge::new(emit));
+    // ADR 0041: the presence app owns EventKit; this process asks it.
+    let tools = if calendar {
+        tools.with_calendar(astrid::calendar::Calendar::new(bridge.clone()))
+    } else {
+        tools
+    };
     let (asks_tx, mut asks_rx) = tokio::sync::mpsc::channel::<(String, Vec<Turn>)>(4);
     let cancel_slot: Arc<Mutex<Option<Cancellation>>> = Arc::default();
     {
@@ -502,6 +527,8 @@ pub async fn serve(
         let mut approvals = UiApprovals {
             pending: pending.clone(),
             next: 0,
+            bridge: bridge.clone(),
+            cancel: cancel.clone(),
         };
         let config = RunConfig {
             routing: None,
@@ -604,6 +631,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn only_calendar_writes_become_spoken_questions() {
+        let write = r#"{"capability":"calendar.write","operation":"event_move","question":"Can I move your 3pm Design review to 4pm?"}"#;
+        assert_eq!(
+            calendar_question(write).as_deref(),
+            Some("Can I move your 3pm Design review to 4pm?")
+        );
+        assert_eq!(
+            calendar_question(r#"{"capability":"mail.read_only","question":"x"}"#),
+            None
+        );
+        assert_eq!(calendar_question("rm -rf /"), None);
+    }
+
+    #[test]
     fn briefs_are_split_from_the_reply_and_bad_json_falls_back_to_text() {
         let reply = "Here's your inbox.\n```brief\n{\"title\":\"Two things\",\"sources\":[{\"id\":1,\"kind\":\"gmail\"}]}\n```";
         let (text, brief) = split_brief(reply);
@@ -659,12 +700,12 @@ mod tests {
 
     #[test]
     fn tasks_without_history_are_unchanged_and_history_comes_first() {
-        let plain = compose_task("hi", &[]);
+        let plain = compose_task_with("hi", &[], "");
         assert_eq!(
             plain,
             format!("hi\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}")
         );
-        let task = compose_task(
+        let task = compose_task_with(
             "make it bigger",
             &[
                 Turn {
@@ -676,6 +717,7 @@ mod tests {
                     text: "Here is a pump.".into(),
                 },
             ],
+            "",
         );
         assert!(task.starts_with(
             "Earlier in this conversation (context only):\nUser: draw a pump\nAstrid: Here is a pump.\n\nThe user now asks:\nmake it bigger\n\n"

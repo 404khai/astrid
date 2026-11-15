@@ -26,6 +26,7 @@ pub mod batch_manifest;
 pub mod batch_trace;
 pub mod scheduler;
 
+pub mod calendar;
 pub mod computer;
 pub mod computer_png;
 pub mod computer_wire;

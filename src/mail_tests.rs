@@ -201,7 +201,7 @@ fn sign_in_url_requests_only_gmail_readonly_with_pkce_and_checks_state() {
     );
     let client = ClientConfig {
         client_id: "cid".into(),
-        client_secret: "cs".into(),
+        client_secret: "client-secret-xyz".into(),
     };
     let url = login::authorize_url(
         &Endpoints::default(),
@@ -213,7 +213,7 @@ fn sign_in_url_requests_only_gmail_readonly_with_pkce_and_checks_state() {
     assert!(url.contains("scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.readonly&"));
     assert!(url.contains("code_challenge_method=S256") && url.contains("state=st8"));
     assert!(
-        !url.contains("cs"),
+        !url.contains("client-secret-xyz"),
         "client secret never goes in the browser URL"
     );
     assert_eq!(

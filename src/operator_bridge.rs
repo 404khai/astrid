@@ -9,7 +9,13 @@
 //!         | {"type":"act","request_id","frame","display","x","y","action":{..}}
 //! stdin:  {"type":"frame","request_id","png_base64"} | {"type":"capture_failed","request_id","reason"}
 //!         | {"type":"choice","id","choice"} | {"type":"acted","request_id","outcome"}
+//!
+//! ADR 0041 calendar requests use the same pipes:
+//! stdout: {"type":"calendar","request_id","op",..}
+//! stdin:  {"type":"calendar_result","request_id","ok",.."data"|"reason"}
+//! and a calendar write's question is a card with Go ahead / Stop.
 use astrid::{
+    calendar::CalendarHost,
     cancellation::Cancellation,
     operator::{Card, Choice, OperatorUi, Step},
     presence::LookHost,
@@ -31,6 +37,8 @@ const MAX_PNG: usize = 1024 * 1024;
 /// How long a step card waits for a press before the session stops.
 const CARD_TIMEOUT: Duration = Duration::from_secs(600);
 const ACT_TIMEOUT: Duration = Duration::from_secs(20);
+/// How long a calendar write's question waits for Go ahead (ADR 0041).
+const CONFIRM_TIMEOUT: Duration = Duration::from_secs(300);
 
 type Waiters<K, T> = Mutex<HashMap<K, oneshot::Sender<T>>>;
 
@@ -40,6 +48,7 @@ pub struct Bridge {
     frames: Waiters<String, Result<Vec<u8>, String>>,
     choices: Waiters<u64, String>,
     acts: Waiters<String, String>,
+    calendars: Waiters<String, Result<Value, String>>,
     /// The card on screen and its buttons, for answers spoken in voice mode.
     current: Mutex<Option<(u64, Vec<Choice>)>>,
     /// Request id of the latest captured frame; "Do it" is checked against it.
@@ -67,6 +76,7 @@ impl Bridge {
             frames: Mutex::default(),
             choices: Mutex::default(),
             acts: Mutex::default(),
+            calendars: Mutex::default(),
             current: Mutex::default(),
             last_frame: Mutex::default(),
             elements: Mutex::default(),
@@ -131,6 +141,21 @@ impl Bridge {
                     let _ = tx.send(choice.id().to_owned());
                 }
             }
+            Some("calendar_result") => {
+                if let Some(tx) = take(&self.calendars, &id) {
+                    let reply = if message["ok"] == true {
+                        Ok(message["data"].clone())
+                    } else {
+                        Err(message["reason"]
+                            .as_str()
+                            .unwrap_or("calendar_failed")
+                            .chars()
+                            .take(64)
+                            .collect())
+                    };
+                    let _ = tx.send(reply);
+                }
+            }
             Some("acted") => {
                 if let Some(tx) = take(&self.acts, &id) {
                     let _ = tx.send(message["outcome"].as_str().unwrap_or("failed").to_owned());
@@ -139,6 +164,99 @@ impl Bridge {
             _ => return false,
         }
         true
+    }
+}
+
+impl Bridge {
+    /// Shows a card and waits for one of its buttons; Stop on cancel, timeout
+    /// or anything the card didn't offer. Voice answers it too (`utterance`).
+    pub async fn card(
+        &self,
+        card: Card,
+        display: u32,
+        cancel: &Cancellation,
+        timeout: Duration,
+    ) -> Choice {
+        let id = self.next_card.fetch_add(1, Ordering::Relaxed) + 1;
+        let (tx, rx) = oneshot::channel();
+        self.choices
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(id, tx);
+        *self.current.lock().unwrap_or_else(|e| e.into_inner()) = Some((id, card.buttons.clone()));
+        (self.emit)(card.wire(id, display));
+        let choice = tokio::select! {biased;
+            _ = cancel.cancelled() => None,
+            _ = tokio::time::sleep(timeout) => None,
+            reply = rx => reply.ok(),
+        };
+        take(&self.choices, &id);
+        self.current
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take_if(|(shown, _)| *shown == id);
+        (self.emit)(json!({"type":"step_clear","id":id}));
+        choice
+            .and_then(|c| Choice::from_id(&c))
+            .filter(|c| card.buttons.contains(c))
+            .unwrap_or(Choice::Stop)
+    }
+
+    /// ADR 0041: asks one calendar write's question; true only for Go ahead.
+    pub async fn confirm(&self, question: &str, cancel: &Cancellation) -> bool {
+        let card = Card {
+            step: None,
+            text: question.chars().take(300).collect(),
+            buttons: vec![Choice::DoIt, Choice::Stop],
+            at: None,
+        };
+        self.card(card, 0, cancel, CONFIRM_TIMEOUT).await == Choice::DoIt
+    }
+}
+
+/// The panel's card for an event the user just added or moved.
+pub fn event_card(event: &Value) -> Option<Value> {
+    let text = |k: &str, n: usize| {
+        event[k]
+            .as_str()
+            .map(|s| s.chars().take(n).collect::<String>())
+    };
+    let url = event["web_url"]
+        .as_str()
+        .filter(|u| u.starts_with("https://calendar.google.com/"));
+    Some(
+        json!({"type":"calendar-event","title":text("title", 200)?,"start":text("start", 40)?,
+        "end":text("end", 40)?,"calendar":text("calendar", 80),"account":text("account", 16),"url":url}),
+    )
+}
+
+#[async_trait]
+impl CalendarHost for Bridge {
+    async fn call(&self, mut request: Value, cancel: &Cancellation) -> Result<Value, String> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let (tx, rx) = oneshot::channel();
+        self.calendars
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(id.clone(), tx);
+        let changes = matches!(request["op"].as_str(), Some("event_create" | "event_move"));
+        request["type"] = json!("calendar");
+        request["request_id"] = json!(id);
+        (self.emit)(request);
+        let result = tokio::select! {biased;
+            _ = cancel.cancelled() => Err("cancelled".to_string()),
+            reply = rx => reply.unwrap_or_else(|_| Err("presence_app_went_away".into())),
+        };
+        take(&self.calendars, &id);
+        // ADR 0041 amendment: after a change the panel shows the event as a
+        // card (with its Google Calendar page). The link never reaches the model.
+        if changes
+            && let Ok(data) = &result
+            && let Some(card) = event_card(&data["event"])
+        {
+            (self.emit)(card);
+        }
+        result
     }
 }
 
@@ -195,36 +313,9 @@ pub struct Session {
 #[async_trait]
 impl OperatorUi for Session {
     async fn card(&self, card: Card) -> Choice {
-        let id = self.bridge.next_card.fetch_add(1, Ordering::Relaxed) + 1;
-        let (tx, rx) = oneshot::channel();
         self.bridge
-            .choices
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(id, tx);
-        *self
-            .bridge
-            .current
-            .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some((id, card.buttons.clone()));
-        (self.bridge.emit)(card.wire(id, self.display));
-        let choice = tokio::select! {biased;
-            _ = self.cancel.cancelled() => None,
-            _ = tokio::time::sleep(CARD_TIMEOUT) => None,
-            reply = rx => reply.ok(),
-        };
-        take(&self.bridge.choices, &id);
-        self.bridge
-            .current
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .take_if(|(shown, _)| *shown == id);
-        (self.bridge.emit)(json!({"type":"step_clear","id":id}));
-        // Only a button the card actually offered counts.
-        choice
-            .and_then(|c| Choice::from_id(&c))
-            .filter(|c| card.buttons.contains(c))
-            .unwrap_or(Choice::Stop)
+            .card(card, self.display, &self.cancel, CARD_TIMEOUT)
+            .await
     }
     async fn present(&self, event: Value) {
         (self.bridge.emit)(json!({"type":"present","event":event}));
@@ -307,6 +398,105 @@ mod tests {
         bridge.receive(&json!({"type":"frame","request_id":request["request_id"],"png_base64":STANDARD.encode(b"png")}));
         assert_eq!(task.await.unwrap().unwrap(), b"png");
         assert!(!bridge.receive(&json!({"type":"ask"})));
+    }
+
+    #[tokio::test]
+    async fn calendar_requests_go_out_and_replies_come_back_by_request_id() {
+        let (bridge, out) = bridge();
+        let task = {
+            let bridge = bridge.clone();
+            tokio::spawn(async move {
+                bridge
+                    .call(
+                        json!({"op":"agenda","from":"a","to":"b"}),
+                        &Cancellation::default(),
+                    )
+                    .await
+            })
+        };
+        tokio::task::yield_now().await;
+        let request = last(&out, "calendar");
+        assert_eq!(request["op"], "agenda");
+        assert!(
+            bridge.receive(
+                &json!({"type":"calendar_result","request_id":"other","ok":true,"data":{}})
+            )
+        );
+        bridge.receive(&json!({"type":"calendar_result","request_id":request["request_id"],"ok":false,"reason":"calendar_access_denied"}));
+        assert_eq!(task.await.unwrap().unwrap_err(), "calendar_access_denied");
+    }
+
+    #[tokio::test]
+    async fn a_new_event_shows_a_card_with_only_a_google_calendar_link() {
+        let (bridge, out) = bridge();
+        let task = {
+            let bridge = bridge.clone();
+            tokio::spawn(async move {
+                bridge
+                    .call(
+                        json!({"op":"event_create","title":"Coffee chat"}),
+                        &Cancellation::default(),
+                    )
+                    .await
+            })
+        };
+        tokio::task::yield_now().await;
+        let request = last(&out, "calendar");
+        bridge.receive(
+            &json!({"type":"calendar_result","request_id":request["request_id"],"ok":true,
+            "data":{"event":{"id":"n@1","title":"Coffee chat","start":"2026-11-20T14:00:00-08:00",
+            "end":"2026-11-20T17:00:00-08:00","calendar":"me@gmail.com","account":"google",
+            "web_url":"https://calendar.google.com/calendar/r/day/2026/11/20"}}}),
+        );
+        task.await.unwrap().unwrap();
+        let card = last(&out, "calendar-event");
+        assert_eq!(card["title"], "Coffee chat");
+        assert_eq!(
+            card["url"],
+            "https://calendar.google.com/calendar/r/day/2026/11/20"
+        );
+        assert!(
+            event_card(&json!({"title":"x","start":"a","end":"b","web_url":"https://evil.io"}))
+                .unwrap()["url"]
+                .is_null()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_calendar_question_is_answered_by_voice_and_only_go_ahead_says_yes() {
+        let (bridge, out) = bridge();
+        for (said, expected) in [("yes go ahead", true), ("no, don't", false)] {
+            let task = {
+                let bridge = bridge.clone();
+                tokio::spawn(async move {
+                    bridge
+                        .confirm(
+                            "Can I move your 3pm Design review to 4pm?",
+                            &Cancellation::default(),
+                        )
+                        .await
+                })
+            };
+            tokio::task::yield_now().await;
+            let card = last(&out, "step");
+            assert_eq!(card["text"], "Can I move your 3pm Design review to 4pm?");
+            assert_eq!(
+                card["buttons"],
+                json!([{"id":"do","label":"Go ahead"},{"id":"stop","label":"Stop"}])
+            );
+            bridge.receive(&json!({"type":"utterance","text":said}));
+            assert_eq!(task.await.unwrap(), expected, "{said}");
+        }
+        // Cancelling the ask answers Stop and clears the card.
+        let cancel = Cancellation::default();
+        let task = {
+            let (bridge, cancel) = (bridge.clone(), cancel.clone());
+            tokio::spawn(async move { bridge.confirm("Can I remind you?", &cancel).await })
+        };
+        tokio::task::yield_now().await;
+        cancel.cancel();
+        assert!(!task.await.unwrap());
+        assert_eq!(last(&out, "step_clear")["id"], last(&out, "step")["id"]);
     }
 
     #[tokio::test]

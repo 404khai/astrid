@@ -45,6 +45,8 @@ final class PresenceController: NSObject, NSApplicationDelegate {
 
     private let askConfig: AskConfig?
     private var ask: AskController?
+    /// ADR 0042: nudges need the resident host and the ask surface.
+    private var nudges: NudgeController?
     /// ADR 0038: true while an operator session drives the cursor Astrid.
     private var operating = false
     /// The latest look's fingerprint, for "Do it" freshness. Memory only.
@@ -103,6 +105,11 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         if let askConfig {
             ask = AskController(config: askConfig)
             ask?.host = self
+            if resident, let ask {
+                let nudges = NudgeController(ask: ask, astrid: ask.astridURL)
+                ask.nudges = nudges
+                self.nudges = nudges
+            }
             AXElements.startTracking()
             // In --ask mode the mark is on screen from launch.
             playIntro()
@@ -181,6 +188,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         if resident, now >= nextTimerCheck {
             nextTimerCheck = now + 0.25
             fireDueTimers()
+            nudges?.tick()
         }
 
         if exitAtEnd, !resident, inputEnded, player.isIdle, !motion.isMoving, capturesInFlight == 0 {

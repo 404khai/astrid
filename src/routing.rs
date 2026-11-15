@@ -58,6 +58,8 @@ pub struct RequestOptions {
     /// ADR 0028 mail tools for these enabled sources.
     pub mail_apple: bool,
     pub mail_gmail: bool,
+    /// ADR 0041 calendar tools.
+    pub calendar: bool,
     pub effort: Option<ReasoningEffort>,
     pub replay: ReplayMode,
 }
