@@ -84,6 +84,15 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         IntroWave.play(on: screen)
     }
 
+    /// While an operator session works the wave keeps playing, one pass after
+    /// another, so it is plain that Astrid is live on the screen.
+    private func playWorkingWave() {
+        guard operating, intro, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        IntroWave.play(on: screen) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self?.playWorkingWave() }
+        }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         systemReduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -152,14 +161,15 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         let pointer = DisplayLayout.cocoaToQuartz(point: NSEvent.mouseLocation, primaryHeight: primaryHeight)
         motion.step(now: now, dt: dt, pointer: pointer, reduceMotion: reduceMotion)
-        // ADR 0038: the ask box rides beside the cursor Astrid while it works.
-        if operating { ask?.follow(tip: motion.tip, primaryHeight: primaryHeight) }
+        // ADR 0038: the Astrid you talk to rides with the cursor tip while it
+        // works, in place of the overlay's own logo.
+        if operating { ask?.follow(logo: motion.logoCenter, primaryHeight: primaryHeight) }
 
         let subtitleDisplay = layout.display(nearest: motion.tip)?.index
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         for scene in scenes {
-            scene.render(motion, time: now, reduceMotion: reduceMotion)
+            scene.render(motion, time: now, reduceMotion: reduceMotion, logoHidden: operating)
         }
         CATransaction.commit()
         for scene in scenes {
@@ -558,6 +568,7 @@ extension PresenceController: OperatorHost {
         operating = true
         motion.jump(to: mark)
         player.enqueue(.show(at: nil))
+        playWorkingWave()
         // The user's app keeps focus, so clicks and typing land there.
         AXElements.targetApp()?.activate()
         // Reading on-screen controls and acting both need Accessibility; asks once.
@@ -630,7 +641,10 @@ extension PresenceController: OperatorHost {
             // The planning look stays the reference for this step.
             self.lastLook = look
             let global = CGPoint(x: display.frame.minX + target.x, y: display.frame.minY + target.y)
+            // The talking Astrid rides near the target: let the action through it.
+            self.ask?.passThrough(true)
             Injector.perform(action, at: global)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.ask?.passThrough(false) }
             reply("done")
         }
     }

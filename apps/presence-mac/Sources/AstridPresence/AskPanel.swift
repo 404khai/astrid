@@ -35,8 +35,8 @@ protocol OperatorHost: AnyObject {
 final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
     private let config: AskConfig
     weak var host: OperatorHost?
-    /// ADR 0038: while operator runs the panel is a small box beside the
-    /// cursor Astrid (no mark of its own), following it.
+    /// ADR 0038: while operator runs the panel's mark rides with the cursor
+    /// tip and talks to you from there.
     private(set) var following = false
     /// Writes to the runtime child, off the main thread (frames are large).
     private let childWrites = DispatchQueue(label: "dev.astrid.presence.ask-writes")
@@ -118,20 +118,26 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         deliver(["type": "pointer", "x": mouse.x - frame.minX, "y": frame.maxY - mouse.y])
     }
 
-    /// Places the panel around its anchor, kept fully on the anchor's screen.
-    /// Keeps the panel just below-right of the cursor tip (global Quartz
-    /// points), flipping left/up near screen edges.
-    func follow(tip: CGPoint, primaryHeight: CGFloat) {
-        let point = NSPoint(x: tip.x, y: primaryHeight - tip.y)
+    /// ADR 0038: while operator works the panel's mark is Astrid's body
+    /// beside the cursor tip. Puts the mark's centre on the overlay logo's
+    /// centre (global Quartz points); the speech bubble sits to its right.
+    func follow(logo: CGPoint, primaryHeight: CGFloat) {
+        let point = NSPoint(x: logo.x, y: primaryHeight - logo.y)
         let screen = NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
         let size = panel.frame.size
-        var origin = NSPoint(x: point.x + 30, y: point.y - 34 - size.height)
-        if origin.x + size.width > visible.maxX { origin.x = point.x - 30 - size.width }
-        if origin.y < visible.minY { origin.y = point.y + 34 }
+        var origin = NSPoint(x: point.x - Self.markCentre.x, y: point.y - size.height + Self.markCentre.y)
         origin.x = min(max(origin.x, visible.minX), visible.maxX - size.width)
         origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
         if panel.frame.origin != origin { panel.setFrameOrigin(origin) }
+    }
+
+    /// The mark's centre from the panel's top-left in the operator layout.
+    private static let markCentre = CGPoint(x: 34, y: 34)
+
+    /// Lets one posted action reach the app under the panel.
+    func passThrough(_ on: Bool) {
+        panel.ignoresMouseEvents = on
     }
 
     /// The mark's centre in global Quartz points, where the cursor Astrid starts.
@@ -323,13 +329,14 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             }
             return
         case "operator":
-            // The cursor Astrid takes over; the panel becomes its following box.
+            // The cursor tip takes over the pointing; the mark rides with it.
             if object["on"] as? Bool == true {
                 following = true
                 panel.resignKey()
                 host?.operatorBegan(from: markPoint())
             } else {
                 following = false
+                panel.ignoresMouseEvents = false
                 host?.operatorEnded()
                 place()
             }

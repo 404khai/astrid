@@ -178,12 +178,13 @@ function App() {
         case "operator-card": {
           setOpCard({ id: m.id, text: m.text, step: m.step, total: m.total, buttons: m.buttons });
           setOpHint(null);
-          // Spoken asks get spoken steps: the card, then what you can say.
+          // Astrid says its questions out loud, like a person beside you.
+          // Spoken asks also hear what to say back.
           if (askedByVoice.current || modeRef.current === "voice") {
             const choices = m.buttons.map((b) => `“${b.label}”`);
             const say = choices.length > 1 ? `${choices.slice(0, -1).join(", ")} or ${choices.at(-1)}` : choices[0];
             speak(`${m.text} Say ${say}.`.replace(/[“”]/g, ""));
-          }
+          } else speak(m.text);
           break;
         }
         case "operator":
@@ -343,14 +344,34 @@ function App() {
       send({ type: "choice", id: card.id, choice });
       setOpCard(null);
     };
+    // One Astrid: this mark rides beside the cursor tip and talks from here.
+    // It reacts to its own voice and to yours while it waits on an answer.
+    const ring = speaking ? "speaking" : voice.listening ? "listening" : opCard ? "idle" : "processing";
+    const eyes: EyeExpression = speaking ? "composing" : voice.listening ? "listening" : opCard ? "listening" : look.eyes;
     return (
       <div className="pr-root pr-operator" ref={root}>
+        <div className="pr-op-body" aria-hidden="true">
+          <VoiceRing
+            size={68}
+            theme="dark"
+            state={ring}
+            stream={ring === "listening" ? voice.stream : null}
+            analyser={(ring === "speaking" ? speakerAnalyser.current : voice.analyser.current) as unknown as AnalyserNode}
+            paused={reduced}
+          />
+          <span className="pr-op-mark">
+            <AstridLogo expression={eyes} />
+          </span>
+        </div>
         <div className="pr-op-box" aria-live="polite">
-          <div className="pr-op-state">
-            <ThinkingOrb state={opCard ? looks.listening.orb : look.orb} size={20} theme="dark" paused={reduced} />
-            <span>{opCard?.step ? `Step ${opCard.step} of ${opCard.total}` : label}</span>
-          </div>
-          {opCard && <p className="pr-op-text">{opCard.text}</p>}
+          {opCard ? (
+            <p className="pr-op-text">{opCard.text}</p>
+          ) : (
+            <div className="pr-op-state">
+              <ThinkingOrb state={look.orb} size={20} theme="dark" paused={reduced} />
+              <span>{label}</span>
+            </div>
+          )}
           {opCard && (
             <div className="pr-op-actions">
               {opCard.buttons.map((b, i) => (

@@ -407,7 +407,8 @@ async fn astrid_does_the_steps_itself_and_asks_only_before_risky_ones() {
     assert_eq!(cards.len(), 1);
     assert_eq!(cards[0].step, Some((2, 2)));
     assert_eq!(cards[0].buttons, vec![Choice::DoIt, Choice::Stop]);
-    assert!(cards[0].text.ends_with("Shall I?"));
+    assert!(cards[0].text.starts_with("Can I go ahead and "));
+    assert!(cards[0].text.ends_with('?'));
 }
 
 #[tokio::test]
@@ -947,4 +948,11 @@ else printf '%s\n' '{{"type":"done","text":"","tool_calls":[{{"id":"toolu_look",
     // The bridge got the whole (scaled) frame, within its 8 MiB request limit.
     let request = std::fs::metadata(log.join("1.json")).unwrap().len();
     assert!(request > 200_000 && request < 8 * 1024 * 1024, "{request}");
+}
+
+#[test]
+fn confirm_steps_ask_like_a_person() {
+    assert_eq!(ask_first("Click Send."), "Can I go ahead and click Send?");
+    assert_eq!(ask_first("Delete the draft"), "Can I go ahead and delete the draft?");
+    assert_eq!(ask_first("  "), "Can I go ahead?");
 }

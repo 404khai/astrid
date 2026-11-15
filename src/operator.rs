@@ -579,7 +579,7 @@ impl Choice {
     pub fn label(self) -> &'static str {
         match self {
             Self::Look => "Look",
-            Self::DoIt => "Do it",
+            Self::DoIt => "Go ahead",
             Self::ShowMe => "Show me",
             Self::Done => "Done",
             Self::Stop => "Stop",
@@ -598,6 +598,18 @@ impl Choice {
         .into_iter()
         .find(|c| c.id() == id)
     }
+}
+
+/// The question Astrid asks before a step that sends, deletes, pays, posts or
+/// submits: "Click Send" becomes "Can I go ahead and click Send?".
+pub fn ask_first(instruction: &str) -> String {
+    let instruction = instruction.trim().trim_end_matches(['.', '!']);
+    let mut chars = instruction.chars();
+    let lowered = match chars.next() {
+        Some(first) => first.to_lowercase().chain(chars).collect::<String>(),
+        None => return "Can I go ahead?".into(),
+    };
+    format!("Can I go ahead and {lowered}?")
 }
 
 /// Maps something the user said to one of the card's offered buttons, for
@@ -819,7 +831,7 @@ pub async fn walk(
                 let ok = ui
                     .card(Card {
                         step: counter,
-                        text: format!("{} Shall I?", step.instruction),
+                        text: ask_first(&step.instruction),
                         buttons: vec![Choice::DoIt, Choice::Stop],
                         at,
                     })

@@ -76,10 +76,11 @@ final class OverlayScene {
     }
 
     /// Positions Astrid for this frame; actions disabled by the caller.
-    func render(_ motion: PresenceMotion, time: Double, reduceMotion: Bool) {
+    /// `logoHidden`: the ask panel's mark stands in for the logo (operator).
+    func render(_ motion: PresenceMotion, time: Double, reduceMotion: Bool, logoHidden: Bool = false) {
         let opacity = Float(motion.opacity)
         tip.opacity = opacity
-        logo.opacity = opacity
+        logo.opacity = logoHidden ? 0 : opacity
         tip.position = local(motion.tip)
         let origin = local(motion.logo)
         let bob = reduceMotion ? (offset: CGPoint.zero, degrees: 0.0) : PresenceMotion.bob(time: time)

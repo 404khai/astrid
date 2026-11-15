@@ -27,15 +27,20 @@ final class IntroWave {
 
     /// Keeps the running wave alive until it finishes.
     private static var current: IntroWave?
+    /// Callers that asked while a wave was already running; told when it ends.
+    private static var waiting: [() -> Void] = []
 
     /// Plays the wave once on `screen`. Does nothing without Metal; the caller
     /// skips it under Reduce Motion.
     static func play(on screen: NSScreen, done: @escaping () -> Void = {}) {
-        guard current == nil else { return }
+        guard current == nil else { return waiting.append(done) }
         do {
             current = try IntroWave(screen: screen) {
                 current = nil
                 done()
+                let others = waiting
+                waiting = []
+                others.forEach { $0() }
             }
             current?.begin()
         } catch {
