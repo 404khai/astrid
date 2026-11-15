@@ -171,6 +171,28 @@ maintainer asked for a full desktop app on that same native stack, with macOS
    - **Coloured mark:** drawn natively from the web logo's paths and gradient,
      on the new-chat page and in the sidebar.
 
+10. **Peek material, sidebar edge, quieter peek and blob groups (amended
+    2026-11-15).**
+    - **Peek material:** a peek now uses the window's own behind-window material
+      under the same tint as the docked sidebar.
+    - **Sidebar edge:** pushing the edge 40 pt past the minimum width closes the
+      sidebar.
+    - **Peek haptics:** one tap when it peeks and one when it leaves. The docked
+      slide keeps its sequence.
+    - **Blob groups (cosmetic):** a Giovanni button, drawn as a little macOS
+      icon beside the waveform, opens a picker. Picked blobs preview together
+      in a dark circle, and "Make group" saves a `BlobGroup` (name and member
+      blob files) in the app's preferences.
+      - **Sidebar:** groups show under Diagrams as their blobs in a dark circle
+        plus the name; deleting is in the context menu.
+      - **Chat:** a group opens a mock chat with Astrid's animated mark up top,
+        the blob count, and seeded charts (a per-blob progress ring and bars,
+        an activity line, status chips).
+      - **Rendering:** all of it comes from `web/group.html` and the blob
+        renderer.
+      - **Scope:** nothing is sent to a model and nothing is written to the chat
+        store.
+
 ## Alternatives considered
 
 - **A new executable target in `apps/presence-mac`.** It would raise presence

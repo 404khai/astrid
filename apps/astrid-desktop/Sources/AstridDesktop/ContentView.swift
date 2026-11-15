@@ -59,12 +59,13 @@ struct RootView: View {
                 .frame(width: width)
                 .frame(maxHeight: .infinity)
                 // Docked, the window's own tinted material shows through. Over
-                // the card it needs the same look of its own, so it fades in
-                // and out with the same motion.
+                // the card it brings the same thing along: the window's
+                // behind-window material under the same tint, so a peek looks
+                // exactly like the open sidebar. It fades with the same motion.
                 .background {
                     ZStack {
-                        Rectangle().fill(.ultraThinMaterial)
-                        palette.sidebar.opacity(min(1, palette.spec.sidebarOpacity + 0.2))
+                        WindowMaterial()
+                        palette.sidebar.opacity(palette.spec.sidebarOpacity)
                     }
                     .opacity(docked ? 0 : 1)
                 }
@@ -73,7 +74,7 @@ struct RootView: View {
                 .clipShape(UnevenRoundedRectangle(topLeadingRadius: docked ? 0 : 12, bottomLeadingRadius: docked ? 0 : 12, style: .continuous))
                 .shadow(color: .black.opacity(docked || !peeking ? 0 : (palette.spec.dark ? 0.3 : 0.12)), radius: 12, x: 3)
                 .overlay(alignment: .trailing) {
-                    if docked { ResizeHandle(width: $settings.sidebarWidth).offset(x: 4) }
+                    if docked { ResizeHandle(width: $settings.sidebarWidth) { settings.sidebarShown = false }.offset(x: 4) }
                 }
                 .padding(docked ? 0 : 8)
                 .allowsHitTesting(visible)
@@ -91,6 +92,7 @@ struct RootView: View {
         .background(WindowChrome(trafficLights: settings.trafficLightsVisible, measured: $lights))
         .ignoresSafeArea()
         .environment(\.palette, palette)
+        .environmentObject(settings)
         .animation(Self.slide, value: docked)
         .animation(Self.slide, value: peeking)
         .sheet(isPresented: $settings.showSettings) {
@@ -101,12 +103,14 @@ struct RootView: View {
                 .presentationBackground(palette.content)
         }
         // Docking from a peek keeps the sidebar where it is; only the card moves.
+        // Haptics: opening or closing the docked sidebar ticks along the slide
+        // and settles at full width; docking a peek settles once.
         .onChange(of: settings.sidebarShown) { _, shown in
-            if shown && peeking { Haptics.settle() }
+            if shown && peeking { Haptics.settle() } else { Haptics.slide(opening: shown) }
             if shown { peeking = false }
         }
-        // Haptics along the slide, settling at full width.
-        .onChange(of: visible) { _, nowVisible in Haptics.slide(opening: nowVisible) }
+        // A peek is lighter: one tap as it comes in, one as it goes back.
+        .onChange(of: peeking) { _, _ in if !settings.sidebarShown { Haptics.tick() } }
         // Debug: ASTRID_DESKTOP_PEEK=1 holds a closed sidebar peeking.
         .onAppear {
             if pinnedPeek {
@@ -133,9 +137,26 @@ struct RootView: View {
     }
 }
 
-/// Drag the docked sidebar's right edge to resize it.
+/// The window's own behind-window material, for a peeking sidebar that has
+/// to look like the open one while it lies over the card.
+struct WindowMaterial: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.blendingMode = .behindWindow
+        view.material = .underWindowBackground
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
+/// Drag the docked sidebar's right edge to resize it; push it past the
+/// narrowest width and it closes.
 struct ResizeHandle: View {
     @Binding var width: Double
+    /// Called when the edge is pushed well past the narrowest width.
+    var close: () -> Void = {}
     @State private var start: Double?
 
     var body: some View {
@@ -151,7 +172,15 @@ struct ResizeHandle: View {
                     .onChanged { value in
                         let base = start ?? width
                         start = base
-                        let next = min(max(base + value.translation.width, AppSettings.sidebarMin), AppSettings.sidebarMax)
+                        let wanted = base + value.translation.width
+                        // Pushed 40 pt past the narrowest width: close it.
+                        if wanted < AppSettings.sidebarMin - 40 {
+                            start = nil
+                            width = AppSettings.sidebarMin
+                            close()
+                            return
+                        }
+                        let next = min(max(wanted, AppSettings.sidebarMin), AppSettings.sidebarMax)
                         // A detent every 20 pt; a firmer bump at either end.
                         if (next == AppSettings.sidebarMax || next == AppSettings.sidebarMin) && next != width {
                             Haptics.settle()
@@ -253,6 +282,16 @@ struct Sidebar: View {
             VStack(spacing: 2) {
                 SidebarRow(symbol: "plus", title: "New Chat", selected: false) { model.newChat() }
                 SidebarRow(symbol: "square.grid.2x2", title: "Diagrams", selected: model.page == .diagrams) { model.page = .diagrams }
+                // Blob groups: their blobs in a dark circle, then the name.
+                ForEach(settings.groups) { group in
+                    GroupRow(ui: model.config.ui, group: group, selected: model.page == .group(group.id)) { model.page = .group(group.id) }
+                        .contextMenu {
+                            Button("Delete Group", role: .destructive) {
+                                settings.groups.removeAll { $0.id == group.id }
+                                if model.page == .group(group.id) { model.page = .chat }
+                            }
+                        }
+                }
                 Divider().opacity(0.5).padding(.vertical, 4)
                 ScrollView {
                     LazyVStack(spacing: 2) {
@@ -453,12 +492,20 @@ struct ContentCard: View {
     var peeking = false
     @Environment(\.palette) private var palette
 
+    private var title: String {
+        switch model.page {
+        case .diagrams: "Diagrams"
+        case .group(let id): settings.groups.first { $0.id == id }?.name ?? "Group"
+        case .chat: model.selected?.title ?? "New Chat"
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 // The toggle and new chat, in the same spot open or closed.
                 SidebarButtons(model: model, settings: settings, peeking: peeking)
-                Text(model.page == .diagrams ? "Diagrams" : model.selected?.title ?? "New Chat")
+                Text(title)
                     .font(.headline)
                     .lineLimit(1)
                 if model.page == .diagrams {
@@ -473,6 +520,12 @@ struct ContentCard: View {
             switch model.page {
             case .chat: ThreadView(model: model)
             case .diagrams: DiagramsView(model: model)
+            case .group(let id):
+                if let group = settings.groups.first(where: { $0.id == id }) {
+                    GroupChatView(ui: model.config.ui, group: group)
+                } else {
+                    ThreadView(model: model)
+                }
             }
         }
         .foregroundStyle(palette.text)
@@ -755,7 +808,10 @@ struct Composer: View {
                         .padding(.vertical, 11)
                         .opacity(talking ? 0 : 1)
                         .glassEffect(talking ? .identity : .regular.interactive(), in: .rect(cornerRadius: 20))
-                    if !talking { button }
+                    if !talking {
+                        if !typing && !running { BlobButton(model: model) }
+                        button
+                    }
                 }
                 .opacity(talking ? 0 : 1)
                 .disabled(talking)

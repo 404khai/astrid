@@ -1,4 +1,5 @@
 import AppKit
+import DesktopCore
 import SwiftUI
 
 /// Astrid's desktop app (ADR 0037): its own process and bundle, a normal Dock
@@ -97,6 +98,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.link?.newOffer()
                 print("astrid-desktop pairing \(self?.link?.pairingURL ?? "unavailable")")
                 fflush(stdout)
+            }
+        }
+        // Debug: ASTRID_DESKTOP_GROUP=1 makes a sample blob group (if none)
+        // and opens its mock chat.
+        if environment["ASTRID_DESKTOP_GROUP"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                guard let settings = self?.settings, let model = self?.model else { return }
+                if settings.groups.isEmpty {
+                    let picked = Array(Blobs.all().prefix(3))
+                    settings.groups = [BlobGroup(name: "Launch week", members: picked.map(\.id))]
+                }
+                if let group = settings.groups.first { model.page = .group(group.id) }
             }
         }
         // Debug: ASTRID_DESKTOP_SETTINGS=1 opens Settings once the window is up.
