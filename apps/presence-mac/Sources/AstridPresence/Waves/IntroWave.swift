@@ -24,18 +24,49 @@ final class IntroWave {
     private var displayLink: CADisplayLink?
     private var start: CFTimeInterval = 0
     private let done: () -> Void
+    /// The steady working rim: colour held on the edges, no sweep or sparks.
+    private var steady = false
+    /// When the steady rim was asked to fade out, nil while it holds.
+    private var releasedAt: CFTimeInterval?
+    private static var held: IntroWave?
+    private static let fade = 0.6
+
+    /// ADR 0038: while operator works, the colour stays on the screen's edges,
+    /// drifting and breathing, until `release()`. Fades in; no sweep.
+    static func hold(on screen: NSScreen) {
+        if let held { held.releasedAt = nil; return }
+        do {
+            let wave = try IntroWave(screen: screen) { held = nil }
+            wave.steady = true
+            held = wave
+            wave.begin()
+        } catch {
+            FileHandle.standardError.write(Data("astrid-presence: working wave unavailable: \(error)\n".utf8))
+        }
+    }
+
+    /// Fades the working rim out.
+    static func release() {
+        guard let held, held.releasedAt == nil else { return }
+        held.releasedAt = CACurrentMediaTime()
+    }
 
     /// Keeps the running wave alive until it finishes.
     private static var current: IntroWave?
+    /// Callers that asked while a wave was already running; told when it ends.
+    private static var waiting: [() -> Void] = []
 
     /// Plays the wave once on `screen`. Does nothing without Metal; the caller
     /// skips it under Reduce Motion.
     static func play(on screen: NSScreen, done: @escaping () -> Void = {}) {
-        guard current == nil else { return }
+        guard current == nil else { return waiting.append(done) }
         do {
             current = try IntroWave(screen: screen) {
                 current = nil
                 done()
+                let others = waiting
+                waiting = []
+                others.forEach { $0() }
             }
             current?.begin()
         } catch {
@@ -111,11 +142,29 @@ final class IntroWave {
     }
 
     @objc private func frame(_ link: CADisplayLink) {
+        if steady { return steadyFrame() }
         let progress = (CACurrentMediaTime() - start) / style.duration
         guard progress < 1 else { return finish() }
         let front = WaveFront(progress: progress, source: source, size: size, style: style)
         render(front)
         moveSparks(front)
+    }
+
+    /// The wave's end state with the band long gone, its edge colour whole and
+    /// its own clock still running so the lumps drift and breathe.
+    private func steadyFrame() {
+        let now = CACurrentMediaTime()
+        let shown = min((now - start) / Self.fade, 1)
+        let leaving = releasedAt.map { min((now - $0) / Self.fade, 1) } ?? 0
+        guard leaving < 1 else { return finish() }
+        var front = WaveFront(progress: 1, source: source, size: size, style: style)
+        front.time = now - start
+        front.energy = 0
+        front.glow = 0
+        front.clearRadius = -1e6
+        front.hairClearRadius = -1e6
+        front.rim = style.rimStrength * shown * (1 - leaving)
+        render(front)
     }
 
     private func render(_ front: WaveFront) {

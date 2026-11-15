@@ -69,6 +69,8 @@ enum FrameCapture {
             let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
             return .success(image)
         } catch {
+            // The real reason, for diagnosis (never the frame or screen content).
+            FileHandle.standardError.write(Data("astrid-presence: capture: \(error)\n".utf8))
             // Try ScreenCaptureKit first: the preflight can lag behind a fresh
             // grant. Only a refusal without access is reported as permission.
             if !CGPreflightScreenCaptureAccess() {

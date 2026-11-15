@@ -108,6 +108,9 @@ without exact trial approval. PR, no merge. Same day (2026-11-14) the maintainer
 ("i don't have a codex sub rn") and to "talk normally and it will infer": ADR 0038 amendment, operator defaults
 to `claude-code/sonnet` (local-look image path via the Claude Agent SDK), plain asks hand screen tasks to operator
 via an `operator-start` block, and voice answers step cards ("do it", "show me", "done", "stop").
+2026-11-15, on `feat/operator` fast-forwarded to main `acd9d51a`: "the astrid I talk to, should be the one to get a
+cursor and do stuff" (ADR 0038 amendment): no following box, the ask mark rides with the cursor tip, the wave loops
+while working, and confirm steps ask "Can I go ahead and ...?" out loud.
 
 **V2-06 phone companion started 2026-11-14.** Maintainer: "time to work on v2-06 for astrid for my phone. it should
 be an overlay ... distortion wave along the edges of my phone screen ... load it onto my android phone ... qr code

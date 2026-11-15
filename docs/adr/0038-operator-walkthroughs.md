@@ -235,6 +235,35 @@ above, on the maintainer's instruction:
   the panel returns to its place with the answer. The native step card is
   removed.
 
+## Amendment 2026-11-15: the Astrid you talk to does the work
+
+The maintainer, revisiting operator: "if it is working, the distortion waves
+should play while it is working ... set aside the box that follows the cursor
+around ... the astrid I talk to, should be the one to get a cursor and do
+stuff. if it needs confirmation, it can ask can I go ahead and do this ...
+like a normal spatial assistant conversing".
+
+- **One body.** While operator works, the overlay draws only the cursor tip (in
+  the step's cursor style) and the ink. Its own logo is hidden, and the ask
+  panel's mark, with its voice ring, rides in the logo's place beside the tip.
+  A speech bubble to its right shows what Astrid is doing or asking. The
+  following box is gone. The panel lets mouse events through for each posted
+  action, so a target under it still gets the click. Capture already excludes
+  every Astrid window.
+- **Waves while working.** While the session works, the Distortion Waves edge
+  colour stays on the screen's edges, drifting and breathing, and fades out when
+  it ends. There is no sweep from the bottom and no sparks (those stay the launch
+  intro). Reduce Motion and `--no-intro` still turn it off.
+- **No overlay cursor.** The cursor tip is hidden during sessions. Live use
+  showed it drawn far from the target, and the riding mark already shows where
+  Astrid works. Show-me circles still draw. The mark is larger while working
+  (46 pt logo inside a 128 pt ring), with space between them.
+- **Asking like a person.** A `confirm` step's question is "Can I go ahead and
+  <instruction>?" with [Go ahead] [Stop], and Astrid says every operator
+  question out loud. A spoken "yes", "go ahead" or "do it" answers it, as
+  before. The authority is unchanged: one answer approves exactly that step's
+  action.
+
 ## Alternatives considered
 
 - **(b) A time-boxed "watching" grant.** Fewer presses, but it is a standing

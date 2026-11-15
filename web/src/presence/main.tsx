@@ -23,6 +23,19 @@ const looks: Record<string, { orb: OrbState; eyes: EyeExpression }> = {
   idle: { orb: "breathing", eyes: "idle" },
 };
 
+/** How the operator's voice ring moves for each agent state, after the
+ * thinking orbs: quick and turning while working, a fast sweep while
+ * searching, slow and settled while weaving or composing, near still while
+ * it waits on you. */
+const ringMotion: Record<string, { calm: number; idle: number; spin: number }> = {
+  working: { calm: 0.9, idle: 0.2, spin: 60 },
+  searching: { calm: 0.7, idle: 0.15, spin: 140 },
+  weaving: { calm: 0.5, idle: 0.2, spin: 40 },
+  composing: { calm: 0.4, idle: 0.15, spin: 24 },
+  listening: { calm: 0.25, idle: 0.12, spin: 8 },
+  idle: { calm: 0.3, idle: 0.1, spin: 12 },
+};
+
 /** Asks the host to read text aloud, showing Astrid as speaking straight
  * away so voice mode doesn't reopen the mic before her voice starts. */
 let speakingHint: (on: boolean) => void = () => {};
@@ -178,12 +191,13 @@ function App() {
         case "operator-card": {
           setOpCard({ id: m.id, text: m.text, step: m.step, total: m.total, buttons: m.buttons });
           setOpHint(null);
-          // Spoken asks get spoken steps: the card, then what you can say.
+          // Astrid says its questions out loud, like a person beside you.
+          // Spoken asks also hear what to say back.
           if (askedByVoice.current || modeRef.current === "voice") {
             const choices = m.buttons.map((b) => `“${b.label}”`);
             const say = choices.length > 1 ? `${choices.slice(0, -1).join(", ")} or ${choices.at(-1)}` : choices[0];
             speak(`${m.text} Say ${say}.`.replace(/[“”]/g, ""));
-          }
+          } else speak(m.text);
           break;
         }
         case "operator":
@@ -343,15 +357,34 @@ function App() {
       send({ type: "choice", id: card.id, choice });
       setOpCard(null);
     };
+    // One Astrid: this mark rides beside the cursor tip and talks from here.
+    // It reacts to its own voice and to yours while it waits on an answer.
+    // No orb: its face and the ring's motion show the agent state, and the
+    // bubble appears only when Astrid has something to ask.
+    const ring = speaking ? "speaking" : voice.listening ? "listening" : opCard ? "idle" : "processing";
+    const motion = opCard ? ringMotion.listening : (ringMotion[state.state] ?? ringMotion.idle);
+    const eyes: EyeExpression = speaking ? "composing" : voice.listening ? "listening" : opCard ? "listening" : look.eyes;
     return (
       <div className="pr-root pr-operator" ref={root}>
-        <div className="pr-op-box" aria-live="polite">
-          <div className="pr-op-state">
-            <ThinkingOrb state={opCard ? looks.listening.orb : look.orb} size={20} theme="dark" paused={reduced} />
-            <span>{opCard?.step ? `Step ${opCard.step} of ${opCard.total}` : label}</span>
-          </div>
-          {opCard && <p className="pr-op-text">{opCard.text}</p>}
-          {opCard && (
+        <div className="pr-op-body" aria-hidden="true">
+          <VoiceRing
+            size={128}
+            theme="dark"
+            state={ring}
+            stream={ring === "listening" ? voice.stream : null}
+            analyser={(ring === "speaking" ? speakerAnalyser.current : voice.analyser.current) as unknown as AnalyserNode}
+            paused={reduced}
+            calm={motion.calm}
+            idle={motion.idle}
+            gradientSpin={motion.spin}
+          />
+          <span className="pr-op-mark">
+            <AstridLogo expression={eyes} />
+          </span>
+        </div>
+        {opCard && (
+          <div className="pr-op-box" aria-live="polite">
+            <p className="pr-op-text">{opCard.text}</p>
             <div className="pr-op-actions">
               {opCard.buttons.map((b, i) => (
                 <button
@@ -364,9 +397,9 @@ function App() {
                 </button>
               ))}
             </div>
-          )}
-          {opCard && (opHint || voice.listening) && <small className="pr-op-hint">{opHint ?? "Listening…"}</small>}
-        </div>
+            {(opHint || voice.listening) && <small className="pr-op-hint">{opHint ?? "Listening…"}</small>}
+          </div>
+        )}
       </div>
     );
   }
