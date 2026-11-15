@@ -1,5 +1,6 @@
 import AppKit
 import AstridWebUI
+import PresenceCore
 import WebKit
 
 /// ADR 0033: the presence app's ask surface. A small floating panel in the
@@ -23,6 +24,8 @@ struct AskConfig {
     var wake = false
     /// ADR 0038: the `/operator` image model (nil: the runtime's default).
     var operatorModel: String?
+    /// ADR 0041: Calendar and Reminders through EventKit (`--ask-calendar off` turns it off).
+    var calendar = true
 }
 
 /// What the operator (ADR 0038) needs from the presence app.
@@ -64,6 +67,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     private var hotkey: Hotkey?
     private var dragTimer: Timer?
     private let speaker: Speaker
+    /// ADR 0041: EventKit calls block, so they run one at a time off the main thread.
+    private let calendarQueue = DispatchQueue(label: "dev.astrid.presence.calendar")
+    private lazy var calendar = CalendarService(source: EventKitCalendar())
     /// ADR 0036: the live canvas, created on the first drawing.
     private lazy var canvas: CanvasController = {
         let canvas = CanvasController(page: config.ui.deletingLastPathComponent().appendingPathComponent("canvas.html"))
@@ -293,6 +299,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
         var arguments = ["presence-ask", "--model", config.model]
         if let operatorModel = config.operatorModel { arguments += ["--operator-model", operatorModel] }
         if let mail = config.mail { arguments += ["--mail-source", mail] }
+        if config.calendar { arguments.append("--calendar") }
         process.arguments = arguments
         let input = Pipe(), output = Pipe()
         process.standardInput = input
@@ -348,6 +355,18 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             let id = object["request_id"] as? String ?? ""
             host?.operatorAct(object) { [weak self] outcome in
                 self?.send(["type": "acted", "request_id": id, "outcome": outcome])
+            }
+            return
+        case "calendar":
+            // ADR 0041: only the ask child's calendar requests, answered by EventKit.
+            guard config.calendar else {
+                send(["type": "calendar_result", "request_id": object["request_id"] ?? "", "ok": false, "reason": "calendar_access_denied"])
+                return
+            }
+            let service = calendar
+            calendarQueue.async { [weak self] in
+                let reply = service.handle(object)
+                DispatchQueue.main.async { self?.send(reply) }
             }
             return
         case "operator":

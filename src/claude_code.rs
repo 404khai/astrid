@@ -243,6 +243,9 @@ impl ClaudeCodeProvider {
         if !mail.is_empty() {
             definitions.extend(crate::mail::definitions(&mail));
         }
+        if request.options.calendar {
+            definitions.extend(crate::calendar::definitions());
+        }
         // ADR 0038: local look and presentation tools (look, point_at, sketch, say).
         if request.options.look {
             definitions.extend(crate::computer::look_definitions());

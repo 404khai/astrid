@@ -363,11 +363,32 @@ function App() {
   const label = approval ? "Waiting for you" : state.label;
   const busy = asking !== null;
 
+  const choose = (card: OpCard, choice: string) => {
+    send({ type: "choice", id: card.id, choice });
+    setOpCard(null);
+  };
+  // ADR 0041: a calendar write's question ("Can I move your 3pm ...?") in the
+  // panel itself, with the buttons it offers; voice answers it too.
+  const question = opCard && !operating && (
+    <div className="pr-question" aria-live="polite">
+      <p className="pr-op-text">{opCard.text}</p>
+      <div className="pr-op-actions">
+        {opCard.buttons.map((b, i) => (
+          <button
+            key={b.id}
+            type="button"
+            className={i === 0 && b.id !== "stop" ? "pr-btn" : "pr-btn pr-btn-ghost"}
+            onClick={() => choose(opCard, b.id)}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+      {opHint && <small className="pr-op-hint">{opHint}</small>}
+    </div>
+  );
+
   if (operating) {
-    const choose = (card: OpCard, choice: string) => {
-      send({ type: "choice", id: card.id, choice });
-      setOpCard(null);
-    };
     // One Astrid: this mark rides beside the cursor tip and talks from here.
     // It reacts to its own voice and to yours while it waits on an answer.
     // No orb: its face and the ring's motion show the agent state, and the
@@ -444,10 +465,11 @@ function App() {
             : voice.error ?? "";
     return (
       <div className="pr-root pr-voice" ref={root}>
-        {(approval || error || (answer && !canvasOpen)) && (
+        {(approval || error || question || (answer && !canvasOpen)) && (
           <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
             <Liquid.Item transition="smooth">
               <div className="pr-card" aria-live="polite">
+                {question}
                 {approval && <ApprovalCard approval={approval} onDecide={decide} />}
                 {error && !busy && !approval && <p className="pr-error">{error}</p>}
                 {answer && !busy && !approval && !canvasOpen && (
@@ -504,9 +526,7 @@ function App() {
                 </div>
               )}
               {busy && <p className="pr-ask">“{asking}”</p>}
-              {busy && opCard && (
-                <p className="pr-ask">{opHint ?? `Say ${opCard.buttons.map((b) => `“${b.label}”`).join(" or ")}, or use the card.`}</p>
-              )}
+              {question}
               {approval && <ApprovalCard approval={approval} onDecide={decide} />}
               {error && !busy && <p className="pr-error">{error}</p>}
               {answer && !busy && !canvasOpen && (

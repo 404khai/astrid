@@ -76,6 +76,10 @@ pub trait ToolExecutor: Send + Sync {
     fn mail(&self) -> Option<&crate::mail::Mail> {
         None
     }
+    /// ADR 0041 Calendar and Reminders through the presence host.
+    fn calendar(&self) -> Option<&crate::calendar::Calendar> {
+        None
+    }
     fn permission(&self, call: &ToolCall) -> Result<Option<PermissionRequest>, ToolError>;
     async fn execute(&self, call: &ToolCall, cancellation: &Cancellation) -> ToolExecution;
     async fn execute_stream(
@@ -94,6 +98,7 @@ pub struct Tools {
     instabox: Option<crate::remote::InstaboxTool>,
     computer: Option<crate::computer::Computer>,
     mail: Option<crate::mail::Mail>,
+    calendar: Option<crate::calendar::Calendar>,
 }
 
 #[derive(Deserialize)]
@@ -134,6 +139,7 @@ impl Tools {
             instabox: None,
             computer: None,
             mail: None,
+            calendar: None,
         })
     }
 
@@ -148,6 +154,10 @@ impl Tools {
     }
     pub fn with_mail(mut self, mail: crate::mail::Mail) -> Self {
         self.mail = Some(mail);
+        self
+    }
+    pub fn with_calendar(mut self, calendar: crate::calendar::Calendar) -> Self {
+        self.calendar = Some(calendar);
         self
     }
 
@@ -367,6 +377,9 @@ impl ToolExecutor for Tools {
     }
     fn mail(&self) -> Option<&crate::mail::Mail> {
         self.mail.as_ref()
+    }
+    fn calendar(&self) -> Option<&crate::calendar::Calendar> {
+        self.calendar.as_ref()
     }
     fn instabox(&self) -> Option<&crate::remote::InstaboxTool> {
         self.instabox.as_ref()

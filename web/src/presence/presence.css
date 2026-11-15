@@ -564,3 +564,11 @@ button {
   font: 400 11px/16px var(--mono);
   color: var(--muted);
 }
+
+/* ADR 0041: a calendar write's question inside the ask card. */
+.pr-question {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 2px;
+}

@@ -372,6 +372,9 @@ enum Commands {
         /// Display operator looks at (0 = the display with the menu bar).
         #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u32).range(0..=15))]
         operator_display: u32,
+        /// Calendar and Reminders through the presence app's EventKit (ADR 0041).
+        #[arg(long)]
+        calendar: bool,
     },
     /// Gmail sign-in for read-only mail search (ADR 0028).
     Mail {
@@ -1087,6 +1090,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             mail_source,
             operator_model,
             operator_display,
+            calendar,
         }) => {
             let workspace = presence_ask::workspace()?;
             let mut tools = Tools::new(workspace, Duration::from_secs(1))?;
@@ -1116,7 +1120,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 model: operator_model,
                 display: operator_display,
             };
-            return presence_ask::serve(provider, tools, model, Some(operator)).await;
+            return presence_ask::serve(provider, tools, model, Some(operator), calendar).await;
         }
         Some(Commands::Mail { command }) => return mail_command(command).await,
         Some(Commands::Claude { command }) => return claude_command(command),

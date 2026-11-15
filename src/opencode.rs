@@ -250,6 +250,9 @@ impl OpenCodeProvider {
         if !mail.is_empty() {
             definitions.extend(crate::mail::definitions(&mail));
         }
+        if request.options.calendar {
+            definitions.extend(crate::calendar::definitions());
+        }
         let tools: Vec<Value> = definitions
             .iter()
             .map(|d| json!({"type":"function","function":{"name":d["name"],"description":d["description"],"parameters":d["parameters"]}}))

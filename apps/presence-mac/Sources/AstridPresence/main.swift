@@ -34,6 +34,8 @@ OPTIONS
   --operator-model M  Image model for operator walkthroughs (ADR 0038):
                    claude-code/sonnet (default), claude-code/opus or gpt-5.6-sol/terra/luna.
   --ask-mail SRC   gmail, apple, all or none (default gmail).
+  --ask-calendar on|off  Calendar and Reminders through EventKit (default on;
+                   macOS asks for access the first time). See ADR 0041.
   --ask-voice V    Kokoro voice for spoken replies (default af_heart).
   --voice-cmd PATH The astrid-voice executable (default: apps/astrid-voice/.venv/bin/astrid-voice;
                    without it, macOS's built-in voice speaks).
@@ -69,6 +71,7 @@ var askMode = false
 var wake = false
 var askModel = "claude-code/sonnet"
 var askMail: String? = "gmail"
+var askCalendar = true
 var askVoice = "af_heart"
 var operatorModel: String?
 var voiceCommandPath: String?
@@ -136,6 +139,9 @@ while let argument = arguments.popFirst() {
     case "--ask-mail":
         guard let value = arguments.popFirst(), ["gmail", "apple", "all", "none"].contains(value) else { fail("--ask-mail needs gmail, apple, all or none") }
         askMail = value == "none" ? nil : value
+    case "--ask-calendar":
+        guard let value = arguments.popFirst(), ["on", "off"].contains(value) else { fail("--ask-calendar needs on or off") }
+        askCalendar = value == "on"
     case "--operator-model":
         guard let value = arguments.popFirst(), ["claude-code/sonnet", "claude-code/opus", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"].contains(value) else {
             fail("--operator-model needs claude-code/sonnet, claude-code/opus or gpt-5.6-sol/terra/luna")
@@ -186,6 +192,7 @@ if askMode {
     let voiceCommand = voiceCommandPath.map { URL(fileURLWithPath: $0) } ?? repoFile("apps/astrid-voice/.venv/bin/astrid-voice")
     askConfig = AskConfig(ui: ui, astrid: astrid, model: askModel, mail: askMail, voiceCommand: voiceCommand, voiceName: askVoice, operatorModel: operatorModel)
     askConfig?.wake = wake
+    askConfig?.calendar = askCalendar
     // The ask surface replaces the scripted demo; Astrid waits in the corner.
     if sourceCount == 0 { source = .script([]) }
 }

@@ -26,6 +26,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Astrid listens only while you hold the mic. Audio stays on this Mac.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key><string>Astrid reads your calendar to answer "what's my day?" and moves an event only after you say go ahead.</string>
+  <key>NSRemindersFullAccessUsageDescription</key><string>Astrid reads your reminders and adds one only after you say go ahead.</string>
+  <key>NSContactsUsageDescription</key><string>Astrid reads only the home address on your own contact card, for "remind me when I get home".</string>
   <key>NSSpeechRecognitionUsageDescription</key><string>Astrid turns what you say into text on this Mac, without sending audio anywhere.</string>
 </dict>
 </plist>

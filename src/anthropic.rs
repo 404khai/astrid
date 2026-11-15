@@ -200,6 +200,9 @@ impl ClaudeProvider {
         if !mail.is_empty() {
             definitions.extend(crate::mail::definitions(&mail));
         }
+        if request.options.calendar {
+            definitions.extend(crate::calendar::definitions());
+        }
         let tools: Vec<Value> = definitions
             .iter()
             .map(|d| json!({"name":d["name"],"description":d["description"],"input_schema":d["parameters"],"eager_input_streaming":true}))
