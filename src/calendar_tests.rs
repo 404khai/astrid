@@ -76,7 +76,7 @@ fn times_parse_format_and_read_aloud() {
         Time::parse("2026-12-01T09:00:00-08:00")
             .unwrap()
             .day_phrase(&now),
-        "on Dec 1"
+        "on Tuesday, Dec 1"
     );
     assert!(now_line(&now).contains("Monday"));
     for bad in [
@@ -271,6 +271,70 @@ async fn read_only_events_are_refused_and_host_reasons_are_explained() {
         .await
         .unwrap_err();
     assert!(error.contains("ask what time"));
+}
+
+#[test]
+fn new_events_default_to_google_and_say_when_and_where() {
+    let calendar = Calendar::new(Arc::new(Host::default()));
+    let now = monday();
+    let coffee = calendar
+        .prepare(
+            "event_create",
+            r#"{"title":"Coffee chat","start":"2026-11-20T14:00:00-08:00","end":"2026-11-20T17:00:00-08:00","calendar":null}"#,
+            &now,
+        )
+        .unwrap();
+    assert_eq!(
+        coffee.question.as_deref(),
+        Some("Can I add Coffee chat on Friday from 2pm to 5pm to your Google calendar?")
+    );
+    let Op::Create {
+        calendar: ref choice,
+        ..
+    } = coffee.op
+    else {
+        panic!()
+    };
+    assert_eq!(choice, &None);
+    assert_eq!(coffee.wire()["op"], "event_create");
+    let apple = calendar_label(Some("apple"));
+    assert_eq!(apple, "your Apple calendar");
+    assert_eq!(calendar_label(Some("Family")), "your “Family” calendar");
+    for bad in [
+        r#"{"title":"x","start":"2026-11-20T17:00:00-08:00","end":"2026-11-20T14:00:00-08:00","calendar":null}"#,
+        r#"{"title":"x","start":"2026-11-20T14:00:00-08:00","end":"2026-11-22T14:00:00-08:00","calendar":null}"#,
+        r#"{"title":"x","start":"2026-11-20T14:00:00-08:00","end":"2026-11-20T15:00:00-08:00","calendar":null,"attendees":["a@b.c"]}"#,
+        r#"{"title":"","start":"2026-11-20T14:00:00-08:00","end":"2026-11-20T15:00:00-08:00","calendar":null}"#,
+    ] {
+        assert!(
+            calendar.prepare("event_create", bad, &now).is_err(),
+            "{bad}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn moving_to_next_week_names_the_day() {
+    let calendar = Calendar::new(Arc::new(Host::default()));
+    let now = monday();
+    let agenda = calendar
+        .prepare("calendar_agenda", r#"{"start_date":null,"days":1}"#, &now)
+        .unwrap();
+    calendar
+        .execute(&agenda, &Cancellation::default())
+        .await
+        .unwrap();
+    let next_wednesday = calendar
+        .prepare(
+            "event_move",
+            r#"{"event_id":"e1","start":"2026-11-25T15:00:00-08:00","end":null}"#,
+            &now,
+        )
+        .unwrap();
+    assert_eq!(
+        next_wednesday.question.as_deref(),
+        Some("Can I move your 3pm Design review to 3pm on Wednesday, Nov 25?")
+    );
 }
 
 mod runtime_flow {

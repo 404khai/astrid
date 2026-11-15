@@ -21,11 +21,13 @@ public struct CalendarEvent: Equatable, Sendable {
     public var meetingURL: URL?
     /// False for subscribed, birthday and other read-only calendars.
     public var editable: Bool
+    /// "google", "apple" (iCloud or On My Mac) or "other": the calendar's account.
+    public var account: String = "other"
 
     public init(id: String, title: String, start: Date, end: Date, allDay: Bool = false, calendar: String = "Calendar",
-                location: String? = nil, meetingURL: URL? = nil, editable: Bool = true) {
+                location: String? = nil, meetingURL: URL? = nil, editable: Bool = true, account: String = "other") {
         (self.id, self.title, self.start, self.end, self.allDay, self.calendar) = (id, title, start, end, allDay, calendar)
-        (self.location, self.meetingURL, self.editable) = (location, meetingURL, editable)
+        (self.location, self.meetingURL, self.editable, self.account) = (location, meetingURL, editable, account)
     }
 }
 
@@ -43,6 +45,36 @@ public struct ReminderItem: Equatable, Sendable {
     }
 }
 
+/// Which calendar a new event goes in: Google by default (ADR 0041
+/// amendment), Apple (iCloud or On My Mac), or one calendar by its name.
+public enum CalendarChoice: Equatable, Sendable {
+    case google, apple
+    case named(String)
+
+    public static func parse(_ value: Any?) -> CalendarChoice? {
+        guard let text = (value as? String)?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return .google }
+        switch text.lowercased() {
+        case "google", "gmail", "google calendar": return .google
+        case "apple", "icloud", "apple calendar": return .apple
+        default: return text.count <= 80 ? .named(text) : nil
+        }
+    }
+}
+
+/// The web page for a Google Calendar event's day (EventKit has no Google
+/// event id), opened only in the user's browser.
+public enum GoogleCalendarLink {
+    public static func day(_ date: Date, calendar: Calendar = .current) -> URL? {
+        let d = calendar.dateComponents([.year, .month, .day], from: date)
+        guard let y = d.year, let m = d.month, let day = d.day else { return nil }
+        return URL(string: "https://calendar.google.com/calendar/r/day/\(y)/\(m)/\(day)")
+    }
+
+    public static func isAllowed(_ url: URL) -> Bool {
+        url.scheme == "https" && url.host == "calendar.google.com"
+    }
+}
+
 /// Where a location reminder fires. Only home, from the user's own contact card.
 public enum ReminderPlace: String, Sendable { case home }
 
@@ -54,6 +86,7 @@ public enum CalendarFailure: String, Error, Sendable {
     case eventChanged = "event_changed"
     case readOnlyCalendar = "calendar_read_only"
     case homeUnavailable = "home_address_unavailable"
+    case calendarNotFound = "calendar_not_found"
     case invalidRequest = "invalid_request"
     case failed = "calendar_failed"
 }
@@ -64,6 +97,8 @@ public protocol CalendarSource: AnyObject {
     func events(from: Date, to: Date) throws -> [CalendarEvent]
     func reminders(dueBefore: Date) throws -> [ReminderItem]
     func createReminder(title: String, due: Date?, place: ReminderPlace?) throws -> ReminderItem
+    /// Adds one event with no invitees. Throws `calendarNotFound` when the choice matches no writable calendar.
+    func createEvent(title: String, start: Date, end: Date, in choice: CalendarChoice) throws -> CalendarEvent
     /// Moves one occurrence. Throws `eventChanged` unless it still starts at `expectStart`.
     func moveEvent(id: String, expectStart: Date, start: Date, end: Date) throws -> CalendarEvent
 }

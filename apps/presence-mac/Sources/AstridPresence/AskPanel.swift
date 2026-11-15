@@ -257,8 +257,9 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
             // ADR 0038 voice: an answer to the operator card on screen.
             if let text = body["text"] as? String { send(["type": "utterance", "text": String(text.prefix(500))]) }
         case "open":
-            // Only Gmail message links, opened in the user's browser.
-            if let text = body["url"] as? String, let url = URL(string: text), url.scheme == "https", url.host == "mail.google.com" {
+            // Gmail messages and (ADR 0041) Google Calendar days, in the browser.
+            if let text = body["url"] as? String, let url = URL(string: text), url.scheme == "https",
+               url.host == "mail.google.com" || GoogleCalendarLink.isAllowed(url) {
                 NSWorkspace.shared.open(url)
             }
         default:

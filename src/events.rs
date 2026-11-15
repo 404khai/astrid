@@ -919,6 +919,7 @@ impl ExecutionState {
                                         | "mail_search"
                                         | "mail_read"
                                         | "reminder_create"
+                                        | "event_create"
                                         | "event_move"
                                 )
                                 && !self.cancellation_acknowledged,

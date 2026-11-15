@@ -10,6 +10,8 @@ final class FakeCalendar: CalendarSource {
     var hasHome = true
     var created: [(String, Date?, ReminderPlace?)] = []
     var moved: [(String, Date, Date)] = []
+    var added: [(String, CalendarChoice)] = []
+    var calendars = ["Work"]
 
     func events(from: Date, to: Date) throws -> [CalendarEvent] {
         if denyEvents { throw CalendarFailure.calendarAccessDenied }
@@ -25,6 +27,13 @@ final class FakeCalendar: CalendarSource {
         if place == .home, !hasHome { throw CalendarFailure.homeUnavailable }
         created.append((title, due, place))
         return ReminderItem(id: "r\(created.count)", title: title, due: due, place: place?.rawValue)
+    }
+
+    func createEvent(title: String, start: Date, end: Date, in choice: CalendarChoice) throws -> CalendarEvent {
+        if case let .named(name) = choice, !calendars.contains(name) { throw CalendarFailure.calendarNotFound }
+        added.append((title, choice))
+        let account = choice == .apple ? "apple" : "google"
+        return CalendarEvent(id: "n@1", title: title, start: start, end: end, calendar: choice == .apple ? "Home" : "me@gmail.com", account: account)
     }
 
     func moveEvent(id: String, expectStart: Date, start: Date, end: Date) throws -> CalendarEvent {
@@ -137,5 +146,33 @@ final class CalendarTests: XCTestCase {
         XCTAssertEqual(MeetingLink.find(in: [nil, "Join: https://acme.zoom.us/j/123?pwd=x thanks"])?.host, "acme.zoom.us")
         XCTAssertEqual(MeetingLink.find(in: ["https://meet.google.com/abc-defg-hij"])?.host, "meet.google.com")
         XCTAssertNil(MeetingLink.find(in: ["http://zoom.us/j/1", "https://evilzoom.us/j/1", "https://example.com"]))
+    }
+
+    func testCreatingDefaultsToGoogleAndLinksTheDayButNeverInvitesAnyone() throws {
+        let source = fake()
+        let service = CalendarService(source: source)
+        let made = service.handle(["request_id": "c", "op": "event_create", "title": "Coffee chat", "calendar": NSNull(),
+                                   "start": "2026-11-20T14:00:00-08:00", "end": "2026-11-20T17:00:00-08:00"], now: now)
+        XCTAssertEqual(made["ok"] as? Bool, true)
+        XCTAssertEqual(source.added.first?.1, .google)
+        let event = try XCTUnwrap((made["data"] as? [String: Any])?["event"] as? [String: Any])
+        XCTAssertEqual(event["account"] as? String, "google")
+        XCTAssertTrue((event["web_url"] as? String)?.hasPrefix("https://calendar.google.com/calendar/r/day/2026/11/") == true)
+        XCTAssertNil(event["attendees"])
+        _ = service.handle(["request_id": "c", "op": "event_create", "title": "Gym", "calendar": "Apple",
+                            "start": "2026-11-20T08:00:00-08:00", "end": "2026-11-20T09:00:00-08:00"], now: now)
+        XCTAssertEqual(source.added.last?.1, .apple)
+        let unknown = service.handle(["request_id": "c", "op": "event_create", "title": "X", "calendar": "Nope",
+                                      "start": "2026-11-20T08:00:00-08:00", "end": "2026-11-20T09:00:00-08:00"], now: now)
+        XCTAssertEqual(unknown["reason"] as? String, "calendar_not_found")
+        let backwards = service.handle(["request_id": "c", "op": "event_create", "title": "X",
+                                        "start": "2026-11-20T09:00:00-08:00", "end": "2026-11-20T08:00:00-08:00"], now: now)
+        XCTAssertEqual(backwards["reason"] as? String, "invalid_request")
+        XCTAssertEqual(CalendarChoice.parse("google calendar"), .google)
+        XCTAssertEqual(CalendarChoice.parse("iCloud"), .apple)
+        XCTAssertFalse(GoogleCalendarLink.isAllowed(URL(string: "https://calendar.google.com.evil.io/x")!))
+        // Reads never carry the link.
+        let agenda = service.handle(["request_id": "q", "op": "agenda", "from": "2026-11-16T00:00:00Z", "to": "2026-11-17T00:00:00Z"], now: now)
+        XCTAssertNil(((agenda["data"] as? [String: Any])?["events"] as? [[String: Any]])?.first?["web_url"])
     }
 }

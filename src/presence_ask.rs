@@ -294,7 +294,9 @@ fn state_for(kind: &EventKind) -> Option<(&'static str, String)> {
             "mail_search" => ("searching", "Searching mail".into()),
             "mail_read" => ("weaving", "Reading an email".into()),
             "calendar_agenda" => ("searching", "Checking your calendar".into()),
-            "reminder_create" | "event_move" => ("weaving", "Updating your calendar".into()),
+            "reminder_create" | "event_create" | "event_move" => {
+                ("weaving", "Updating your calendar".into())
+            }
             _ => ("searching", "Looking".into()),
         }),
         EventKind::PermissionRequested { .. } => Some(("listening", "Waiting for you".into())),

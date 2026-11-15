@@ -214,6 +214,22 @@ impl Bridge {
     }
 }
 
+/// The panel's card for an event the user just added or moved.
+pub fn event_card(event: &Value) -> Option<Value> {
+    let text = |k: &str, n: usize| {
+        event[k]
+            .as_str()
+            .map(|s| s.chars().take(n).collect::<String>())
+    };
+    let url = event["web_url"]
+        .as_str()
+        .filter(|u| u.starts_with("https://calendar.google.com/"));
+    Some(
+        json!({"type":"calendar-event","title":text("title", 200)?,"start":text("start", 40)?,
+        "end":text("end", 40)?,"calendar":text("calendar", 80),"account":text("account", 16),"url":url}),
+    )
+}
+
 #[async_trait]
 impl CalendarHost for Bridge {
     async fn call(&self, mut request: Value, cancel: &Cancellation) -> Result<Value, String> {
@@ -223,6 +239,7 @@ impl CalendarHost for Bridge {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(id.clone(), tx);
+        let changes = matches!(request["op"].as_str(), Some("event_create" | "event_move"));
         request["type"] = json!("calendar");
         request["request_id"] = json!(id);
         (self.emit)(request);
@@ -231,6 +248,14 @@ impl CalendarHost for Bridge {
             reply = rx => reply.unwrap_or_else(|_| Err("presence_app_went_away".into())),
         };
         take(&self.calendars, &id);
+        // ADR 0041 amendment: after a change the panel shows the event as a
+        // card (with its Google Calendar page). The link never reaches the model.
+        if changes
+            && let Ok(data) = &result
+            && let Some(card) = event_card(&data["event"])
+        {
+            (self.emit)(card);
+        }
         result
     }
 }
@@ -399,6 +424,42 @@ mod tests {
         );
         bridge.receive(&json!({"type":"calendar_result","request_id":request["request_id"],"ok":false,"reason":"calendar_access_denied"}));
         assert_eq!(task.await.unwrap().unwrap_err(), "calendar_access_denied");
+    }
+
+    #[tokio::test]
+    async fn a_new_event_shows_a_card_with_only_a_google_calendar_link() {
+        let (bridge, out) = bridge();
+        let task = {
+            let bridge = bridge.clone();
+            tokio::spawn(async move {
+                bridge
+                    .call(
+                        json!({"op":"event_create","title":"Coffee chat"}),
+                        &Cancellation::default(),
+                    )
+                    .await
+            })
+        };
+        tokio::task::yield_now().await;
+        let request = last(&out, "calendar");
+        bridge.receive(
+            &json!({"type":"calendar_result","request_id":request["request_id"],"ok":true,
+            "data":{"event":{"id":"n@1","title":"Coffee chat","start":"2026-11-20T14:00:00-08:00",
+            "end":"2026-11-20T17:00:00-08:00","calendar":"me@gmail.com","account":"google",
+            "web_url":"https://calendar.google.com/calendar/r/day/2026/11/20"}}}),
+        );
+        task.await.unwrap().unwrap();
+        let card = last(&out, "calendar-event");
+        assert_eq!(card["title"], "Coffee chat");
+        assert_eq!(
+            card["url"],
+            "https://calendar.google.com/calendar/r/day/2026/11/20"
+        );
+        assert!(
+            event_card(&json!({"title":"x","start":"a","end":"b","web_url":"https://evil.io"}))
+                .unwrap()["url"]
+                .is_null()
+        );
     }
 
     #[tokio::test]

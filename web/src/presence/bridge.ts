@@ -38,7 +38,17 @@ export type Incoming =
   // ADR 0042 nudges: a bubble beside the mark, its removal, and a yes that asks.
   | { type: "nudge"; id: string; text: string; speak: boolean; buttons: { id: string; label: string }[] }
   | { type: "nudge-clear"; id: string }
-  | { type: "nudge-ask"; text: string };
+  | { type: "nudge-ask"; text: string }
+  // ADR 0041: an event the user just added or moved, with its Google Calendar day.
+  | {
+      type: "calendar-event";
+      title: string;
+      start: string;
+      end: string;
+      calendar: string | null;
+      account: string | null;
+      url: string | null;
+    };
 
 export type Outgoing =
   | { type: "ask"; text: string }

@@ -15,6 +15,10 @@ first after two keep-both conflicts (`bundle.sh` plist keys, `presence.css`).
   only after Go ahead. No deletes; one occurrence per move; freshness by start;
   home reminders from the user's own contact card, else ask for a time. The
   model sees short ids and bounded fields, never notes, attendees or links.
+- ADR 0041 amendment (same day, on "add that to PR 54"): `event_create`, asked
+  like the other writes, no invitees; Google calendar by default (through the
+  macOS Internet Accounts Google account), "apple" or a calendar's name
+  otherwise; an event card with the Gmail icon opens that day in Google Calendar.
 - [ADR 0042](adr/0042-proactive-nudges.md): resident host (`--resident --ask`)
   nudges, each off until turned on in desktop Settings → Nudges
   (`nudges.json`). Pure `Interruption` rule (quiet hours, Focus/DND, lock,

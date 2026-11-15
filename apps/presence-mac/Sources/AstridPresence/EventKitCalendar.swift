@@ -59,7 +59,45 @@ final class EventKitCalendar: CalendarSource {
             id: Self.hostId(event), title: event.title ?? "Untitled", start: event.startDate, end: event.endDate,
             allDay: event.isAllDay, calendar: event.calendar?.title ?? "Calendar", location: event.location,
             meetingURL: MeetingLink.find(in: [event.url?.absoluteString, event.location, event.notes]),
-            editable: event.calendar?.allowsContentModifications ?? false)
+            editable: event.calendar?.allowsContentModifications ?? false,
+            account: event.calendar.map(Self.account) ?? "other")
+    }
+
+    /// Google accounts show up as CalDAV sources named after the address or "Google".
+    static func account(_ calendar: EKCalendar) -> String {
+        guard let source = calendar.source else { return "other" }
+        let title = source.title.lowercased()
+        if title.contains("google") || title.contains("gmail") { return "google" }
+        if source.sourceType == .local || title == "icloud" { return "apple" }
+        return title.contains("@") && source.sourceType == .calDAV && !title.hasSuffix("icloud.com") ? "google" : "other"
+    }
+
+    /// The calendar a new event goes in. Google prefers the system default if it
+    /// is a Google calendar, then the account's primary (named like its source).
+    private func calendar(for choice: CalendarChoice) -> EKCalendar? {
+        let writable = store.calendars(for: .event).filter(\.allowsContentModifications)
+        let fallback = store.defaultCalendarForNewEvents
+        switch choice {
+        case .named(let name):
+            return writable.first { $0.title.caseInsensitiveCompare(name) == .orderedSame }
+        case .google, .apple:
+            let want = choice == .google ? "google" : "apple"
+            if let fallback, fallback.allowsContentModifications, Self.account(fallback) == want { return fallback }
+            let matching = writable.filter { Self.account($0) == want }
+            return matching.first { $0.title == $0.source?.title } ?? matching.first
+        }
+    }
+
+    func createEvent(title: String, start: Date, end: Date, in choice: CalendarChoice) throws -> CalendarEvent {
+        guard access(.event) else { throw CalendarFailure.calendarAccessDenied }
+        guard let target = calendar(for: choice) else { throw CalendarFailure.calendarNotFound }
+        let event = EKEvent(eventStore: store)
+        event.title = title
+        event.startDate = start
+        event.endDate = end
+        event.calendar = target
+        do { try store.save(event, span: .thisEvent, commit: true) } catch { throw CalendarFailure.failed }
+        return convert(event)
     }
 
     func events(from: Date, to: Date) throws -> [CalendarEvent] {

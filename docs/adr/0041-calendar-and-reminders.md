@@ -95,6 +95,41 @@ them over the child's private pipes (ADR 0038).
   ask for a time instead. Reminders' own location triggers then depend on the
   user's devices and Location Services, which Astrid can't check.
 
+## Amendment 2026-11-15: adding events, Google by default, event cards
+
+The maintainer: "yeah add that to PR 54. my default should be my google
+calendar ... show a modal, with a gmail icon ... I can click it to open it in my
+browser. I can also specify on my google calendar, on my apple calendar etc."
+This adds one write, on the maintainer's instruction. The details are the
+agent's calls, pending review.
+
+- **`event_create {title, start, end, calendar | null}`** adds one event (at
+  most 24 h, within a year). It's asked like the other writes: "Can I add
+  Coffee chat on Friday from 2pm to 5pm to your Google calendar?", Go ahead /
+  Stop, spoken and voice-answerable, and sent only after Go ahead.
+- **No invitees, notes, alarms or recurrence**, so adding an event never emails
+  anyone. Invitations would be a separate decision with their own question.
+- **Which calendar.** Google Calendar comes through the Google account added in
+  System Settings → Internet Accounts (EventKit reads it like any other
+  account; no Google API or new sign-in). `null` or "google" means the system
+  default calendar if it is a Google one, else the Google account's primary
+  calendar; "apple" means iCloud or On My Mac; any other value must be a
+  writable calendar's exact name. No match is `calendar_not_found` and nothing
+  is added.
+- **Accounts.** Every event now carries `account` (`google`, `apple` or
+  `other`), sent to the model so "what's on my Google calendar" works.
+- **Event card.** After an add or a move, the panel shows the event as a card
+  (title, day and times, calendar) with the Gmail icon for Google events.
+  Clicking it opens that day in Google Calendar in the browser
+  (`https://calendar.google.com/calendar/r/day/...`; EventKit has no Google
+  event id to link to the event itself). The host adds that link only to a
+  write's reply; the bridge turns it into the card, and the runtime strips it
+  before the model sees the result. The panel opens only `calendar.google.com`
+  and `mail.google.com` https links.
+- **Dates.** "Friday" and "next week Wednesday" are resolved by the model from
+  the local time line in its instructions; the question always names the day
+  ("to 3pm on Wednesday, Nov 25"), so a wrong date is caught before Go ahead.
+
 ## Alternatives considered
 
 - **AppleScript to Calendar.app.** No structured locations, slow, and needs

@@ -1,3 +1,4 @@
+import gmailIcon from "./gmail-icon.svg";
 import { StrictMode, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource/space-grotesk/latin-400.css";
@@ -150,6 +151,8 @@ function App() {
   // ADR 0042: a nudge Astrid brought up unasked, waiting for yes or not now.
   type NudgeBubble = { id: string; text: string; speak: boolean; buttons: { id: string; label: string }[] };
   const [nudge, setNudge] = useState<NudgeBubble | null>(null);
+  // ADR 0041: the event just added or moved, as a card that opens Google Calendar.
+  const [calendarEvent, setCalendarEvent] = useState<CalendarEventCard | null>(null);
   const nudgeRef = useRef<NudgeBubble | null>(null);
   nudgeRef.current = nudge;
   const voice = useVoice((heard, final) => {
@@ -226,6 +229,9 @@ function App() {
         case "error":
           setError(m.message);
           if (modeRef.current === "voice") speak(m.message);
+          break;
+        case "calendar-event":
+          setCalendarEvent({ title: m.title, start: m.start, end: m.end, calendar: m.calendar, account: m.account, url: m.url });
           break;
         case "nudge":
           setNudge({ id: m.id, text: m.text, speak: m.speak, buttons: m.buttons });
@@ -362,6 +368,7 @@ function App() {
     if (speaking) send({ type: "speak-stop" });
     setAsking(ask);
     setAnswer(null);
+    setCalendarEvent(null);
     setError(null);
     setText("");
     setState({ state: "working", label: "Thinking" });
@@ -506,11 +513,12 @@ function App() {
             : voice.error ?? "";
     return (
       <div className="pr-root pr-voice" ref={root}>
-        {(approval || error || question || (answer && !canvasOpen)) && (
+        {(approval || error || question || calendarEvent || (answer && !canvasOpen)) && (
           <Liquid blur={8} contrast={20} fill="#151515" shadow="inset 0 0 0 1px #2a2a2a">
             <Liquid.Item transition="smooth">
               <div className="pr-card" aria-live="polite">
                 {question}
+                {calendarEvent && !busy && <EventCard event={calendarEvent} />}
                 {approval && <ApprovalCard approval={approval} onDecide={decide} />}
                 {error && !busy && !approval && <p className="pr-error">{error}</p>}
                 {answer && !busy && !approval && !canvasOpen && (
@@ -556,7 +564,7 @@ function App() {
             </div>
           </Liquid.Item>
         )}
-        {(busy || answer || error) && !voice.listening && (!canvasOpen || approval || error) && (
+        {(busy || answer || error || calendarEvent) && !voice.listening && (!canvasOpen || approval || error) && (
           <Liquid.Item transition="smooth">
             <div className="pr-card" aria-live="polite">
               {busy && (
@@ -568,6 +576,7 @@ function App() {
               )}
               {busy && <p className="pr-ask">“{asking}”</p>}
               {question}
+              {calendarEvent && !busy && <EventCard event={calendarEvent} />}
               {approval && <ApprovalCard approval={approval} onDecide={decide} />}
               {error && !busy && <p className="pr-error">{error}</p>}
               {answer && !busy && !canvasOpen && (
@@ -804,6 +813,53 @@ function VoiceHalo({
         </span>
       )}
     </div>
+  );
+}
+
+type CalendarEventCard = {
+  title: string;
+  start: string;
+  end: string;
+  calendar: string | null;
+  account: string | null;
+  url: string | null;
+};
+
+/** "Fri, Nov 20 · 2–5 PM", in the user's own time zone. */
+function when(start: string, end: string) {
+  const a = new Date(start);
+  const b = new Date(end);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return "";
+  const day = a.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const time = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${day} · ${time(a)} – ${time(b)}`;
+}
+
+/** ADR 0041: the event Astrid just added or moved. A Google event opens its
+ * day in Google Calendar in the browser. */
+function EventCard({ event }: { event: CalendarEventCard }) {
+  const google = event.account === "google" && event.url;
+  const body = (
+    <>
+      {google && <img className="pr-event-icon" src={gmailIcon} alt="" />}
+      <span className="pr-event-text">
+        <strong>{event.title}</strong>
+        <span>{when(event.start, event.end)}</span>
+        {event.calendar && <small>{google ? "Google Calendar" : event.calendar}</small>}
+      </span>
+    </>
+  );
+  return google ? (
+    <button
+      type="button"
+      className="pr-event"
+      title="Open in Google Calendar"
+      onClick={() => send({ type: "open", url: event.url! })}
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="pr-event">{body}</div>
   );
 }
 

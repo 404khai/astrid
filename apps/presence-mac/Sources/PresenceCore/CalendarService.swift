@@ -53,7 +53,7 @@ public struct CalendarService {
             // Reminders are optional: a denied Reminders grant still answers with events.
             let reminders = try? source.reminders(dueBefore: to)
             var data: [String: Any] = [
-                "events": events.prefix(Self.maxEvents).map(Self.eventJSON),
+                "events": events.prefix(Self.maxEvents).map { Self.eventJSON($0) },
                 "truncated": events.count > Self.maxEvents || (reminders?.count ?? 0) > Self.maxReminders,
             ]
             if let reminders {
@@ -78,6 +78,17 @@ public struct CalendarService {
                 place = parsed
             }
             return ["reminder": Self.reminderJSON(try source.createReminder(title: title, due: due, place: place))]
+        case "event_create":
+            guard let raw = request["title"] as? String else { throw CalendarFailure.invalidRequest }
+            let title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty, title.count <= Self.maxTitle, Self.printable(title),
+                  let choice = CalendarChoice.parse(request["calendar"]) else { throw CalendarFailure.invalidRequest }
+            let start = try time(request["start"]), end = try time(request["end"])
+            guard end > start, end.timeIntervalSince(start) <= Self.maxEventLength,
+                  start > now.addingTimeInterval(-Self.maxBehind), start < now.addingTimeInterval(Self.maxAhead) else {
+                throw CalendarFailure.invalidRequest
+            }
+            return ["event": Self.eventJSON(try source.createEvent(title: title, start: start, end: end, in: choice), card: true)]
         case "event_move":
             guard let id = request["event_id"] as? String, !id.isEmpty, id.count <= 512 else { throw CalendarFailure.invalidRequest }
             let expect = try time(request["expect_start"]), start = try time(request["start"]), end = try time(request["end"])
@@ -85,7 +96,7 @@ public struct CalendarService {
                   start > now.addingTimeInterval(-Self.maxBehind), start < now.addingTimeInterval(Self.maxAhead) else {
                 throw CalendarFailure.invalidRequest
             }
-            return ["event": Self.eventJSON(try source.moveEvent(id: id, expectStart: expect, start: start, end: end))]
+            return ["event": Self.eventJSON(try source.moveEvent(id: id, expectStart: expect, start: start, end: end), card: true)]
         default:
             throw CalendarFailure.invalidRequest
         }
@@ -102,8 +113,10 @@ public struct CalendarService {
 
     /// What the runtime gets for one event. Notes, attendees and the link
     /// itself stay in the host; only whether a meeting link exists goes on.
-    public static func eventJSON(_ event: CalendarEvent) -> [String: Any] {
-        [
+    /// `card`: after a change, also the Google Calendar page for the panel's
+    /// event card. The runtime shows it to the user, never to the model.
+    public static func eventJSON(_ event: CalendarEvent, card: Bool = false) -> [String: Any] {
+        var json: [String: Any] = [
             "id": event.id,
             "title": String(event.title.prefix(maxTitle)),
             "start": CalendarTime.format(event.start),
@@ -113,7 +126,10 @@ public struct CalendarService {
             "location": clip(event.location),
             "has_meeting_link": event.meetingURL != nil,
             "editable": event.editable,
+            "account": event.account,
         ]
+        if card, event.account == "google", let url = GoogleCalendarLink.day(event.start) { json["web_url"] = url.absoluteString }
+        return json
     }
 
     public static func reminderJSON(_ reminder: ReminderItem) -> [String: Any] {

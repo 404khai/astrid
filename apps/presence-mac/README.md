@@ -78,7 +78,11 @@ synthetic` no input is ever posted.
 ## Calendar and Reminders (ADR 0041)
 
 Ask "What's my day?", "remind me to water the plants when I get home" or
-"move my 3pm to 4", typed or spoken. Reading needs no prompt; anything that
+"move my 3pm to 4", typed or spoken. You can add events too ("set a coffee
+chat on Friday from 2 to 5"); they go in your Google calendar unless you say
+"on my Apple calendar" or name one. Google Calendar comes from the Google
+account in System Settings → Internet Accounts. After a change, a card shows the
+event; click it to open that day in Google Calendar. Reading needs no prompt; anything that
 changes your calendar is asked first ("Can I move your 3pm Design review to
 4pm?") with **Go ahead** / **Stop**, out loud too, and you can answer by voice.
 Nothing is ever deleted. macOS asks for Calendars and Reminders access the
