@@ -264,3 +264,33 @@ final class BlobGroupTests: XCTestCase {
         XCTAssertEqual(BlobGroup(name: "x", members: Array(repeating: "a", count: 30)).members.count, BlobGroups.maxMembers)
     }
 }
+
+final class MemoryStoreTests: XCTestCase {
+    func testReadsTheRuntimeFileNewestFirstAndDeletesOne() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("memory.json")
+        // As src/memory.rs writes it.
+        try Data(#"{"version":1,"next":3,"facts":[{"id":1,"text":"my name is Khai","at":100},{"id":2,"text":"I like short replies","at":200}]}"#.utf8).write(to: url)
+        let store = MemoryStore(url: url)
+        XCTAssertEqual(try store.load().map(\.id), [2, 1])
+        try store.delete(1)
+        XCTAssertEqual(try store.load().map(\.text), ["I like short replies"])
+        let saved = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+        XCTAssertEqual(saved["next"] as? Int, 3)
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int, 0o600)
+        try store.deleteAll()
+        XCTAssertEqual(try store.load(), [])
+    }
+
+    func testMissingFileIsEmptyAndABadFileIsNeverOverwritten() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
+        XCTAssertEqual(try MemoryStore(url: url).load(), [])
+        try Data("not json".utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        XCTAssertThrowsError(try MemoryStore(url: url).load())
+        XCTAssertThrowsError(try MemoryStore(url: url).delete(1))
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "not json")
+    }
+}

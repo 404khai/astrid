@@ -35,7 +35,11 @@ The ask surface (ADR 0033) and the desktop app (ADR 0037) both run asks through
   (and to operator's goal only through the ask model's hand-off). The memory
   file itself is never sent anywhere else, synced or traced.
 - **Visible and editable.** `astrid memory list | add <text> | forget <id> | clear`,
-  plus the spoken forms above. The file is plain JSON the user can read.
+  plus the spoken forms above. The file is plain JSON the user can read. The
+  desktop app (ADR 0037) shows it in Settings → Memory, newest first, with a
+  Delete button per fact and Forget Everything (confirmed). It reads and writes
+  the same file in the same format (`MemoryStore`), keeps the next id and 0600,
+  and won't touch a file it can't read.
 
 ## Alternatives considered
 
