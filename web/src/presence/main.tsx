@@ -368,7 +368,7 @@ function App() {
       <div className="pr-root pr-operator" ref={root}>
         <div className="pr-op-body" aria-hidden="true">
           <VoiceRing
-            size={96}
+            size={128}
             theme="dark"
             state={ring}
             stream={ring === "listening" ? voice.stream : null}

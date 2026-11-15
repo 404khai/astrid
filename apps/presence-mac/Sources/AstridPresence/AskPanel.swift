@@ -133,7 +133,7 @@ final class AskController: NSObject, WKScriptMessageHandler, WKNavigationDelegat
     }
 
     /// The mark's centre from the panel's top-left in the operator layout.
-    private static let markCentre = CGPoint(x: 48, y: 48)
+    private static let markCentre = CGPoint(x: 64, y: 64)
 
     /// Lets one posted action reach the app under the panel.
     func passThrough(_ on: Bool) {

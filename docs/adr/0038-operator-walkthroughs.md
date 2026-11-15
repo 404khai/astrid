@@ -257,7 +257,7 @@ like a normal spatial assistant conversing".
 - **No overlay cursor.** The cursor tip is hidden during sessions. Live use
   showed it drawn far from the target, and the riding mark already shows where
   Astrid works. Show-me circles still draw. The mark is larger while working
-  (46 pt logo inside a 96 pt ring), with space between them.
+  (46 pt logo inside a 128 pt ring), with space between them.
 - **Asking like a person.** A `confirm` step's question is "Can I go ahead and
   <instruction>?" with [Go ahead] [Stop], and Astrid says every operator
   question out loud. A spoken "yes", "go ahead" or "do it" answers it, as
