@@ -187,7 +187,15 @@ pub fn parse_report(reply: &str, frame: Frame) -> Result<Report, String> {
         _ => return Err("verified must be true, false or absent".into()),
     };
     let reason = match value["reason"].as_str() {
-        Some(_) => text(&value, "reason", MAX_TEXT)?,
+        // The model's own note on what it saw: shown, never acted on, so a
+        // long one is cut to one short line rather than ending the session.
+        Some(reason) => reason
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(MAX_TEXT)
+            .collect(),
         None => String::new(),
     };
     let next = match (&value["step"], &value["finish"]) {

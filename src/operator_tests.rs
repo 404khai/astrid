@@ -959,3 +959,22 @@ fn confirm_steps_ask_like_a_person() {
     );
     assert_eq!(ask_first("  "), "Can I go ahead?");
 }
+
+#[test]
+fn a_long_reason_is_trimmed_not_fatal() {
+    let long = "x ".repeat(400);
+    let reply = format!(
+        "```operator\n{}\n```",
+        serde_json::json!({"reason": format!("Line one.\n{long}"), "finish": "Done."})
+    );
+    let report = parse_report(
+        &reply,
+        Frame {
+            width: 100,
+            height: 100,
+        },
+    )
+    .unwrap();
+    assert!(report.reason.chars().count() <= MAX_TEXT);
+    assert!(!report.reason.contains('\n'));
+}
