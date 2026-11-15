@@ -84,13 +84,10 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         IntroWave.play(on: screen)
     }
 
-    /// While an operator session works the wave keeps playing, one pass after
-    /// another, so it is plain that Astrid is live on the screen.
-    private func playWorkingWave() {
-        guard operating, intro, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        IntroWave.play(on: screen) { [weak self] in
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self?.playWorkingWave() }
-        }
+    /// While an operator session works the colour stays on the screen's edges.
+    private func holdWorkingWave() {
+        guard intro, !reduceMotion, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        IntroWave.hold(on: screen)
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -169,7 +166,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         for scene in scenes {
-            scene.render(motion, time: now, reduceMotion: reduceMotion, logoHidden: operating)
+            scene.render(motion, time: now, reduceMotion: reduceMotion, operating: operating)
         }
         CATransaction.commit()
         for scene in scenes {
@@ -226,7 +223,7 @@ final class PresenceController: NSObject, NSApplicationDelegate {
             case .quit:
                 NSApp.terminate(nil)
             case .wave:
-                playWave()
+                if !operating { playWave() }
             case let .capture(requestId, display):
                 capture(requestId: requestId, display: display)
             case .timerStart, .timerCancel, .alarmSet, .timersList:
@@ -568,7 +565,7 @@ extension PresenceController: OperatorHost {
         operating = true
         motion.jump(to: mark)
         player.enqueue(.show(at: nil))
-        playWorkingWave()
+        holdWorkingWave()
         // The user's app keeps focus, so clicks and typing land there.
         AXElements.targetApp()?.activate()
         // Reading on-screen controls and acting both need Accessibility; asks once.
@@ -652,6 +649,7 @@ extension PresenceController: OperatorHost {
     func operatorEnded() {
         guard operating else { return }
         operating = false
+        IntroWave.release()
         player.enqueue(contentsOf: [.clearInk, .hide])
         lastLook = nil
     }

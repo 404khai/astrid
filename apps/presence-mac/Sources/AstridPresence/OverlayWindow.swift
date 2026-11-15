@@ -76,11 +76,12 @@ final class OverlayScene {
     }
 
     /// Positions Astrid for this frame; actions disabled by the caller.
-    /// `logoHidden`: the ask panel's mark stands in for the logo (operator).
-    func render(_ motion: PresenceMotion, time: Double, reduceMotion: Bool, logoHidden: Bool = false) {
+    /// `operating`: the ask panel's mark is Astrid's only body (ADR 0038), so
+    /// neither the logo nor the cursor tip is drawn; ink still is.
+    func render(_ motion: PresenceMotion, time: Double, reduceMotion: Bool, operating: Bool = false) {
         let opacity = Float(motion.opacity)
-        tip.opacity = opacity
-        logo.opacity = logoHidden ? 0 : opacity
+        tip.opacity = operating ? 0 : opacity
+        logo.opacity = operating ? 0 : opacity
         tip.position = local(motion.tip)
         let origin = local(motion.logo)
         let bob = reduceMotion ? (offset: CGPoint.zero, degrees: 0.0) : PresenceMotion.bob(time: time)

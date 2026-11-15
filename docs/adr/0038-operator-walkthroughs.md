@@ -250,9 +250,14 @@ like a normal spatial assistant conversing".
   following box is gone. The panel lets mouse events through for each posted
   action, so a target under it still gets the click. Capture already excludes
   every Astrid window.
-- **Waves while working.** The Distortion Waves pass repeats from the moment the
-  session starts until it ends (Reduce Motion and `--no-intro` still turn it
-  off). It no longer plays once.
+- **Waves while working.** While the session works, the Distortion Waves edge
+  colour stays on the screen's edges, drifting and breathing, and fades out when
+  it ends. There is no sweep from the bottom and no sparks (those stay the launch
+  intro). Reduce Motion and `--no-intro` still turn it off.
+- **No overlay cursor.** The cursor tip is hidden during sessions. Live use
+  showed it drawn far from the target, and the riding mark already shows where
+  Astrid works. Show-me circles still draw. The mark is larger while working
+  (46 pt logo inside a 96 pt ring), with space between them.
 - **Asking like a person.** A `confirm` step's question is "Can I go ahead and
   <instruction>?" with [Go ahead] [Stop], and Astrid says every operator
   question out loud. A spoken "yes", "go ahead" or "do it" answers it, as

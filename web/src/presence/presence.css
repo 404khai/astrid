@@ -501,7 +501,7 @@ button {
 
 /* ADR 0038: while it works, the Astrid you talk to rides beside the cursor
    tip: its mark and voice ring, and a speech bubble to the right. The mark's
-   centre is 34px from the top-left; the native side relies on that. */
+   centre is 48px from the top-left; the native side relies on that. */
 .pr-operator {
   width: auto;
   padding: 0;
@@ -512,8 +512,8 @@ button {
 .pr-op-body {
   position: relative;
   flex: none;
-  width: 68px;
-  height: 68px;
+  width: 96px;
+  height: 96px;
   pointer-events: none;
 }
 .pr-op-mark {
@@ -524,15 +524,16 @@ button {
   animation: pr-bob 2.4s ease-in-out infinite;
   filter: drop-shadow(0 2px 4px #0006);
 }
+/* Bigger than the corner mark, with clear space inside the ring. */
 .pr-op-mark .astrid-logo {
-  width: 36px;
-  height: 29px;
+  width: 46px;
+  height: 37px;
 }
 .pr-op-box {
   /* A fixed width: measured against the panel's own small start size it
      would wrap a word per line. */
   width: 260px;
-  margin-top: 14px;
+  margin-top: 24px;
   box-sizing: border-box;
   padding: 9px 13px 11px;
   border-radius: 4px 16px 16px 16px;
