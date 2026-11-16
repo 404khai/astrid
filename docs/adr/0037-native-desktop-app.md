@@ -362,3 +362,13 @@ A group turn's prompt says "this group" and "here", which `presence-ask`'s scree
 on-screen requests, so turns tried a look and failed with "observation deadline". `presence-ask --no-operator`
 (new, hidden like the command) leaves the operator out entirely: no routing, no hint, no look. The desktop app's
 group child always passes it. A short tag such as `@moss` now tags the one goblin whose name starts that way.
+
+### Amendment 17 — summary titles and pinned chats (2026-11-17)
+
+Maintainer: "titles of threads should be like one liner summaries of the first message sent. I want to be able to
+pin threads, and see pinned". A new chat still starts with the derived title (`ChatTitle.derive`), then a separate
+`presence-ask` child (no mail, `--no-operator`) asks the chat's model for a one-line summary of the first message
+(at most 7 words); the cleaned first line (60 characters at most) replaces the title, once, queued one chat at a
+time. A rename sets `titleSource: "user"` and is never replaced. Chats gain optional `pinned` and `titleSource`
+(older files decode unchanged); pinned chats sort first and list under "Pinned" above "Chats" in the sidebar,
+pinned and unpinned from the chat's context menu. The first message is sent to the model once more for this.

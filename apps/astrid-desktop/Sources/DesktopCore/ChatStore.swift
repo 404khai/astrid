@@ -51,9 +51,10 @@ public final class ChatStore {
         return Array(Self.sorted(chats).prefix(ChatLimits.maxChats))
     }
 
-    /// Most recent activity first; ties by creation, then id, so the order is stable.
+    /// Pinned first, then most recent activity; ties by creation, then id, so the order is stable.
     public static func sorted(_ chats: [ChatSession]) -> [ChatSession] {
         chats.sorted {
+            if $0.isPinned != $1.isPinned { return $0.isPinned }
             if $0.updated != $1.updated { return $0.updated > $1.updated }
             if $0.created != $1.created { return $0.created > $1.created }
             return $0.id.uuidString < $1.id.uuidString

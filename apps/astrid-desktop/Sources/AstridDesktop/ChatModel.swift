@@ -78,6 +78,12 @@ final class ChatModel: ObservableObject {
     private var phoneChild: AskChild
     /// Goblin group chats, with their own child (no mail).
     let groupChat: GroupChatModel
+    /// Gives new chats their one-line summary titles, one at a time, through
+    /// its own child (no mail, no screen).
+    private var titler: AskChild
+    private var titling: UUID?
+    private var titleQueue: [(chat: UUID, text: String)] = []
+    private var titleReply = ""
 
     init(config: DesktopConfig, model: String, mail: String) {
         self.config = config
@@ -85,11 +91,13 @@ final class ChatModel: ObservableObject {
         childConfig = AskChild.Config(astrid: config.astrid, model: model, mail: mail == "none" ? nil : mail)
         child = AskChild(config: childConfig)
         phoneChild = AskChild(config: AskChild.Config(astrid: config.astrid, model: model, mail: nil))
+        titler = AskChild(config: AskChild.Config(astrid: config.astrid, model: model, mail: nil, screen: false))
         groupChat = GroupChatModel(astrid: config.astrid, model: model, root: config.chats.deletingLastPathComponent())
         chats = store.loadAll()
         selection = chats.first?.id
         child.onEvent = { [weak self] event in self?.handle(event, from: .desktop) }
         phoneChild.onEvent = { [weak self] event in self?.handle(event, from: .phone) }
+        titler.onEvent = { [weak self] in self?.titled($0) }
         setUpVoice()
     }
 
@@ -101,6 +109,11 @@ final class ChatModel: ObservableObject {
     func reconfigure(model: String, mail: String) {
         let next = AskChild.Config(astrid: config.astrid, model: model, mail: mail == "none" ? nil : mail)
         groupChat.reconfigure(model: model)
+        if titling == nil, titleQueue.isEmpty {
+            titler.stop()
+            titler = AskChild(config: AskChild.Config(astrid: config.astrid, model: model, mail: nil, screen: false))
+            titler.onEvent = { [weak self] in self?.titled($0) }
+        }
         guard live == nil, next.model != childConfig.model || next.mail != childConfig.mail else { return }
         child.stop()
         childConfig = next
@@ -186,6 +199,8 @@ final class ChatModel: ObservableObject {
         } else {
             history = []
             chat = ChatSession(first: message)
+            titleQueue.append((chat.id, message.text))
+            nextTitle()
         }
         put(chat)
         var reply = LiveReply(chatID: chat.id, origin: origin)
@@ -198,6 +213,42 @@ final class ChatModel: ObservableObject {
         }
         live = reply
         return (chat.id, reply.id)
+    }
+
+    /// Pins or unpins a chat; pinned chats list first, under Pinned.
+    func togglePin(_ id: UUID) {
+        guard var chat = chats.first(where: { $0.id == id }) else { return }
+        chat.pinned = chat.isPinned ? nil : true
+        put(chat)
+    }
+
+    var pinnedChats: [ChatSession] { visibleChats.filter(\.isPinned) }
+    var unpinnedChats: [ChatSession] { visibleChats.filter { !$0.isPinned } }
+
+    // MARK: Summary titles
+
+    private func nextTitle() {
+        guard titling == nil, !titleQueue.isEmpty else { return }
+        let next = titleQueue.removeFirst()
+        titling = next.chat
+        titleReply = ""
+        if !titler.ask(ChatTitle.summaryPrompt(for: next.text), history: []) {
+            titling = nil
+            nextTitle()
+        }
+    }
+
+    private func titled(_ event: AskEvent?) {
+        guard let id = titling else { return }
+        switch event {
+        case .delta(let text): titleReply += text
+        case .answer(let text, _, _): titleReply = text
+        case .done, nil:
+            titling = nil
+            if event != nil, var chat = chats.first(where: { $0.id == id }), chat.applySummary(titleReply) { put(chat) }
+            nextTitle()
+        default: break
+        }
     }
 
     func cancel() {
@@ -213,6 +264,7 @@ final class ChatModel: ObservableObject {
     func shutdown() {
         child.stop()
         phoneChild.stop()
+        titler.stop()
         groupChat.shutdown()
     }
 
