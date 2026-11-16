@@ -2,3 +2,6 @@
 .DS_Store
 .env
 .env.*
+
+# Generated desktop dependencies are not workspace source evidence.
+/apps/desktop/node_modules/
