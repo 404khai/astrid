@@ -376,6 +376,10 @@ enum Commands {
         /// Calendar and Reminders through the presence app's EventKit (ADR 0041).
         #[arg(long)]
         calendar: bool,
+        /// No operator: asks never look at the screen (goblin group turns,
+        /// ADR 0037 amendment 16).
+        #[arg(long)]
+        no_operator: bool,
     },
     /// Header-only check for new important mail, for the presence host's
     /// opt-in nudge (ADR 0042). Prints one JSON line; no model is called.
@@ -1102,6 +1106,7 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             operator_model,
             operator_display,
             calendar,
+            no_operator,
         }) => {
             let workspace = presence_ask::workspace()?;
             let mut tools = Tools::new(workspace, Duration::from_secs(1))?;
@@ -1131,7 +1136,8 @@ async fn execute(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 model: operator_model,
                 display: operator_display,
             };
-            return presence_ask::serve(provider, tools, model, Some(operator), calendar).await;
+            let operator = (!no_operator).then_some(operator);
+            return presence_ask::serve(provider, tools, model, operator, calendar).await;
         }
         Some(Commands::Mail { command }) => return mail_command(command).await,
         Some(Commands::NudgeMail { source, sender }) => {

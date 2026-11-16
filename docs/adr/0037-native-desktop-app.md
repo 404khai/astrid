@@ -355,3 +355,10 @@ at most 64 items per list and 8 KB; the page checks it again and draws it with B
 its shadcn registry into `web/src/bklit`; adds motion, d3-array/scale/shape, @number-flow/react, clsx,
 tailwind-merge, and Tailwind v4 with no preflight for the presence pages build). The model never sends code:
 only data drawn by fixed components, as with the canvas (ADR 0036).
+
+### Amendment 16 — group turns never look (2026-11-16)
+
+A group turn's prompt says "this group" and "here", which `presence-ask`'s screen-task routing (ADR 0038) took as
+on-screen requests, so turns tried a look and failed with "observation deadline". `presence-ask --no-operator`
+(new, hidden like the command) leaves the operator out entirely: no routing, no hint, no look. The desktop app's
+group child always passes it. A short tag such as `@moss` now tags the one goblin whose name starts that way.

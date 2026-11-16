@@ -171,12 +171,34 @@ public enum Mentions {
                 if !found.contains(where: { $0.key == key }) { found.append((range.lowerBound, key)) }
             }
         }
+        // A short `@moss` still tags Mossbeard when only one name starts that way.
+        for word in words(after: "@", in: lower) where word.count >= 3 {
+            let hits = members.filter { $0.name.lowercased().hasPrefix(word) }
+            guard hits.count == 1, let at = lower.range(of: "@" + word),
+                  !found.contains(where: { $0.key == hits[0].id }) else { continue }
+            found.append((at.lowerBound, hits[0].id))
+        }
         var keys: [String] = []
         for key in found.sorted(by: { $0.at < $1.at }).map(\.key) {
             for k in key == "@all" ? members.map(\.id) : [key] where !keys.contains(k) { keys.append(k) }
         }
         return keys
     }
+}
+
+/// The words right after each `marker` in `text`.
+func words(after marker: Character, in text: String) -> [String] {
+    var out: [String] = []
+    var i = text.startIndex
+    while let at = text[i...].firstIndex(of: marker) {
+        let start = text.index(after: at)
+        let end = text[start...].firstIndex { !($0.isLetter || $0.isNumber) } ?? text.endIndex
+        let glued = at > text.startIndex && (text[text.index(before: at)].isLetter || text[text.index(before: at)].isNumber)
+        if start < end, !glued { out.append(String(text[start..<end])) }
+        i = end > start ? end : start
+        if i >= text.endIndex { break }
+    }
+    return out
 }
 
 /// Who speaks next. A user message goes to whoever it tags, or to Astrid if

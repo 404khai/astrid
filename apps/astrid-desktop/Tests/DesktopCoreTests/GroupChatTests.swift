@@ -108,3 +108,13 @@ final class GroupAllAndChartTests: XCTestCase {
         XCTAssertNil(GroupChart.check(["kind": "bar", "labels": Array(repeating: "x", count: 100)]))
     }
 }
+
+final class GroupShortTagTests: XCTestCase {
+    func testUniquePrefixTagsAndGroupAsksNeverLook() {
+        let members = [GroupMember(id: "m", name: "Mossbeard"), GroupMember(id: "h", name: "Hob"), GroupMember(id: "h2", name: "Hobnail")]
+        XCTAssertEqual(Mentions.find(in: "@moss", members: members), ["m"])
+        XCTAssertEqual(Mentions.find(in: "@ho", members: members), [])
+        XCTAssertEqual(Mentions.find(in: "@hobn hi", members: members), ["h2"])
+        XCTAssertTrue(AskChild(config: .init(astrid: URL(fileURLWithPath: "/x"), model: "m", mail: nil, screen: false)).arguments.contains("--no-operator"))
+    }
+}

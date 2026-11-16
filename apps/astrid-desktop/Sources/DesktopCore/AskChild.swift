@@ -79,10 +79,13 @@ public final class AskChild {
         public var astrid: URL
         public var model: String
         public var mail: String?
-        public init(astrid: URL, model: String, mail: String?) {
+        /// False for asks that must never look at the screen (goblin groups).
+        public var screen: Bool
+        public init(astrid: URL, model: String, mail: String?, screen: Bool = true) {
             self.astrid = astrid
             self.model = model
             self.mail = mail
+            self.screen = screen
         }
     }
 
@@ -98,6 +101,7 @@ public final class AskChild {
     public var arguments: [String] {
         var arguments = ["presence-ask", "--model", config.model]
         if let mail = config.mail { arguments += ["--mail-source", mail] }
+        if !config.screen { arguments.append("--no-operator") }
         return arguments
     }
 

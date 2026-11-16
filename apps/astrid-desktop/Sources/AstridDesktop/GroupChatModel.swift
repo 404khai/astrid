@@ -7,7 +7,7 @@ import Foundation
 /// answers (Astrid, the overseer, if nobody is tagged), and anyone a reply
 /// tags answers after it, one at a time, bounded by `GroupTurnPlan`. Every
 /// turn is one ask to the app's own `astrid presence-ask` child for groups,
-/// with no mail source; any approval it asks for is declined.
+/// with no mail source and no operator (it never looks at the screen); any approval it asks for is declined.
 final class GroupChatModel: ObservableObject {
     /// What Astrid's eyes in the group are doing.
     enum Overseer: String { case idle, tagged, question, checking, talking }
@@ -43,7 +43,7 @@ final class GroupChatModel: ObservableObject {
     init(astrid: URL, model: String, root: URL) {
         store = GroupThreadStore(directory: root.appendingPathComponent("Groups", isDirectory: true))
         memoryStore = GoblinMemoryStore(directory: root.appendingPathComponent("Goblins/Memory", isDirectory: true))
-        config = AskChild.Config(astrid: astrid, model: model, mail: nil)
+        config = AskChild.Config(astrid: astrid, model: model, mail: nil, screen: false)
         child = AskChild(config: config)
         child.onEvent = { [weak self] in self?.handle($0) }
     }
