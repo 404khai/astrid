@@ -20,7 +20,7 @@ struct SettingsView: View {
         case memory = "Memory"
         case nudges = "Nudges"
         case phone = "Phone"
-        case blobs = "Blobs"
+        case goblins = "Goblins"
         case about = "About"
         var id: String { rawValue }
 
@@ -31,7 +31,7 @@ struct SettingsView: View {
             case .memory: "brain.head.profile"
             case .nudges: "bell.badge.fill"
             case .phone: "iphone.gen3"
-            case .blobs: "face.smiling"
+            case .goblins: "face.smiling"
             case .about: "info.circle.fill"
             }
         }
@@ -42,7 +42,7 @@ struct SettingsView: View {
             case .memory: [Color(red: 1, green: 0.55, blue: 0.75), Color(red: 0.7, green: 0.3, blue: 0.95)]
             case .nudges: [Color(red: 1, green: 0.75, blue: 0.2), Color(red: 1, green: 0.45, blue: 0.1)]
             case .phone: [Color(red: 0.4, green: 0.46, blue: 1), Color(red: 0.1, green: 0.2, blue: 0.93)]
-            case .blobs: [Color(white: 0.2), Color(white: 0.12)]
+            case .goblins: [Color(white: 0.2), Color(white: 0.12)]
             case .about: [Color(red: 0, green: 0.85, blue: 0.75), Color(red: 0.1, green: 0.5, blue: 0.9)]
             }
         }
@@ -54,7 +54,7 @@ struct SettingsView: View {
             case .memory: "memory remember forget facts about me delete personal"
             case .nudges: "nudges proactive morning brief meeting reminder important email quiet hours focus speak"
             case .phone: "phone android pair qr code link sync devices revoke"
-            case .blobs: "blobs bots avatars characters sidebar row"
+            case .goblins: "goblins bots avatars characters sidebar row"
             case .about: "about version privacy credits"
             }
         }
@@ -82,8 +82,8 @@ struct SettingsView: View {
                     Button { page = item } label: {
                         HStack(spacing: 10) {
                             Group {
-                                if item == .blobs, let giovanni = Blobs.icon {
-                                    Image(nsImage: giovanni).resizable().frame(width: 20, height: 20)
+                                if item == .goblins {
+                                    BrambleGlyph(size: 20).frame(width: 20, height: 20)
                                 } else {
                                     Image(systemName: item.symbol)
                                         .font(.system(size: 13, weight: .semibold))
@@ -132,7 +132,7 @@ struct SettingsView: View {
                         case .memory: MemoryPage()
                         case .nudges: NudgesPage()
                         case .phone: PhonePage()
-                        case .blobs: BlobsPage(settings: settings)
+                        case .goblins: GoblinsPage(settings: settings)
                         case .about: AboutPage()
                         }
                     }
@@ -802,19 +802,35 @@ struct PairingSheet: View {
     }
 }
 
-/// Blobs: the little bots in a row above the sidebar's foot.
-struct BlobsPage: View {
+/// Goblins: the little bots in a row above the sidebar's foot.
+struct GoblinsPage: View {
     @ObservedObject var settings: AppSettings
     @Environment(\.palette) private var palette
-    @State private var every: [Blob] = Blobs.all()
+    @State private var every: [Goblin] = Goblins.all()
+    @State private var pasted = ""
+    @State private var note: (text: String, ok: Bool)?
+
+    /// Saves the pasted goblins as one file in the Goblins folder, then shows
+    /// them everywhere (the row, the picker and groups).
+    private func add() {
+        switch Goblins.add(json: pasted) {
+        case .success(let names):
+            note = ("Added \(names.joined(separator: ", ")).", true)
+            pasted = ""
+            every = Goblins.all()
+            NotificationCenter.default.post(name: Goblins.changed, object: nil)
+        case .failure(let error):
+            note = (error.message, false)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(title: "Blobs")
+            SectionTitle(title: "Goblins")
             SettingsGroup {
-                Toggle(isOn: $settings.showBlobs) {
+                Toggle(isOn: $settings.showGoblins) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Show blobs in the sidebar")
+                        Text("Show goblins in the sidebar")
                         Text("A row of little bots above Astrid's mark. Click one to pick it; it reacts while Astrid works.")
                             .font(.caption)
                             .foregroundStyle(palette.secondary)
@@ -822,37 +838,49 @@ struct BlobsPage: View {
                 }
                 .toggleStyle(.switch)
             }
-            SectionTitle(title: "In the row (\(settings.blobsShown.filter { id in every.contains { $0.id == id } }.count) of \(Blobs.limit))")
+            SectionTitle(title: "In the row (\(settings.goblinsShown.filter { id in every.contains { $0.id == id } }.count) of \(Goblins.limit))")
             SettingsGroup {
-                ForEach(every) { blob in
-                    let on = settings.blobsShown.contains(blob.id)
-                    let full = settings.blobsShown.filter { id in every.contains { $0.id == id } }.count >= Blobs.limit
+                ForEach(every) { goblin in
+                    let on = settings.goblinsShown.contains(goblin.id)
+                    let full = settings.goblinsShown.filter { id in every.contains { $0.id == id } }.count >= Goblins.limit
                     Toggle(isOn: Binding(
                         get: { on },
                         set: { next in
-                            if next { settings.blobsShown.append(blob.id) } else { settings.blobsShown.removeAll { $0 == blob.id } }
+                            if next { settings.goblinsShown.append(goblin.id) } else { settings.goblinsShown.removeAll { $0 == goblin.id } }
                         })) {
-                        Text(blob.name)
+                        Text(goblin.name)
                     }
                     .disabled(!on && full)
-                    if blob.id != every.last?.id { Divider() }
+                    if goblin.id != every.last?.id { Divider() }
                 }
             }
-            SectionTitle(title: "More blobs")
+            SectionTitle(title: "Add goblins")
             SettingsGroup {
-                Text("The built-in bots are from Bible Strong Avatar Lab (AGPL-3.0). To add your own, make one at avatars.bible-strong.app, export it (Export › .avatar.json), put it in the Blobs folder, and press Reload.")
+                Text("Paste a goblin's JSON from the Goblins studio: a goblins/v1 file, one goblin, or a list. Each one needs at least a skin and a hat.")
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
+                TextEditor(text: $pasted)
+                    .font(.system(.caption, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .frame(height: 120)
+                    .padding(6)
+                    .background(palette.text.opacity(0.05), in: .rect(cornerRadius: 10))
+                    .accessibilityLabel("Goblin JSON")
+                if let note {
+                    Text(note.text).font(.caption).foregroundStyle(note.ok ? palette.secondary : .red)
+                }
                 HStack {
-                    Button("Open Avatar Lab") { NSWorkspace.shared.open(URL(string: "https://avatars.bible-strong.app")!) }
+                    Button("Add") { add() }
+                        .buttonStyle(.glassProminent)
+                        .disabled(pasted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Paste from Clipboard") { pasted = NSPasteboard.general.string(forType: .string) ?? "" }
                         .buttonStyle(.glass)
+                    Spacer()
                     Button("Open Folder") {
-                        try? FileManager.default.createDirectory(at: Blobs.folder, withIntermediateDirectories: true)
-                        NSWorkspace.shared.open(Blobs.folder)
+                        try? FileManager.default.createDirectory(at: Goblins.folder, withIntermediateDirectories: true)
+                        NSWorkspace.shared.open(Goblins.folder)
                     }
                     .buttonStyle(.glass)
-                    Button("Reload") { every = Blobs.all(); NotificationCenter.default.post(name: Blobs.changed, object: nil) }
-                        .buttonStyle(.glass)
                 }
             }
         }

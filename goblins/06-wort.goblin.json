@@ -1,0 +1,27 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g6",
+      "name": "Wort",
+      "expression": "angry",
+      "skin": "#7C8A99",
+      "head": "wide",
+      "ears": "pointy",
+      "nose": "hook",
+      "eyes": "beady",
+      "hat": "headband",
+      "hatColor": "#D8402F",
+      "beard": "none",
+      "beardColor": "#EDE8DF",
+      "eyewear": "none",
+      "scarf": "none",
+      "scarfColor": "#ECE6D6",
+      "extras": [
+        "tusks",
+        "earring"
+      ]
+    }
+  ]
+}

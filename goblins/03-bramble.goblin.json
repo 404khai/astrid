@@ -1,0 +1,26 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g3",
+      "name": "Bramble",
+      "expression": "searching",
+      "skin": "#4E9C8E",
+      "head": "wide",
+      "ears": "droopy",
+      "nose": "bulb",
+      "eyes": "visor",
+      "hat": "gnome",
+      "hatColor": "#2F4AA8",
+      "beard": "braid",
+      "beardColor": "#9A948C",
+      "eyewear": "none",
+      "scarf": "none",
+      "scarfColor": "#E0A92B",
+      "extras": [
+        "headphones"
+      ]
+    }
+  ]
+}

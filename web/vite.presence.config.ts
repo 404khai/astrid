@@ -9,6 +9,6 @@ export default defineConfig({
   build: {
     outDir: "dist-presence",
     emptyOutDir: true,
-    rollupOptions: { input: { presence: "presence.html", canvas: "canvas.html", voice: "voice.html", blobs: "blobs.html", group: "group.html" } },
+    rollupOptions: { input: { presence: "presence.html", canvas: "canvas.html", voice: "voice.html", blobs: "blobs.html", goblins: "goblins.html", group: "group.html" } },
   },
 });

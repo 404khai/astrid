@@ -247,21 +247,21 @@ final class SVGPathTests: XCTestCase {
     }
 }
 
-final class BlobGroupTests: XCTestCase {
+final class GoblinGroupTests: XCTestCase {
     func testDefaultNamesComeFromMembers() {
-        XCTAssertEqual(BlobGroups.defaultName([]), "New group")
-        XCTAssertEqual(BlobGroups.defaultName(["Sunee"]), "Sunee")
-        XCTAssertEqual(BlobGroups.defaultName(["Sunee", "Kirby"]), "Sunee & Kirby")
-        XCTAssertEqual(BlobGroups.defaultName(["Sunee", "Kirby", "Cubee", "Nova"]), "Sunee, Kirby +2")
+        XCTAssertEqual(GoblinGroups.defaultName([]), "New group")
+        XCTAssertEqual(GoblinGroups.defaultName(["Sunee"]), "Sunee")
+        XCTAssertEqual(GoblinGroups.defaultName(["Sunee", "Kirby"]), "Sunee & Kirby")
+        XCTAssertEqual(GoblinGroups.defaultName(["Sunee", "Kirby", "Cubee", "Nova"]), "Sunee, Kirby +2")
     }
 
     func testGroupsRoundTripAndDropEmptyOrBadData() {
-        let group = BlobGroup(name: "Launch week", members: ["06-sunee.avatar.json", "07-kirby.avatar.json"])
-        let empty = BlobGroup(name: "Nobody", members: [])
-        XCTAssertEqual(BlobGroups.decode(BlobGroups.encode([group, empty])), [group])
-        XCTAssertEqual(BlobGroups.decode(Data("nope".utf8)), [])
-        XCTAssertEqual(BlobGroups.decode(nil), [])
-        XCTAssertEqual(BlobGroup(name: "x", members: Array(repeating: "a", count: 30)).members.count, BlobGroups.maxMembers)
+        let group = GoblinGroup(name: "Launch week", members: ["06-sunee.avatar.json", "07-kirby.avatar.json"])
+        let empty = GoblinGroup(name: "Nobody", members: [])
+        XCTAssertEqual(GoblinGroups.decode(GoblinGroups.encode([group, empty])), [group])
+        XCTAssertEqual(GoblinGroups.decode(Data("nope".utf8)), [])
+        XCTAssertEqual(GoblinGroups.decode(nil), [])
+        XCTAssertEqual(GoblinGroup(name: "x", members: Array(repeating: "a", count: 30)).members.count, GoblinGroups.maxMembers)
     }
 }
 

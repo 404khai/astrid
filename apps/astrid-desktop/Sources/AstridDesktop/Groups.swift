@@ -4,52 +4,42 @@ import DesktopCore
 import SwiftUI
 import WebKit
 
-/// Blob groups (cosmetic for now, ADR 0037 amendment): pick blobs with the
+/// Goblin groups (cosmetic for now, ADR 0037 amendment): pick goblins with the
 /// Giovanni button in the composer, make a group, and it shows in the sidebar
-/// as its blobs in a dark circle with its name, opening a mock group chat.
+/// as its goblins in a dark circle with its name, opening a mock group chat.
 /// Everything is drawn by `web/group.html`; no model is involved.
 
-/// Giovanni as a symbol-style glyph, like an SF Symbol: his outline as a white
-/// stroke and his eye and mouth as white fills, drawn from giovanni.svg's
-/// paths (25 × 25). No background.
-struct GiovanniIcon: View {
+/// Bramble as a symbol-style glyph, like an SF Symbol: the maintainer's
+/// beardless recipe (wide head, long ears, bulb nose, beady eyes, gnome hat)
+/// drawn by the goblins library's own glyph renderer into
+/// `goblins/bramble-glyph.svg` (web/scripts/build-bramble-glyph.ts), shown as a
+/// template image so it takes the button's colour.
+struct BrambleGlyph: View {
     var size: CGFloat
     var color: Color = .white
 
-    private static let body = SVGPath.parse("M20.7241 18.5209C19.1273 20.7021 16.7294 22.1598 14.0578 22.5731C11.3863 22.9863 8.66 22.3214 6.4787 20.7246C5.39863 19.9339 4.48487 18.9383 3.7896 17.7945C3.09432 16.6507 2.63114 15.3811 2.4265 14.0583C2.01322 11.3868 2.67813 8.66048 4.27495 6.47919C5.87178 4.29789 8.26971 2.84027 10.9412 2.42699C13.6128 2.01371 16.3391 2.67861 18.5204 4.27544C20.7017 5.87226 22.1593 8.2702 22.5726 10.9417C22.9858 13.6133 22.3209 16.3396 20.7241 18.5209Z")
-    private static let eye = SVGPath.parse("M8.81232 8.19588L8.92898 8.21671L9.04065 8.25171L9.14648 8.30088L9.24565 8.36171L9.33565 8.43588L9.41565 8.52171L9.48565 8.61754L9.54398 8.72338L9.58982 8.83671L9.62232 8.95754L9.64148 9.08338L9.64648 9.21254L9.63732 9.34421L9.61398 9.47588L9.58232 9.61671L9.55065 9.75838L9.51898 9.90004L9.48898 10.0434L9.45815 10.1859L9.42898 10.33L9.39982 10.4742L9.37148 10.6192L9.34315 10.7642L9.31565 10.91L9.28898 11.0559L9.26315 11.2017L9.23732 11.3484L9.21232 11.4959L9.18732 11.6425L9.16398 11.79L9.14065 11.9367L9.11732 12.0842L9.09565 12.2317L9.07398 12.3792L9.05315 12.5267L9.03315 12.6742L9.01315 12.8217L8.99398 12.9692L8.96982 13.1059L8.93232 13.2375L8.88148 13.3634L8.81898 13.4825L8.74482 13.5925L8.66148 13.6917L8.56815 13.7792L8.46732 13.855L8.35982 13.9167L8.24732 13.9642L8.13148 13.9975L8.01315 14.0159L7.89315 14.0192L7.77398 14.0067L7.65732 13.98L7.54315 13.9384L7.43398 13.8825L7.33065 13.8134L7.23398 13.7317L7.14565 13.6384L7.06648 13.535L6.99815 13.4217L6.94065 13.3009L6.89482 13.1742L6.86148 13.0425L6.84065 12.9067L6.83398 12.77L6.84065 12.6334L6.85482 12.4884L6.87065 12.3425L6.88732 12.1975L6.90482 12.0517L6.92315 11.9067L6.94232 11.7617L6.96315 11.6167L6.98482 11.4717L7.00732 11.3267L7.03065 11.1817L7.05565 11.0375L7.08065 10.8942L7.10732 10.75L7.13482 10.6067L7.16315 10.4642L7.19232 10.3217L7.22232 10.18L7.25315 10.0384L7.28482 9.89754L7.31815 9.75754L7.35148 9.61754L7.38648 9.47838L7.42148 9.34004L7.45815 9.20254L7.49898 9.07504L7.55315 8.95171L7.61898 8.83254L7.69565 8.72088L7.78232 8.61671L7.87898 8.52171L7.98232 8.43671L8.09232 8.36338L8.20815 8.30171L8.32732 8.25338L8.44815 8.21838L8.57065 8.19671L8.69232 8.18921L8.81232 8.19588Z")
-    private static let mouth = SVGPath.parse("M12.5974 11.0442L12.7474 11.0709L12.8974 11.0967L13.0482 11.1226L13.1982 11.1492L13.3474 11.1759L13.4974 11.2026L13.6466 11.2292L13.7957 11.2567L13.9449 11.2834L14.0932 11.3109L14.2416 11.3376L14.3891 11.3651L14.5366 11.3926L14.6832 11.4201L14.8299 11.4476L14.9749 11.4759L15.1207 11.5034L15.2649 11.5309L15.4082 11.5592L15.5516 11.5867L15.6941 11.6151L15.8357 11.6426L15.9766 11.6709L16.1157 11.6984L16.1857 11.7167L16.2541 11.7434L16.3182 11.7784L16.3782 11.8201L16.4341 11.8692L16.4849 11.9242L16.5291 11.9842L16.5666 12.0501L16.5966 12.1192L16.6199 12.1926L16.6349 12.2676L16.6424 12.3434L16.6416 12.4201L16.6332 12.4959L16.6166 12.5701L16.5924 12.6426L16.5607 12.7109L16.5216 12.7751L16.4766 12.8351L16.4249 12.8884L16.3682 12.9351L16.3074 12.9751L16.2424 13.0084L16.1741 13.0326L16.1041 13.0492L16.0324 13.0567L15.9599 13.0559L15.8882 13.0467L15.7482 13.0192L15.6066 12.9926L15.4649 12.9659L15.3224 12.9384L15.1791 12.9117L15.0349 12.8842L14.8899 12.8576L14.7441 12.8301L14.5982 12.8034L14.4516 12.7759L14.3049 12.7492L14.1566 12.7226L14.0091 12.6951L13.8607 12.6684L13.7116 12.6417L13.5624 12.6151L13.4132 12.5884L13.2632 12.5617L13.1132 12.5351L12.9632 12.5084L12.8124 12.4826L12.6624 12.4559L12.5124 12.4301L12.3616 12.4042L12.2857 12.3867L12.2132 12.3609L12.1432 12.3267L12.0774 12.2859L12.0174 12.2376L11.9624 12.1826L11.9141 12.1217L11.8732 12.0559L11.8399 11.9859L11.8141 11.9134L11.7974 11.8376L11.7891 11.7609V11.6834L11.7982 11.6059L11.8157 11.5309L11.8416 11.4584L11.8757 11.3884L11.9166 11.3234L11.9657 11.2626L12.0207 11.2084L12.0816 11.1601L12.1474 11.1192L12.2174 11.0859L12.2907 11.0609L12.3657 11.0442L12.4432 11.0359H12.5207L12.5974 11.0442Z")
-
-    private static func path(_ commands: [SVGPath.Command], scale s: CGFloat, inset: CGFloat) -> Path {
-        var path = Path()
-        func p(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: (x - inset) * s, y: (y - inset) * s) }
-        for command in commands {
-            switch command {
-            case let .move(x, y): path.move(to: p(x, y))
-            case let .line(x, y): path.addLine(to: p(x, y))
-            case let .cubic(x1, y1, x2, y2, x, y): path.addCurve(to: p(x, y), control1: p(x1, y1), control2: p(x2, y2))
-            case .close: path.closeSubpath()
-            }
-        }
-        return path
-    }
+    static let image: NSImage? = {
+        guard let url = repoFile("goblins/bramble-glyph.svg"), let image = NSImage(contentsOf: url) else { return nil }
+        image.isTemplate = true
+        return image
+    }()
 
     var body: some View {
-        Canvas { context, canvas in
-            // The drawing spans about 2…23 of the 25-unit box; frame that.
-            let inset = 1.6
-            let s = canvas.width / (25 - inset * 2)
-            context.stroke(Self.path(Self.body, scale: s, inset: inset), with: .color(color), style: StrokeStyle(lineWidth: max(1.4, 1.7 * s), lineJoin: .round))
-            context.fill(Self.path(Self.eye, scale: s, inset: inset), with: .color(color))
-            context.fill(Self.path(Self.mouth, scale: s, inset: inset), with: .color(color))
+        Group {
+            if let image = Self.image {
+                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+            } else {
+                Image(systemName: "face.smiling").resizable().scaledToFit()
+            }
         }
+        .foregroundStyle(color)
         .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
 }
 
-/// The composer's blob button, beside the waveform: opens the blob picker.
-struct BlobButton: View {
+/// The composer's goblin button, beside the waveform: opens the goblin picker.
+struct GoblinButton: View {
     @ObservedObject var model: ChatModel
     @EnvironmentObject private var settings: AppSettings
     @State private var open = false
@@ -57,31 +47,31 @@ struct BlobButton: View {
 
     var body: some View {
         Button { open.toggle() } label: {
-            GiovanniIcon(size: 19).frame(width: 22, height: 22)
+            BrambleGlyph(size: 21).frame(width: 22, height: 22)
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .controlSize(.large)
-        .help("Blobs")
-        .accessibilityLabel("Blobs: pick a group")
+        .help("Goblins")
+        .accessibilityLabel("Goblins: pick a group")
         .popover(isPresented: $open, arrowEdge: .top) {
             GroupWeb(ui: model.config.ui, mode: "picker", payload: [
                 "type": "picker",
-                "items": Blobs.all().map(\.json),
-                "selected": settings.blobsPicked,
+                "items": Goblins.all().map(\.json),
+                "selected": settings.goblinsPicked,
                 "palette": palette.json,
             ]) { message in
                 switch message["type"] as? String {
                 case "toggle":
-                    settings.blobsPicked = message["selected"] as? [String] ?? []
+                    settings.goblinsPicked = message["selected"] as? [String] ?? []
                 case "create":
                     let members = message["members"] as? [String] ?? []
                     guard !members.isEmpty else { return }
-                    let names = members.compactMap { id in Blobs.all().first { $0.id == id }?.name }
-                    let name = (message["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? BlobGroups.defaultName(names)
-                    let group = BlobGroup(name: name, members: members)
+                    let names = members.compactMap { id in Goblins.all().first { $0.id == id }?.name }
+                    let name = (message["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? GoblinGroups.defaultName(names)
+                    let group = GoblinGroup(name: name, members: members)
                     settings.groups.insert(group, at: 0)
-                    settings.blobsPicked = []
+                    settings.goblinsPicked = []
                     model.page = .group(group.id)
                     open = false
                 default: break
@@ -93,10 +83,10 @@ struct BlobButton: View {
     }
 }
 
-/// A group in the sidebar: its blobs in a dark circle, then its name.
+/// A group in the sidebar: its goblins in a dark circle, then its name.
 struct GroupRow: View {
     var ui: URL
-    var group: BlobGroup
+    var group: GoblinGroup
     var selected: Bool
     var action: () -> Void
     @Environment(\.palette) private var palette
@@ -132,27 +122,38 @@ struct GroupRow: View {
 }
 
 /// The mock group chat, filling the card under its header.
+/// Its side panel can rename the group and describe it ("save").
 struct GroupChatView: View {
     var ui: URL
-    var group: BlobGroup
+    var group: GoblinGroup
+    @EnvironmentObject private var settings: AppSettings
     @Environment(\.palette) private var palette
 
     var body: some View {
-        GroupWeb(ui: ui, mode: "chat", payload: group.payload(palette: palette))
-            .id(group.id)
+        GroupWeb(ui: ui, mode: "chat", payload: group.payload(palette: palette)) { message in
+            guard message["type"] as? String == "save",
+                  let index = settings.groups.firstIndex(where: { $0.id == group.id }) else { return }
+            let name = (message["name"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let about = (message["about"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            var saved = settings.groups[index]
+            if !name.isEmpty { saved.name = String(name.prefix(60)) }
+            saved.about = about.isEmpty ? nil : String(about.prefix(GoblinGroup.maxAbout))
+            settings.groups[index] = saved
+        }
+        .id(group.id)
     }
 }
 
-extension Blob {
+extension Goblin {
     var json: [String: Any] { ["id": id, "name": name, "character": character] }
 }
 
-extension BlobGroup {
-    /// The group with its blobs' characters, for the page.
+extension GoblinGroup {
+    /// The group with its goblins' characters, for the page.
     func payload(palette: Palette) -> [String: Any] {
-        let every = Blobs.all()
-        let blobs = members.compactMap { id in every.first { $0.id == id } }
-        return ["type": "group", "name": name, "members": blobs.map(\.json), "palette": palette.json]
+        let every = Goblins.all()
+        let goblins = members.compactMap { id in every.first { $0.id == id } }
+        return ["type": "group", "name": name, "about": about ?? "", "members": goblins.map(\.json), "palette": palette.json]
     }
 }
 
@@ -182,7 +183,9 @@ struct GroupWeb: NSViewRepresentable {
         web.setValue(false, forKey: "drawsBackground")
         context.coordinator.web = web
         context.coordinator.update(self)
-        web.load(URLRequest(url: URL(string: "astrid-ui://app/group.html?mode=\(mode)")!))
+        // Debug: ASTRID_DESKTOP_GROUP=panel opens the chat with its side panel.
+        let panel = mode == "chat" && ProcessInfo.processInfo.environment["ASTRID_DESKTOP_GROUP"] == "panel" ? "&panel=1" : ""
+        web.load(URLRequest(url: URL(string: "astrid-ui://app/group.html?mode=\(mode)\(panel)")!))
         return web
     }
 

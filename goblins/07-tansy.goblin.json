@@ -1,0 +1,26 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g7",
+      "name": "Tansy",
+      "expression": "love",
+      "skin": "#E2508C",
+      "head": "egg",
+      "ears": "round",
+      "nose": "button",
+      "eyes": "oval",
+      "hat": "mushroom",
+      "hatColor": "#D8402F",
+      "beard": "none",
+      "beardColor": "#EDE8DF",
+      "eyewear": "none",
+      "scarf": "wrap",
+      "scarfColor": "#ECE6D6",
+      "extras": [
+        "freckles"
+      ]
+    }
+  ]
+}

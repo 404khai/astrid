@@ -1,0 +1,26 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g8",
+      "name": "Knuckle",
+      "expression": "laughing",
+      "skin": "#C07A55",
+      "head": "round",
+      "ears": "droopy",
+      "nose": "bulb",
+      "eyes": "wonky",
+      "hat": "beanie",
+      "hatColor": "#2E6B46",
+      "beard": "forked",
+      "beardColor": "#C9652B",
+      "eyewear": "none",
+      "scarf": "long",
+      "scarfColor": "#E0A92B",
+      "extras": [
+        "earring"
+      ]
+    }
+  ]
+}

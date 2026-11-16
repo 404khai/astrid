@@ -1,0 +1,26 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g11",
+      "name": "Dabble",
+      "expression": "surprised",
+      "skin": "#E8613C",
+      "head": "round",
+      "ears": "round",
+      "nose": "bulb",
+      "eyes": "round",
+      "hat": "headband",
+      "hatColor": "#2F4AA8",
+      "beard": "none",
+      "beardColor": "#5B3B28",
+      "eyewear": "none",
+      "scarf": "none",
+      "scarfColor": "#E0A92B",
+      "extras": [
+        "tusks"
+      ]
+    }
+  ]
+}

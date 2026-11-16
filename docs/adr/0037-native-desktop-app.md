@@ -193,6 +193,26 @@ maintainer asked for a full desktop app on that same native stack, with macOS
       - **Scope:** nothing is sent to a model and nothing is written to the chat
         store.
 
+11. **Goblins replace blobs (amended 2026-11-16).** The maintainer: "port
+    https://github.com/404khai/goblins. add support for all its animations ...
+    these will replace blobs ... use bramble ... to create the outline icon".
+    - **Library:** the Goblins library (MIT, the maintainer's own) is vendored
+      in `web/src/goblin` with `three`.
+    - **Clan files:** its clan is written by `web/scripts/build-goblin-clan.ts`
+      as goblins/v1 recipe files in the repo's `goblins/`. Users can drop studio
+      exports into `~/Library/Application Support/Astrid/Goblins`.
+    - **Desktop app:**
+      - The sidebar row (`web/goblins.html`) shows live 3D goblins.
+      - The picker, group avatars and small rows use flat SVG goblins.
+      - The group chat uses live goblins with a mood per message, the "writing"
+        spell for typing and the "progress" spell on the pulse card.
+      - Clicking any live goblin plays its next animation: all 15 moods, then
+        all 15 spells.
+    - **Composer icon:** a native white outline glyph of Bramble, drawn from the
+      maintainer's beardless recipe (beady eyes, long ears, gnome hat).
+    - **Phone:** the phone app keeps its blobs for now, so `blobs/` and
+      `blobs.html` stay.
+
 ## Alternatives considered
 
 - **A new executable target in `apps/presence-mac`.** It would raise presence
@@ -265,3 +285,29 @@ At the maintainer's request:
   build), deleting `blobs/` removes it; the app runs without bots.
 - **Voice mode's ring** is presence's `VoiceRing` (`web/voice.html`), fed by
   the host's analyser frames.
+
+### Amendment 12 — goblins as a dependency, expressions only, paste to add (2026-11-16)
+
+Maintainer: "bun add github:404khai/goblins#v0.7.0 for now no spells only expressions. allow me to add bots by
+pasting json. the goblin face of the icon in the composer, is not so good, make it better". The vendored
+`web/src/goblin` is replaced by the `@404khai/goblins` v0.7.0 git dependency (`/flat` and `/react` entry points;
+pnpm `allowBuilds` lets its `prepare` step build `dist`). Goblins show expressions only: clicking one cycles the
+fifteen expressions, and no spell or morph plays in the row, picker or group chat. Settings → Goblins gains an
+"Add goblins" field: pasted JSON (a goblins/v1 file, one goblin or a list, at most 512 KB) is checked with the same
+`recipes(in:)` as files and saved as one goblins/v1 file (0600) in the Goblins folder, then shown everywhere. The
+composer icon is now `goblins/bramble-glyph.svg`, drawn by the library's `goblinGlyphSvg` from the beardless Bramble
+recipe (`web/scripts/build-bramble-glyph.ts`) and shown as a template image.
+
+### Amendment 13 — group chat panel and goblin profiles (2026-11-16)
+
+Maintainer: "increase the goblins size in a group chat ... the astrid logo and the pill should allow content
+scroll under ... their background should be transparent ... if I click the pill, it should [open] a side panel
+from the right ... the logo, made up of the animated goblins, 3 max ... every goblin in that group, the name of the
+group, the description, with a save button ... click on a goblin ... their profile in a modal", then "put a settings
+icon in the top right ... the right panel should be full height". A group chat's page now fills the whole content
+card under the app's floating header row; the mark and pill float with no background over a chat that scrolls
+under them and fades out at the top (a mask, no painted band). Faces are 64 px. The pill and a top-right gear open
+a full-height side panel: up to three live goblins overlapping, editable name and description, the roster, and
+Save, which sends `{type:"save", name, about}`; the app stores `about` as an optional `GoblinGroup` field (at most
+280 characters; older stored groups decode unchanged). A roster goblin opens a profile modal: the goblin live (click
+for its expressions), its skin and traits. Still cosmetic: no model is involved.

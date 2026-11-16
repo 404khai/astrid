@@ -1,0 +1,24 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g9",
+      "name": "Fennick",
+      "expression": "confused",
+      "skin": "#4A7FD6",
+      "head": "bean",
+      "ears": "long",
+      "nose": "long",
+      "eyes": "round",
+      "hat": "none",
+      "hatColor": "#D8402F",
+      "beard": "pointy",
+      "beardColor": "#EDE8DF",
+      "eyewear": "round",
+      "scarf": "none",
+      "scarfColor": "#E0A92B",
+      "extras": []
+    }
+  ]
+}

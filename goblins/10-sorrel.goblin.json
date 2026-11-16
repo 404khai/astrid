@@ -1,0 +1,26 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g10",
+      "name": "Sorrel",
+      "expression": "sad",
+      "skin": "#6FA35A",
+      "head": "egg",
+      "ears": "droopy",
+      "nose": "button",
+      "eyes": "oval",
+      "hat": "beanie",
+      "hatColor": "#2F4AA8",
+      "beard": "none",
+      "beardColor": "#9A948C",
+      "eyewear": "none",
+      "scarf": "long",
+      "scarfColor": "#D8402F",
+      "extras": [
+        "headphones"
+      ]
+    }
+  ]
+}
