@@ -36,6 +36,7 @@ class OverlayService : Service() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     if (intent?.action == ACTION_STOP) {
+      want(this, false)
       stopSelf()
       return START_NOT_STICKY
     }
@@ -185,12 +186,23 @@ class OverlayService : Service() {
     const val EXTRA_WAVE = "wave"
     @Volatile var running = false
 
+    private const val PREFS = "astrid-presence"
+
+    /** Whether the bubble should come back after a restart. */
+    fun wanted(context: Context): Boolean =
+      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("on", false)
+
+    private fun want(context: Context, on: Boolean) =
+      context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("on", on).apply()
+
     fun start(context: Context, wave: Boolean) {
+      want(context, true)
       val intent = Intent(context, OverlayService::class.java).putExtra(EXTRA_WAVE, wave)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent) else context.startService(intent)
     }
 
     fun stop(context: Context) {
+      want(context, false)
       context.stopService(Intent(context, OverlayService::class.java))
     }
   }

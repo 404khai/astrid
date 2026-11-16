@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Android TV home-screen tile (320x180): Astrid's mark on her dark ground. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <item>
+    <shape android:shape="rectangle">
+      <size android:width="320dp" android:height="180dp" />
+      <solid android:color="#0b0b10" />
+    </shape>
+  </item>
+  <item android:gravity="center">
+    <bitmap android:src="@drawable/astrid_tv_mark" android:gravity="center" />
+  </item>
+</layer-list>

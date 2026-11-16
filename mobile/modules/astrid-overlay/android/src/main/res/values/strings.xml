@@ -1,0 +1,4 @@
+<resources>
+  <string name="astrid_tv_keys_label">Astrid remote button</string>
+  <string name="astrid_tv_keys_description">Opens Astrid\'s ask panel when you press the remote\'s TV button. Astrid checks only for that one button; it does not read the screen or record other key presses.</string>
+</resources>
