@@ -1,0 +1,35 @@
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+.row {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 0 2px;
+  box-sizing: border-box;
+}
+.slot {
+  flex: 0 1 44px;
+  min-width: 0;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s;
+}
+.slot:hover { background: rgba(255, 255, 255, 0.05); }
+.slot.on { background: rgba(255, 255, 255, 0.09); }
+.live-goblin {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+}

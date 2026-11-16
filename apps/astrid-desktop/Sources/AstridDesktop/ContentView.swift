@@ -282,7 +282,7 @@ struct Sidebar: View {
             VStack(spacing: 2) {
                 SidebarRow(symbol: "plus", title: "New Chat", selected: false) { model.newChat() }
                 SidebarRow(symbol: "square.grid.2x2", title: "Diagrams", selected: model.page == .diagrams) { model.page = .diagrams }
-                // Blob groups: their blobs in a dark circle, then the name.
+                // Goblin groups: their goblins in a dark circle, then the name.
                 ForEach(settings.groups) { group in
                     GroupRow(ui: model.config.ui, group: group, selected: model.page == .group(group.id)) { model.page = .group(group.id) }
                         .contextMenu {
@@ -315,7 +315,7 @@ struct Sidebar: View {
                 .scrollIndicators(.never)
             }
 
-            BlobsRow(ui: model.config.ui, settings: settings, model: model)
+            GoblinsRow(ui: model.config.ui, settings: settings, model: model)
                 .padding(.bottom, 4)
             HStack {
                 AstridLogoMark(size: 21)
@@ -809,7 +809,7 @@ struct Composer: View {
                         .opacity(talking ? 0 : 1)
                         .glassEffect(talking ? .identity : .regular.interactive(), in: .rect(cornerRadius: 20))
                     if !talking {
-                        if !typing && !running { BlobButton(model: model) }
+                        if !typing && !running { GoblinButton(model: model) }
                         button
                     }
                 }

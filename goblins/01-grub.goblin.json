@@ -1,0 +1,24 @@
+{
+  "$schema": "goblins/v1",
+  "version": 1,
+  "goblins": [
+    {
+      "id": "g1",
+      "name": "Grub",
+      "expression": "idle",
+      "skin": "#6FA35A",
+      "head": "round",
+      "ears": "pointy",
+      "nose": "bulb",
+      "eyes": "round",
+      "hat": "gnome",
+      "hatColor": "#D8402F",
+      "beard": "full",
+      "beardColor": "#EDE8DF",
+      "eyewear": "round",
+      "scarf": "none",
+      "scarfColor": "#E0A92B",
+      "extras": []
+    }
+  ]
+}

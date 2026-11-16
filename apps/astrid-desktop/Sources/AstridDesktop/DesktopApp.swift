@@ -100,14 +100,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 fflush(stdout)
             }
         }
-        // Debug: ASTRID_DESKTOP_GROUP=1 makes a sample blob group (if none)
+        // Debug: ASTRID_DESKTOP_GROUP=1 makes a sample goblin group (if none)
         // and opens its mock chat.
         if environment["ASTRID_DESKTOP_GROUP"] != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
                 guard let settings = self?.settings, let model = self?.model else { return }
                 if settings.groups.isEmpty {
-                    let picked = Array(Blobs.all().prefix(3))
-                    settings.groups = [BlobGroup(name: "Launch week", members: picked.map(\.id))]
+                    let picked = Array(Goblins.all().prefix(3))
+                    settings.groups = [GoblinGroup(name: "Launch week", members: picked.map(\.id))]
                 }
                 if let group = settings.groups.first { model.page = .group(group.id) }
             }

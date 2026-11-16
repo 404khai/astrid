@@ -3,97 +3,107 @@ import AstridWebUI
 import SwiftUI
 import WebKit
 
-/// A bot exported from Avatar Lab (avatars.bible-strong.app) as `.avatar.json`.
-struct Blob: Identifiable, Equatable {
+/// A goblin from the Goblins library (github.com/404khai/goblins, MIT): its
+/// recipe (skin, head, hat, beard, eyewear, extras…) as the page draws it.
+struct Goblin: Identifiable, Equatable {
     var id: String
     var name: String
     var character: Any
 
-    static func == (a: Blob, b: Blob) -> Bool { a.id == b.id && a.name == b.name }
+    static func == (a: Goblin, b: Goblin) -> Bool { a.id == b.id && a.name == b.name }
 }
 
-/// Blobs: Avatar Lab's ten built-in bots, kept in the repo's `blobs/`
-/// (AGPL-3.0, see its README), and any the user exports into Astrid's Blobs
-/// folder. Up to five show in the sidebar, chosen in Settings.
-enum Blobs {
+/// Goblins: the Goblins clan, kept as goblins/v1 recipe files in the repo's
+/// `goblins/` (written by web/scripts/build-goblin-clan.ts), and any the user
+/// exports from the Goblins studio into Astrid's Goblins folder. A file may
+/// hold several goblins. Up to five show in the sidebar, chosen in Settings.
+enum Goblins {
     static let limit = 5
-    /// Shown until the user picks: a round, a cloud, a cone, a cube, a pink one.
-    static let defaults = ["06-sunee.avatar.json", "08-cloudee.avatar.json", "03-citrus.avatar.json", "02-freddy.avatar.json", "07-kirby.avatar.json"]
+    /// Shown until the user picks: Bramble, Grub, Pip, Tansy and Hob.
+    static let defaults = ["03-bramble.goblin.json#0", "01-grub.goblin.json#0", "04-pip.goblin.json#0", "07-tansy.goblin.json#0", "12-hob.goblin.json#0"]
     static let maxBytes = 512 * 1024
-    static let changed = Notification.Name("astrid.blobs.changed")
+    static let changed = Notification.Name("astrid.goblins.changed")
 
     static var folder: URL {
-        if let path = ProcessInfo.processInfo.environment["ASTRID_DESKTOP_BLOBS"] { return URL(fileURLWithPath: path, isDirectory: true) }
+        if let path = ProcessInfo.processInfo.environment["ASTRID_DESKTOP_GOBLINS"] { return URL(fileURLWithPath: path, isDirectory: true) }
         return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Astrid/Blobs", isDirectory: true)
+            .appendingPathComponent("Astrid/Goblins", isDirectory: true)
     }
 
-    /// Settings' Blobs icon: Giovanni, from the repo.
-    static let icon: NSImage? = repoFile("giovanni.svg").flatMap { NSImage(contentsOf: $0) }
-
     /// The built-in bots, from the repo.
-    static var builtIn: URL? { repoFile("blobs") }
+    static var builtIn: URL? { repoFile("goblins") }
 
     /// Every bot: the built-in ones, then the user's.
-    static func all() -> [Blob] {
+    static func all() -> [Goblin] {
         (builtIn.map { load(from: $0, limit: 32) } ?? []) + load(from: folder, limit: 32)
     }
 
     /// The bots in the sidebar: the chosen ones, in the order chosen.
-    static func load(shown: [String] = defaults) -> [Blob] {
+    static func load(shown: [String] = defaults) -> [Goblin] {
         let every = all()
         let picked = shown.compactMap { id in every.first { $0.id == id } }
         return Array((picked.isEmpty ? every : picked).prefix(limit))
     }
 
-    static func load(from folder: URL, limit: Int) -> [Blob] {
+    static func load(from folder: URL, limit: Int) -> [Goblin] {
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey])) ?? []
         return files
             .filter { $0.pathExtension == "json" }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-            .compactMap { url -> Blob? in
+            .flatMap { url -> [Goblin] in
                 guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= maxBytes,
                       let data = try? Data(contentsOf: url),
-                      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-                let stem = url.lastPathComponent.replacingOccurrences(of: ".avatar.json", with: "").replacingOccurrences(of: ".json", with: "")
-                let name = (object["name"] as? String).flatMap { $0.isEmpty ? nil : String($0.prefix(40)) } ?? stem.capitalized
-                return Blob(id: url.lastPathComponent, name: name, character: object)
+                      let json = try? JSONSerialization.jsonObject(with: data) else { return [] }
+                return recipes(in: json).enumerated().map { index, recipe in
+                    let name = (recipe["name"] as? String).flatMap { $0.isEmpty ? nil : String($0.prefix(40)) } ?? "Goblin"
+                    return Goblin(id: "\(url.lastPathComponent)#\(index)", name: name, character: recipe)
+                }
             }
             .prefix(limit)
             .map { $0 }
     }
 }
 
-/// The row of blobs in the sidebar, drawn by `web/blobs.html`.
-struct BlobsRow: View {
+/// The goblins in a goblins/v1 file, a bare goblin or an array of them, as the
+/// library's `fromJSON` accepts. Anything without a skin and a hat is left out.
+func recipes(in json: Any) -> [[String: Any]] {
+    let list: [Any]
+    if let array = json as? [Any] { list = array }
+    else if let object = json as? [String: Any], let goblins = object["goblins"] as? [Any] { list = goblins }
+    else { list = [json] }
+    return list.compactMap { $0 as? [String: Any] }.filter { $0["skin"] is String && $0["hat"] is String }.prefix(32).map { $0 }
+}
+
+/// The row of goblins in the sidebar, drawn by `web/goblins.html`.
+struct GoblinsRow: View {
     var ui: URL
     @ObservedObject var settings: AppSettings
     @ObservedObject var model: ChatModel
-    @State private var blobs: [Blob]
+    @State private var goblins: [Goblin]
 
     init(ui: URL, settings: AppSettings, model: ChatModel) {
         self.ui = ui
         self.settings = settings
         self.model = model
-        _blobs = State(initialValue: Blobs.load(shown: settings.blobsShown))
+        _goblins = State(initialValue: Goblins.load(shown: settings.goblinsShown))
     }
 
     var body: some View {
         Group {
-            if settings.showBlobs, !blobs.isEmpty {
-                BlobsWeb(ui: ui, blobs: blobs, selected: settings.blob ?? blobs.first?.id, busy: model.live != nil) { settings.blob = $0 }
+            if settings.showGoblins, !goblins.isEmpty {
+                GoblinsWeb(ui: ui, goblins: goblins, selected: settings.goblin ?? goblins.first?.id, busy: model.live != nil) { settings.goblin = $0 }
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 50, maxHeight: 50)
                     .clipped()
             }
         }
-        .onChange(of: settings.blobsShown) { _, shown in blobs = Blobs.load(shown: shown) }
-        .onReceive(NotificationCenter.default.publisher(for: Blobs.changed)) { _ in blobs = Blobs.load(shown: settings.blobsShown) }
+        .onChange(of: settings.goblinsShown) { _, shown in goblins = Goblins.load(shown: shown) }
+        .onReceive(NotificationCenter.default.publisher(for: Goblins.changed)) { _ in goblins = Goblins.load(shown: settings.goblinsShown) }
     }
 }
 
-private struct BlobsWeb: NSViewRepresentable {
+private struct GoblinsWeb: NSViewRepresentable {
     var ui: URL
-    var blobs: [Blob]
+    var goblins: [Goblin]
     var selected: String?
     var busy: Bool
     var pick: (String) -> Void
@@ -108,7 +118,7 @@ private struct BlobsWeb: NSViewRepresentable {
         web.setValue(false, forKey: "drawsBackground")
         context.coordinator.web = web
         context.coordinator.update(self)
-        web.load(URLRequest(url: URL(string: "astrid-ui://app/blobs.html")!))
+        web.load(URLRequest(url: URL(string: "astrid-ui://app/goblins.html")!))
         return web
     }
 
@@ -121,16 +131,16 @@ private struct BlobsWeb: NSViewRepresentable {
     final class Coordinator: NSObject, WKScriptMessageHandler {
         weak var web: WKWebView?
         private var ready = false
-        private var view: BlobsWeb?
-        private var sentBlobs: [Blob] = []
+        private var view: GoblinsWeb?
+        private var sentGoblins: [Goblin] = []
         private var sentBusy: Bool?
 
-        func update(_ view: BlobsWeb) {
+        func update(_ view: GoblinsWeb) {
             self.view = view
             guard ready else { return }
-            if view.blobs != sentBlobs {
-                sentBlobs = view.blobs
-                post(["type": "blobs", "items": view.blobs.map { ["id": $0.id, "name": $0.name, "character": $0.character] }, "selected": view.selected as Any])
+            if view.goblins != sentGoblins {
+                sentGoblins = view.goblins
+                post(["type": "goblins", "items": view.goblins.map { ["id": $0.id, "name": $0.name, "character": $0.character] }, "selected": view.selected as Any])
             }
             if view.busy != sentBusy {
                 sentBusy = view.busy
@@ -143,7 +153,7 @@ private struct BlobsWeb: NSViewRepresentable {
             switch body["type"] as? String {
             case "ready":
                 ready = true
-                sentBlobs = []
+                sentGoblins = []
                 sentBusy = nil
                 if let view { update(view) }
             case "select":

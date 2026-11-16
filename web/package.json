@@ -21,12 +21,14 @@
     "react-dom": "^19.2.0",
     "runeicons-react": "file:vendor/runeicons-react",
     "thinking-orbs": "^0.3.2",
+    "three": "0.187.0",
     "voice-ring": "^0.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "0.187.0",
     "@vitejs/plugin-react": "^5.0.4",
     "typescript": "~5.9.3",
     "vite": "^7.1.9"

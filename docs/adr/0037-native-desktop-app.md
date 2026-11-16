@@ -193,6 +193,26 @@ maintainer asked for a full desktop app on that same native stack, with macOS
       - **Scope:** nothing is sent to a model and nothing is written to the chat
         store.
 
+11. **Goblins replace blobs (amended 2026-11-16).** The maintainer: "port
+    https://github.com/404khai/goblins. add support for all its animations ...
+    these will replace blobs ... use bramble ... to create the outline icon".
+    - **Library:** the Goblins library (MIT, the maintainer's own) is vendored
+      in `web/src/goblin` with `three`.
+    - **Clan files:** its clan is written by `web/scripts/build-goblin-clan.ts`
+      as goblins/v1 recipe files in the repo's `goblins/`. Users can drop studio
+      exports into `~/Library/Application Support/Astrid/Goblins`.
+    - **Desktop app:**
+      - The sidebar row (`web/goblins.html`) shows live 3D goblins.
+      - The picker, group avatars and small rows use flat SVG goblins.
+      - The group chat uses live goblins with a mood per message, the "writing"
+        spell for typing and the "progress" spell on the pulse card.
+      - Clicking any live goblin plays its next animation: all 15 moods, then
+        all 15 spells.
+    - **Composer icon:** a native white outline glyph of Bramble, drawn from the
+      maintainer's beardless recipe (beady eyes, long ears, gnome hat).
+    - **Phone:** the phone app keeps its blobs for now, so `blobs/` and
+      `blobs.html` stay.
+
 ## Alternatives considered
 
 - **A new executable target in `apps/presence-mac`.** It would raise presence

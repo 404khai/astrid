@@ -17,14 +17,14 @@ final class AppSettings: ObservableObject {
     @Published var sidebarWidth: Double { didSet { defaults.set(sidebarWidth, forKey: "sidebar.width") } }
     @Published var storedModel: String { didSet { defaults.set(storedModel, forKey: "ask.model") } }
     @Published var storedMail: String { didSet { defaults.set(storedMail, forKey: "ask.mail") } }
-    /// The row of blobs above the sidebar's foot, and the one picked.
-    @Published var showBlobs: Bool { didSet { defaults.set(showBlobs, forKey: "blobs.show") } }
-    @Published var blob: String? { didSet { defaults.set(blob, forKey: "blobs.selected") } }
+    /// The row of goblins above the sidebar's foot, and the one picked.
+    @Published var showGoblins: Bool { didSet { defaults.set(showGoblins, forKey: "goblins.show") } }
+    @Published var goblin: String? { didSet { defaults.set(goblin, forKey: "goblins.selected") } }
     /// Which bots show in the row, in order (file names).
-    @Published var blobsShown: [String] { didSet { defaults.set(blobsShown, forKey: "blobs.shown") } }
-    /// Mock blob groups (cosmetic), newest first, and the blobs being picked.
-    @Published var groups: [BlobGroup] { didSet { defaults.set(BlobGroups.encode(groups), forKey: "blobs.groups") } }
-    @Published var blobsPicked: [String] { didSet { defaults.set(blobsPicked, forKey: "blobs.picked") } }
+    @Published var goblinsShown: [String] { didSet { defaults.set(goblinsShown, forKey: "goblins.shown") } }
+    /// Mock goblin groups (cosmetic), newest first, and the goblins being picked.
+    @Published var groups: [GoblinGroup] { didSet { defaults.set(GoblinGroups.encode(groups), forKey: "goblins.groups") } }
+    @Published var goblinsPicked: [String] { didSet { defaults.set(goblinsPicked, forKey: "goblins.picked") } }
     /// Not stored: whether the settings sheet is open.
     @Published var showSettings = false
 
@@ -46,11 +46,11 @@ final class AppSettings: ObservableObject {
         sidebarShown = defaults.object(forKey: "sidebar.shown") as? Bool ?? true
         let width = defaults.object(forKey: "sidebar.width") as? Double ?? Self.sidebarDefault
         sidebarWidth = min(max(width, Self.sidebarMin), Self.sidebarMax)
-        showBlobs = defaults.object(forKey: "blobs.show") as? Bool ?? true
-        blob = defaults.string(forKey: "blobs.selected")
-        blobsShown = defaults.stringArray(forKey: "blobs.shown") ?? Blobs.defaults
-        groups = BlobGroups.decode(defaults.data(forKey: "blobs.groups"))
-        blobsPicked = defaults.stringArray(forKey: "blobs.picked") ?? []
+        showGoblins = defaults.object(forKey: "goblins.show") as? Bool ?? true
+        goblin = defaults.string(forKey: "goblins.selected")
+        goblinsShown = defaults.stringArray(forKey: "goblins.shown") ?? Goblins.defaults
+        groups = GoblinGroups.decode(defaults.data(forKey: "goblins.groups"))
+        goblinsPicked = defaults.stringArray(forKey: "goblins.picked") ?? []
         storedModel = defaults.string(forKey: "ask.model") ?? "claude-code/sonnet"
         let mail = defaults.string(forKey: "ask.mail") ?? "gmail"
         storedMail = Self.mailSources.contains(mail) ? mail : "gmail"

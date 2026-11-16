@@ -27,13 +27,13 @@ html[data-mode="cluster"] #root {
   display: grid;
   place-items: center;
 }
-.blob {
+.goblin {
   display: inline-grid;
   place-items: center;
   cursor: default;
 }
 
-/* ─── Cluster: blobs overlapping in a dark circle ─── */
+/* ─── Cluster: goblins overlapping in a dark circle ─── */
 .cluster {
   position: relative;
   display: inline-block;
@@ -318,4 +318,11 @@ time { font-size: 11px; color: var(--secondary); padding-left: 4px; }
   place-items: center;
   background: var(--accent);
   color: white;
+}
+.live-goblin {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
 }
