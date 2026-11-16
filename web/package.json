@@ -11,6 +11,7 @@
     "test": "playwright test"
   },
   "dependencies": {
+    "@404khai/goblins": "github:404khai/goblins#v0.7.0",
     "@bible-strong/avatar-web": "1.0.1",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@fontsource/space-grotesk": "^5.2.10",

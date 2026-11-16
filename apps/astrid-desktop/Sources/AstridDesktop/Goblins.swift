@@ -64,6 +64,37 @@ enum Goblins {
     }
 }
 
+struct GoblinAddError: Error { var message: String }
+
+extension Goblins {
+    /// Adds pasted goblin JSON: checked like a file, then saved as a goblins/v1
+    /// file in the Goblins folder (0600). Returns the names added.
+    static func add(json text: String) -> Result<[String], GoblinAddError> {
+        let data = Data(text.trimmingCharacters(in: .whitespacesAndNewlines).utf8)
+        guard data.count <= maxBytes else { return .failure(.init(message: "That's too big for a goblin (512 KB at most).")) }
+        guard let json = try? JSONSerialization.jsonObject(with: data) else {
+            return .failure(.init(message: "That isn't valid JSON."))
+        }
+        let found = recipes(in: json)
+        guard !found.isEmpty else { return .failure(.init(message: "No goblins in that: each needs a skin and a hat.")) }
+        let file: [String: Any] = ["$schema": "goblins/v1", "version": 1, "goblins": found]
+        guard let out = try? JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys]) else {
+            return .failure(.init(message: "Couldn't save those goblins."))
+        }
+        let names = found.map { ($0["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Goblin" }
+        let slug = names[0].lowercased().filter { $0.isLetter || $0.isNumber }
+        let url = folder.appendingPathComponent("\(slug.isEmpty ? "goblin" : slug)-\(Int(Date().timeIntervalSince1970)).goblin.json")
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            try out.write(to: url, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        } catch {
+            return .failure(.init(message: "Couldn't save those goblins: \(error.localizedDescription)"))
+        }
+        return .success(names)
+    }
+}
+
 /// The goblins in a goblins/v1 file, a bare goblin or an array of them, as the
 /// library's `fromJSON` accepts. Anything without a skin and a hat is left out.
 func recipes(in json: Any) -> [[String: Any]] {

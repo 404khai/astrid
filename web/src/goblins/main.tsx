@@ -39,7 +39,7 @@ function Row() {
             host.webkit?.messageHandlers?.astrid?.postMessage({ type: "select", id: item.id });
           }}
         >
-          <LiveGoblin item={item} size={40} expression={item.id === picked && busy ? "thinking" : "idle"} morph={item.id === picked && busy ? "thinking" : null} />
+          <LiveGoblin item={item} size={40} expression={item.id === picked && busy ? "thinking" : "idle"} />
         </span>
       ))}
     </main>

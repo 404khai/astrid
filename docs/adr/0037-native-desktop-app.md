@@ -285,3 +285,15 @@ At the maintainer's request:
   build), deleting `blobs/` removes it; the app runs without bots.
 - **Voice mode's ring** is presence's `VoiceRing` (`web/voice.html`), fed by
   the host's analyser frames.
+
+### Amendment 12 — goblins as a dependency, expressions only, paste to add (2026-11-16)
+
+Maintainer: "bun add github:404khai/goblins#v0.7.0 for now no spells only expressions. allow me to add bots by
+pasting json. the goblin face of the icon in the composer, is not so good, make it better". The vendored
+`web/src/goblin` is replaced by the `@404khai/goblins` v0.7.0 git dependency (`/flat` and `/react` entry points;
+pnpm `allowBuilds` lets its `prepare` step build `dist`). Goblins show expressions only: clicking one cycles the
+fifteen expressions, and no spell or morph plays in the row, picker or group chat. Settings → Goblins gains an
+"Add goblins" field: pasted JSON (a goblins/v1 file, one goblin or a list, at most 512 KB) is checked with the same
+`recipes(in:)` as files and saved as one goblins/v1 file (0600) in the Goblins folder, then shown everywhere. The
+composer icon is now `goblins/bramble-glyph.svg`, drawn by the library's `goblinGlyphSvg` from the beardless Bramble
+recipe (`web/scripts/build-bramble-glyph.ts`) and shown as a template image.

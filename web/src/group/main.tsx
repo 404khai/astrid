@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
 import { FlatGoblin, LiveGoblin, type Item } from "../goblins/live";
-import type { ExpressionId, MorphId } from "../goblin";
+import type { ExpressionId } from "@404khai/goblins/flat";
 import "@fontsource/space-grotesk/latin-400.css";
 import "@fontsource/space-grotesk/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
@@ -130,7 +130,7 @@ function ClusterPage() {
 
 type Line =
   | { kind: "text"; from: number; text: string; at: string; mention?: number; mood: ExpressionId }
-  | { kind: "pulse"; from: number; at: string; mood: ExpressionId; spell?: MorphId }
+  | { kind: "pulse"; from: number; at: string; mood: ExpressionId }
   | { kind: "activity"; from: number; at: string; mood: ExpressionId }
   | { kind: "you"; text: string; at: string }
   | { kind: "typing"; from: number };
@@ -141,7 +141,7 @@ function script(n: number): Line[] {
   const lines: Line[] = [
     { kind: "text", from: 0, at: at(1), mood: "happy", text: "Morning all! Quick round before we start: where is everyone at?" },
     { kind: "text", from: 1 % n, at: at(2), mood: "talking", text: "Mine's nearly there, two small things left.", mention: n > 2 ? 2 : undefined },
-    { kind: "pulse", from: 0, at: at(4), mood: "searching", spell: "progress" },
+    { kind: "pulse", from: 0, at: at(4), mood: "searching" },
     { kind: "you", at: at(5), text: "Looks good. Can someone take the last blocker today?" },
     { kind: "activity", from: (2 % n), at: at(6), mood: "thinking" },
     { kind: "text", from: (n > 3 ? 3 : 0), at: at(7), mood: "celebrate", text: "On it. I'll post an update in an hour." },
@@ -262,13 +262,13 @@ function Chat() {
           if (line.kind === "typing")
             return (
               <div key={i} className="line">
-                <span className="face"><LiveGoblin item={b} size={56} expression="thinking" morph="writing" /></span>
+                <span className="face"><LiveGoblin item={b} size={56} expression="thinking" /></span>
                 <p className="bubble typing" aria-label={`${b.name} is typing`}><i /><i /><i /></p>
               </div>
             );
           return (
             <div key={i} className="line">
-              <span className="face"><LiveGoblin item={b} size={56} expression={line.mood} morph={line.kind === "pulse" ? line.spell ?? null : null} /></span>
+              <span className="face"><LiveGoblin item={b} size={56} expression={line.mood} /></span>
               <div className="said">
                 <span className="who">{b.name}</span>
                 {line.kind === "text" && (

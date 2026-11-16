@@ -807,6 +807,22 @@ struct GoblinsPage: View {
     @ObservedObject var settings: AppSettings
     @Environment(\.palette) private var palette
     @State private var every: [Goblin] = Goblins.all()
+    @State private var pasted = ""
+    @State private var note: (text: String, ok: Bool)?
+
+    /// Saves the pasted goblins as one file in the Goblins folder, then shows
+    /// them everywhere (the row, the picker and groups).
+    private func add() {
+        switch Goblins.add(json: pasted) {
+        case .success(let names):
+            note = ("Added \(names.joined(separator: ", ")).", true)
+            pasted = ""
+            every = Goblins.all()
+            NotificationCenter.default.post(name: Goblins.changed, object: nil)
+        case .failure(let error):
+            note = (error.message, false)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -838,21 +854,33 @@ struct GoblinsPage: View {
                     if goblin.id != every.last?.id { Divider() }
                 }
             }
-            SectionTitle(title: "More goblins")
+            SectionTitle(title: "Add goblins")
             SettingsGroup {
-                Text("The built-in bots are from Bible Strong Avatar Lab (AGPL-3.0). To add your own, make one at avatars.bible-strong.app, export it (Export › .avatar.json), put it in the Goblins folder, and press Reload.")
+                Text("Paste a goblin's JSON from the Goblins studio: a goblins/v1 file, one goblin, or a list. Each one needs at least a skin and a hat.")
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
+                TextEditor(text: $pasted)
+                    .font(.system(.caption, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .frame(height: 120)
+                    .padding(6)
+                    .background(palette.text.opacity(0.05), in: .rect(cornerRadius: 10))
+                    .accessibilityLabel("Goblin JSON")
+                if let note {
+                    Text(note.text).font(.caption).foregroundStyle(note.ok ? palette.secondary : .red)
+                }
                 HStack {
-                    Button("Open Avatar Lab") { NSWorkspace.shared.open(URL(string: "https://avatars.bible-strong.app")!) }
+                    Button("Add") { add() }
+                        .buttonStyle(.glassProminent)
+                        .disabled(pasted.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Paste from Clipboard") { pasted = NSPasteboard.general.string(forType: .string) ?? "" }
                         .buttonStyle(.glass)
+                    Spacer()
                     Button("Open Folder") {
                         try? FileManager.default.createDirectory(at: Goblins.folder, withIntermediateDirectories: true)
                         NSWorkspace.shared.open(Goblins.folder)
                     }
                     .buttonStyle(.glass)
-                    Button("Reload") { every = Goblins.all(); NotificationCenter.default.post(name: Goblins.changed, object: nil) }
-                        .buttonStyle(.glass)
                 }
             }
         }

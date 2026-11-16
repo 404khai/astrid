@@ -9,63 +9,30 @@ import WebKit
 /// as its goblins in a dark circle with its name, opening a mock group chat.
 /// Everything is drawn by `web/group.html`; no model is involved.
 
-/// Bramble as a symbol-style glyph, like an SF Symbol, from the maintainer's
-/// recipe (wide head, long ears, bulb nose, beady eyes, gnome hat, no beard,
-/// no headphones): white outlines, solid eyes, his idle smile. Drawn natively
-/// from the vendored renderer's geometry (web/src/goblin/svg.ts, 1 unit = 60,
-/// head centred at 120, 150). Each part clears what is under it, so no lines
-/// cross.
+/// Bramble as a symbol-style glyph, like an SF Symbol: the maintainer's
+/// beardless recipe (wide head, long ears, bulb nose, beady eyes, gnome hat)
+/// drawn by the goblins library's own glyph renderer into
+/// `goblins/bramble-glyph.svg` (web/scripts/build-bramble-glyph.ts), shown as a
+/// template image so it takes the button's colour.
 struct BrambleGlyph: View {
     var size: CGFloat
     var color: Color = .white
 
+    static let image: NSImage? = {
+        guard let url = repoFile("goblins/bramble-glyph.svg"), let image = NSImage(contentsOf: url) else { return nil }
+        image.isTemplate = true
+        return image
+    }()
+
     var body: some View {
-        Canvas { context, canvas in
-            // The drawing spans x -15…255 and y 5…202; fit its width.
-            let s = canvas.width / 282
-            let ox = canvas.width / 2 - 120 * s, oy = canvas.height / 2 - 104 * s
-            func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
-            func oval(_ cx: CGFloat, _ cy: CGFloat, _ rx: CGFloat, _ ry: CGFloat) -> Path {
-                Path(ellipseIn: CGRect(x: ox + (cx - rx) * s, y: oy + (cy - ry) * s, width: rx * 2 * s, height: ry * 2 * s))
-            }
-            let line = StrokeStyle(lineWidth: max(1.4, 14 * s), lineCap: .round, lineJoin: .round)
-            context.drawLayer { layer in
-                func part(_ path: Path) {
-                    layer.blendMode = .clear
-                    layer.fill(path, with: .color(.black))
-                    layer.blendMode = .normal
-                    layer.stroke(path, with: .color(color), style: line)
-                }
-                // Long ears, angled up and out (the renderer's "long" ear).
-                for mirror in [false, true] {
-                    func m(_ x: CGFloat, _ y: CGFloat) -> CGPoint { p(mirror ? 240 - x : x, y) }
-                    var ear = Path()
-                    ear.move(to: m(172, 134))
-                    ear.addQuadCurve(to: m(255, 116), control: m(216, 119))
-                    ear.addQuadCurve(to: m(180, 157), control: m(223, 140))
-                    ear.closeSubpath()
-                    part(ear)
-                }
-                // Wide head.
-                part(oval(120, 150, 72, 52))
-                // Gnome hat, leaning right.
-                var hat = Path()
-                hat.move(to: p(45, 125))
-                hat.addQuadCurve(to: p(156, 5), control: p(79, 47))
-                hat.addQuadCurve(to: p(195, 125), control: p(184, 59))
-                hat.addQuadCurve(to: p(45, 125), control: p(120, 133))
-                hat.closeSubpath()
-                part(hat)
-                // Beady eyes, bulb nose, idle smile.
-                layer.fill(oval(94, 143, 8, 9.5), with: .color(color))
-                layer.fill(oval(146, 143, 8, 9.5), with: .color(color))
-                part(oval(120, 157, 14, 12.5))
-                var smile = Path()
-                smile.move(to: p(108, 175))
-                smile.addQuadCurve(to: p(132, 175), control: p(120, 186))
-                layer.stroke(smile, with: .color(color), style: line)
+        Group {
+            if let image = Self.image {
+                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+            } else {
+                Image(systemName: "face.smiling").resizable().scaledToFit()
             }
         }
+        .foregroundStyle(color)
         .frame(width: size, height: size)
         .accessibilityHidden(true)
     }
