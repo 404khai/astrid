@@ -14,14 +14,16 @@ import "./group.css";
  * - `picker`: every goblin, pick some, see them as a group, make the group.
  * - `cluster`: a group's avatar, its goblins overlapping in a dark circle.
  * - `chat`: a mock chat between the group's goblins, with Astrid's mark up top.
- * Goblins are drawn by the vendored Goblins library (../goblin, MIT): live 3D
+ *   Its pill opens a side panel (name, description, goblins, save), and a
+ *   goblin there opens its profile.
+ * Goblins are drawn by the Goblins library (@404khai/goblins, MIT): live 3D
  * where they talk, flat SVG where they are small. Nothing here talks to a model.
  */
 type Goblin = Item;
 type Palette = { content: string; text: string; secondary: string; accent: string; bubble: string };
 type Incoming =
   | { type: "picker"; items: Goblin[]; selected: string[]; palette?: Palette }
-  | { type: "group"; name: string; members: Goblin[]; palette?: Palette };
+  | { type: "group"; name: string; about?: string; members: Goblin[]; palette?: Palette };
 
 const host = window as unknown as {
   astrid?: { receive: (m: Incoming) => void };
@@ -218,16 +220,117 @@ function Activity({ seed, names }: { seed: string; names: string[] }) {
   );
 }
 
+const FACE = 64;
+
+/** Up to three live goblins, overlapping: the group's mark in its panel. */
+function GroupMark({ members }: { members: Goblin[] }) {
+  const shown = members.slice(0, 3);
+  return (
+    <div className={`group-mark n${shown.length}`} aria-hidden="true">
+      {shown.map((b, i) => (
+        <span key={b.id} className={`mark-slot s${i}`}>
+          <LiveGoblin item={b} size={shown.length === 1 ? 120 : 96} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const TRAITS: [string, (c: Goblin["character"]) => unknown][] = [
+  ["Head", (c) => c.head],
+  ["Ears", (c) => c.ears],
+  ["Eyes", (c) => c.eyes],
+  ["Nose", (c) => c.nose],
+  ["Hat", (c) => (c.hat && typeof c.hat === "object" ? (c.hat as { style?: string }).style : c.hat)],
+  ["Beard", (c) => c.beard],
+  ["Eyewear", (c) => c.eyewear],
+  ["Scarf", (c) => c.scarf],
+];
+
+/** A goblin's profile: big and live (click it for its expressions), with its traits. */
+function Profile({ goblin, onClose }: { goblin: Goblin; onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    addEventListener("keydown", key);
+    return () => removeEventListener("keydown", key);
+  }, [onClose]);
+  const c = goblin.character;
+  const traits = TRAITS.map(([k, f]) => [k, f(c)] as const).filter(([, v]) => typeof v === "string" && v && v !== "none");
+  return (
+    <div className="scrim" onClick={onClose}>
+      <div className="profile" role="dialog" aria-modal="true" aria-label={`${goblin.name}'s profile`} onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="close" onClick={onClose} aria-label="Close">✕</button>
+        <LiveGoblin item={goblin} size={180} framing="full" title="Click for the next expression" />
+        <h2>{goblin.name}</h2>
+        <span className="skin"><i style={{ background: String(c.skin ?? "#888") }} />{String(c.skin ?? "")}</span>
+        <dl>
+          {traits.map(([k, v]) => (
+            <div key={k}><dt>{k}</dt><dd>{String(v)}</dd></div>
+          ))}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+/** The group's side panel, from the right. */
+function Panel({ name, about, members, open, onClose, onPick }: { name: string; about: string; members: Goblin[]; open: boolean; onClose: () => void; onPick: (g: Goblin) => void }) {
+  const [draft, setDraft] = useState({ name, about });
+  useEffect(() => setDraft({ name, about }), [name, about, open]);
+  const dirty = draft.name.trim() !== name || draft.about.trim() !== about;
+  return (
+    <>
+      <div className={`panel-scrim${open ? " open" : ""}`} onClick={onClose} />
+      <aside className={`panel${open ? " open" : ""}`} aria-hidden={!open} aria-label="Group">
+        <button type="button" className="close" onClick={onClose} aria-label="Close panel" tabIndex={open ? 0 : -1}>✕</button>
+        {open && <GroupMark members={members} />}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (draft.name.trim()) post({ type: "save", name: draft.name.trim(), about: draft.about.trim() });
+          }}
+        >
+          <label>
+            <span>Name</span>
+            <input value={draft.name} maxLength={60} onChange={(e) => setDraft({ ...draft, name: e.target.value })} tabIndex={open ? 0 : -1} />
+          </label>
+          <label>
+            <span>Description</span>
+            <textarea value={draft.about} maxLength={280} rows={3} placeholder="What is this group for?" onChange={(e) => setDraft({ ...draft, about: e.target.value })} tabIndex={open ? 0 : -1} />
+          </label>
+          <span className="panel-label">{members.length} goblin{members.length === 1 ? "" : "s"}</span>
+          <ul className="roster">
+            {members.map((b) => (
+              <li key={b.id}>
+                <button type="button" onClick={() => onPick(b)} tabIndex={open ? 0 : -1}>
+                  <i className="roster-face"><FlatGoblin item={b} size={36} /></i>
+                  <span>{b.name}</span>
+                  <em>›</em>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="submit" className="save" disabled={!dirty || !draft.name.trim()} tabIndex={open ? 0 : -1}>Save</button>
+        </form>
+      </aside>
+    </>
+  );
+}
+
 function Chat() {
   const [name, setName] = useState("");
+  const [about, setAbout] = useState("");
   const [members, setMembers] = useState<Goblin[]>([]);
   const [palette, setPalette] = useState<Palette>();
+  const [panel, setPanel] = useState(() => new URLSearchParams(location.search).has("panel"));
+  const [profile, setProfile] = useState<Goblin | null>(null);
   usePalette(palette);
   useEffect(() => {
     host.astrid = {
       receive: (m) => {
         if (m.type !== "group") return;
         setName(m.name);
+        setAbout(m.about ?? "");
         setMembers(m.members);
         if (m.palette) setPalette(m.palette);
       },
@@ -239,14 +342,17 @@ function Chat() {
   const who = (i: number) => members[i % n];
   return (
     <main className="chat">
+      <button type="button" className="chat-settings" onClick={() => setPanel(true)} aria-label="Group settings" title="Group settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" /><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5A7.6 7.6 0 0 0 7 6.5l-2.4-1-2 3.4 2 1.6a7.7 7.7 0 0 0 0 3l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.6Z" /></svg>
+      </button>
       <header className="chat-top">
         {/* The app's card header shows the group's name; the page keeps the mark and the count. */}
         <div className="chat-center">
           <span className="chat-logo"><AstridLogo animated tracking /></span>
-          <span className="chat-count">
+          <button type="button" className="chat-count" onClick={() => setPanel(true)} aria-expanded={panel} aria-label={`${n} goblins. Open the group panel.`}>
             <Cluster key={members.map((b) => b.id).join()} goblins={members} size={26} />
             {n} goblin{n === 1 ? "" : "s"}
-          </span>
+          </button>
         </div>
       </header>
       <section className="lines">
@@ -262,13 +368,13 @@ function Chat() {
           if (line.kind === "typing")
             return (
               <div key={i} className="line">
-                <span className="face"><LiveGoblin item={b} size={56} expression="thinking" /></span>
+                <span className="face"><LiveGoblin item={b} size={FACE} expression="thinking" /></span>
                 <p className="bubble typing" aria-label={`${b.name} is typing`}><i /><i /><i /></p>
               </div>
             );
           return (
             <div key={i} className="line">
-              <span className="face"><LiveGoblin item={b} size={56} expression={line.mood} /></span>
+              <span className="face"><LiveGoblin item={b} size={FACE} expression={line.mood} /></span>
               <div className="said">
                 <span className="who">{b.name}</span>
                 {line.kind === "text" && (
@@ -289,6 +395,8 @@ function Chat() {
         <span>Message {name}…</span>
         <span className="send">↑</span>
       </footer>
+      <Panel name={name} about={about} members={members} open={panel} onClose={() => setPanel(false)} onPick={setProfile} />
+      {profile && <Profile goblin={profile} onClose={() => setProfile(null)} />}
     </main>
   );
 }

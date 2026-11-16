@@ -7,10 +7,15 @@ public struct GoblinGroup: Codable, Equatable, Identifiable, Sendable {
     public var name: String
     public var members: [String]
     public var created: Date
+    /// What the group is for, set in its side panel (absent in older groups).
+    public var about: String?
 
-    public init(id: UUID = UUID(), name: String, members: [String], created: Date = Date()) {
+    public static let maxAbout = 280
+
+    public init(id: UUID = UUID(), name: String, members: [String], created: Date = Date(), about: String? = nil) {
         self.id = id
         self.name = String(name.prefix(60))
+        self.about = about.map { String($0.prefix(Self.maxAbout)) }
         self.members = Array(members.prefix(GoblinGroups.maxMembers))
         self.created = created
     }

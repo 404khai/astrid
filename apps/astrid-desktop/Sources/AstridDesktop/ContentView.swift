@@ -500,8 +500,38 @@ struct ContentCard: View {
         }
     }
 
+    /// A goblin group fills the whole card, under the header row, so its
+    /// chat scrolls under the title and its side panel is full height.
+    private var group: GoblinGroup? {
+        if case .group(let id) = model.page { return settings.groups.first { $0.id == id } }
+        return nil
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
+            if let group {
+                GroupChatView(ui: model.config.ui, group: group)
+            }
+            VStack(spacing: 0) {
+                header
+                switch model.page {
+                case .chat: ThreadView(model: model)
+                case .diagrams: DiagramsView(model: model)
+                case .group: if group == nil { ThreadView(model: model) } else { Spacer(minLength: 0).allowsHitTesting(false) }
+                }
+            }
+        }
+        .foregroundStyle(palette.text)
+        .background(palette.content)
+        .clipShape(.rect(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(palette.text.opacity(0.07), lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(palette.spec.dark ? 0.35 : 0.10), radius: 10, y: 2)
+    }
+
+    private var header: some View {
             HStack(spacing: 10) {
                 // The toggle and new chat, in the same spot open or closed.
                 SidebarButtons(model: model, settings: settings, peeking: peeking)
@@ -517,25 +547,6 @@ struct ContentCard: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 50)
-            switch model.page {
-            case .chat: ThreadView(model: model)
-            case .diagrams: DiagramsView(model: model)
-            case .group(let id):
-                if let group = settings.groups.first(where: { $0.id == id }) {
-                    GroupChatView(ui: model.config.ui, group: group)
-                } else {
-                    ThreadView(model: model)
-                }
-            }
-        }
-        .foregroundStyle(palette.text)
-        .background(palette.content)
-        .clipShape(.rect(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(palette.text.opacity(0.07), lineWidth: 0.5)
-        }
-        .shadow(color: .black.opacity(palette.spec.dark ? 0.35 : 0.10), radius: 10, y: 2)
     }
 }
 

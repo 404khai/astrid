@@ -122,14 +122,25 @@ struct GroupRow: View {
 }
 
 /// The mock group chat, filling the card under its header.
+/// Its side panel can rename the group and describe it ("save").
 struct GroupChatView: View {
     var ui: URL
     var group: GoblinGroup
+    @EnvironmentObject private var settings: AppSettings
     @Environment(\.palette) private var palette
 
     var body: some View {
-        GroupWeb(ui: ui, mode: "chat", payload: group.payload(palette: palette))
-            .id(group.id)
+        GroupWeb(ui: ui, mode: "chat", payload: group.payload(palette: palette)) { message in
+            guard message["type"] as? String == "save",
+                  let index = settings.groups.firstIndex(where: { $0.id == group.id }) else { return }
+            let name = (message["name"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let about = (message["about"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            var saved = settings.groups[index]
+            if !name.isEmpty { saved.name = String(name.prefix(60)) }
+            saved.about = about.isEmpty ? nil : String(about.prefix(GoblinGroup.maxAbout))
+            settings.groups[index] = saved
+        }
+        .id(group.id)
     }
 }
 
@@ -142,7 +153,7 @@ extension GoblinGroup {
     func payload(palette: Palette) -> [String: Any] {
         let every = Goblins.all()
         let goblins = members.compactMap { id in every.first { $0.id == id } }
-        return ["type": "group", "name": name, "members": goblins.map(\.json), "palette": palette.json]
+        return ["type": "group", "name": name, "about": about ?? "", "members": goblins.map(\.json), "palette": palette.json]
     }
 }
 
@@ -172,7 +183,9 @@ struct GroupWeb: NSViewRepresentable {
         web.setValue(false, forKey: "drawsBackground")
         context.coordinator.web = web
         context.coordinator.update(self)
-        web.load(URLRequest(url: URL(string: "astrid-ui://app/group.html?mode=\(mode)")!))
+        // Debug: ASTRID_DESKTOP_GROUP=panel opens the chat with its side panel.
+        let panel = mode == "chat" && ProcessInfo.processInfo.environment["ASTRID_DESKTOP_GROUP"] == "panel" ? "&panel=1" : ""
+        web.load(URLRequest(url: URL(string: "astrid-ui://app/group.html?mode=\(mode)\(panel)")!))
         return web
     }
 

@@ -297,3 +297,17 @@ fifteen expressions, and no spell or morph plays in the row, picker or group cha
 `recipes(in:)` as files and saved as one goblins/v1 file (0600) in the Goblins folder, then shown everywhere. The
 composer icon is now `goblins/bramble-glyph.svg`, drawn by the library's `goblinGlyphSvg` from the beardless Bramble
 recipe (`web/scripts/build-bramble-glyph.ts`) and shown as a template image.
+
+### Amendment 13 — group chat panel and goblin profiles (2026-11-16)
+
+Maintainer: "increase the goblins size in a group chat ... the astrid logo and the pill should allow content
+scroll under ... their background should be transparent ... if I click the pill, it should [open] a side panel
+from the right ... the logo, made up of the animated goblins, 3 max ... every goblin in that group, the name of the
+group, the description, with a save button ... click on a goblin ... their profile in a modal", then "put a settings
+icon in the top right ... the right panel should be full height". A group chat's page now fills the whole content
+card under the app's floating header row; the mark and pill float with no background over a chat that scrolls
+under them and fades out at the top (a mask, no painted band). Faces are 64 px. The pill and a top-right gear open
+a full-height side panel: up to three live goblins overlapping, editable name and description, the roster, and
+Save, which sends `{type:"save", name, about}`; the app stores `about` as an optional `GoblinGroup` field (at most
+280 characters; older stored groups decode unchanged). A roster goblin opens a profile modal: the goblin live (click
+for its expressions), its skin and traits. Still cosmetic: no model is involved.
