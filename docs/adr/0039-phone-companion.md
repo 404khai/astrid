@@ -199,3 +199,34 @@ The maintainer asked for a ChatGPT-style sidebar and a voice page on the phone.
 - **Edge wave.** Some phones draw overlay windows without the GPU, where the
   AGSL shader throws. Those get the plain glow. This fixes the reported
   "keeps stopping".
+
+## Amendment 2026-11-16: Android TV presence
+
+The maintainer asked to "load astrid onto my Smart TV", agreed that a TV pairs
+"the same way your phone does" ("yes"), then asked for "the presence on the tv
+not the full app" and a remote button to open it.
+
+- **Trust.** A TV is one more paired device under this ADR: the same LAN-only
+  sealed link, one-time two-minute secret and revocable per-device key. A TV
+  has no camera, so it pairs from the copied `astrid://pair` link the Mac
+  already offers. Asks still run on the Mac; the TV holds no model credentials.
+- **Same app.** The Android build runs on TVs (leanback, touchscreen, camera
+  and mic marked not required). No separate TV app or flavour.
+- **Presence only.** A home-screen tile (`PresenceLaunch`) puts the bubble up
+  and opens the ask panel without the full app. `astrid://presence` does the
+  same from a link.
+- **Remote button.** A remote cannot reach a floating bubble, so a
+  key-filtering accessibility service (`TvKeyService`) opens the ask panel on
+  one button. It asks for no window content or accessibility events, looks at
+  that one key code, passes every other key through and keeps or sends nothing.
+  The user turns it on in the system's accessibility settings. It defaults to
+  the TV button, but on the tested TCL (Android TV 11) the system takes
+  KEYCODE_TV before any app sees it; choosing a button the vendor leaves alone
+  is open.
+- **After a restart.** The bubble comes back on boot if it was on when the TV
+  went off (`PresenceBoot`, a stored on/off flag only).
+- **Limits found on the tested TV.** 32-bit ARM and under 1 GB of RAM: no edge
+  wave (Android 11 lacks AGSL, so the plain glow), and TCL's memory manager can
+  kill Astrid's process when the bubble is not running. Validated by hand on
+  that TV (install, pairing, bubble over the home screen, tile registered);
+  the remote button is not yet validated, and Astrid was uninstalled afterwards.

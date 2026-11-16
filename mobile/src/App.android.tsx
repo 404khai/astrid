@@ -46,6 +46,8 @@ export default function App() {
     // A pairing link copied from the Mac's code opens the app and pairs it.
     const pairFrom = (url: string | null) => {
       if (url?.startsWith("astrid://pair") && !getState().pairing) pairFromCode(url);
+      // TVs have no touch to reach the switch: this link puts the bubble up.
+      if (url === "astrid://presence" && overlay?.canDrawOverlays()) overlay.start(true);
     };
     Linking.getInitialURL().then(pairFrom);
     const link = Linking.addEventListener("url", ({ url }) => pairFrom(url));
