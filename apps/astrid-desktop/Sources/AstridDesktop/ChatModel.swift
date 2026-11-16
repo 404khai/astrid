@@ -76,6 +76,8 @@ final class ChatModel: ObservableObject {
     /// Phone asks get their own child without mail (ADR 0039): mail approvals
     /// are answered on the Mac, so a phone ask never reaches mail.
     private var phoneChild: AskChild
+    /// Goblin group chats, with their own child (no mail).
+    let groupChat: GroupChatModel
 
     init(config: DesktopConfig, model: String, mail: String) {
         self.config = config
@@ -83,6 +85,7 @@ final class ChatModel: ObservableObject {
         childConfig = AskChild.Config(astrid: config.astrid, model: model, mail: mail == "none" ? nil : mail)
         child = AskChild(config: childConfig)
         phoneChild = AskChild(config: AskChild.Config(astrid: config.astrid, model: model, mail: nil))
+        groupChat = GroupChatModel(astrid: config.astrid, model: model, root: config.chats.deletingLastPathComponent())
         chats = store.loadAll()
         selection = chats.first?.id
         child.onEvent = { [weak self] event in self?.handle(event, from: .desktop) }
@@ -97,6 +100,7 @@ final class ChatModel: ObservableObject {
     /// ask is running; the old child is stopped and a new one starts on demand.
     func reconfigure(model: String, mail: String) {
         let next = AskChild.Config(astrid: config.astrid, model: model, mail: mail == "none" ? nil : mail)
+        groupChat.reconfigure(model: model)
         guard live == nil, next.model != childConfig.model || next.mail != childConfig.mail else { return }
         child.stop()
         childConfig = next
@@ -209,6 +213,7 @@ final class ChatModel: ObservableObject {
     func shutdown() {
         child.stop()
         phoneChild.stop()
+        groupChat.shutdown()
     }
 
     // MARK: Runtime events

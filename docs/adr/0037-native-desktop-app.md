@@ -311,3 +311,33 @@ a full-height side panel: up to three live goblins overlapping, editable name an
 Save, which sends `{type:"save", name, about}`; the app stores `about` as an optional `GoblinGroup` field (at most
 280 characters; older stored groups decode unchanged). A roster goblin opens a profile modal: the goblin live (click
 for its expressions), its skin and traits. Still cosmetic: no model is involved.
+
+### Amendment 14 — live goblin groups (2026-11-16, agent's calls pending maintainer review)
+
+Maintainer: "make goblins like grok bots, chatgpt dots ... they should be able to tag each other in a group ...
+sending context between each other. the name and description of a group is sort of the ai prompt ... each person can
+have a role and store it to memory. the floating astrid in a group is the sort of overseer, its eyes can react ...
+it can also talk in chat ... react to messages ... change expression ... I should also be able to chat to them".
+Groups stop being cosmetic:
+
+- **Threads.** Each group's messages are kept in `Application Support/Astrid/Groups/<group id>.json` (0600, at most
+  500 messages, removed with the group). A message has an author (`you`, `astrid` or a goblin id), text, mood
+  (a Goblins expression), mentions and reactions (at most 6 emoji, one each per author).
+- **Turns.** A user message goes to whoever it @tags, or to Astrid (the overseer) if nobody is tagged; each reply's
+  tags queue those members next. A round is bounded: 6 turns, 2 per speaker, Stop ends it. Every turn is one ask to
+  a separate `astrid presence-ask` child for groups **without a mail source**; any approval it raises is
+  **declined**, so goblins only talk. The "context" sent between goblins is the bounded recent thread (6,000
+  characters) plus who handed over the turn and their words.
+- **Prompt.** The group's name and description are its purpose; then the speaker's role, its memory, the roster and
+  the thread. The reply ends with a hidden ```group JSON block: `mood`, optional `react` (one emoji on the message
+  it answers) and optional `remember`.
+- **Roles and memory.** Roles are set per goblin in the side panel (`GoblinGroup.roles`, optional, 120 characters;
+  older groups decode unchanged). A goblin's memory is its own list (`Astrid/Goblins/Memory/<id>.json`, 0600, 40
+  facts), separate from the user's ADR 0040 memory; a role saved is noted there, `remember` adds to it, and the
+  panel lists it with Forget all.
+- **Astrid's eyes** in the group header: tagged → listening (with a pop), a question → solving, a round running →
+  searching, Astrid streaming → composing, else idle with pointer tracking.
+- **UI.** Live faces are 84 px and show thinking/talking while a goblin answers and its mood after. Reactions use
+  the Reaction Bubble design (black emoji bubble, a small bubble with who reacted); hovering a bubble offers six
+  quick picks. The composer is native Liquid Glass with @-suggestions; the settings button is a native glass
+  circle in the card header, like New Chat and the sidebar toggle. The page's own gear and fake composer are gone.

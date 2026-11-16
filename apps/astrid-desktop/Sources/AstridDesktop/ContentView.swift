@@ -288,6 +288,7 @@ struct Sidebar: View {
                         .contextMenu {
                             Button("Delete Group", role: .destructive) {
                                 settings.groups.removeAll { $0.id == group.id }
+                                model.groupChat.forget(group.id)
                                 if model.page == .group(group.id) { model.page = .chat }
                             }
                         }
@@ -510,7 +511,7 @@ struct ContentCard: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let group {
-                GroupChatView(ui: model.config.ui, group: group)
+                GroupChatView(ui: model.config.ui, group: group, chat: model.groupChat)
             }
             VStack(spacing: 0) {
                 header
@@ -544,6 +545,9 @@ struct ContentCard: View {
                         .foregroundStyle(palette.secondary)
                 }
                 Spacer()
+                if group != nil {
+                    GlassCircle(symbol: "gearshape", help: "Group settings") { model.groupChat.panelRequest += 1 }
+                }
             }
             .padding(.horizontal, 16)
             .frame(height: 50)
