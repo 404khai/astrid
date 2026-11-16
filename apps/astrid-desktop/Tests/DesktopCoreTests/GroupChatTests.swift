@@ -86,3 +86,25 @@ final class GroupChatTests: XCTestCase {
         XCTAssertTrue(GroupPrompt.build(group: group, speaker: "astrid", members: members, thread: [], memory: GoblinMemory(), handoff: nil).contains("overseer"))
     }
 }
+
+final class GroupAllAndChartTests: XCTestCase {
+    let members = [GroupMember(id: "a", name: "Pip"), GroupMember(id: "b", name: "Hob"), GroupMember(id: "c", name: "Grub")]
+
+    func testAllTagsEveryGoblinAndEachAnswers() {
+        XCTAssertEqual(Mentions.find(in: "@all thoughts?", members: members), ["a", "b", "c"])
+        XCTAssertEqual(Mentions.find(in: "@Hob and @everyone", members: members), ["b", "a", "c"])
+        let ten = (0..<10).map { GroupMember(id: "g\($0)", name: "G\($0)x") }
+        var plan = GroupTurnPlan()
+        plan.start(mentions: Mentions.find(in: "@all", members: ten))
+        var spoke: [String] = []
+        while let s = plan.next() { spoke.append(s) }
+        XCTAssertEqual(spoke, ten.map(\.id))
+    }
+
+    func testChartsAreCheckedAndKept() {
+        let reply = GroupReply.parse("Here.\n```group\n{\"mood\":\"happy\",\"chart\":{\"kind\":\"bar\",\"labels\":[\"a\",\"b\"],\"series\":[{\"name\":\"n\",\"values\":[1,2]}]}}\n```")
+        XCTAssertNotNil(reply.chart)
+        XCTAssertNil(GroupChart.check(["kind": "html", "code": "<script>"]))
+        XCTAssertNil(GroupChart.check(["kind": "bar", "labels": Array(repeating: "x", count: 100)]))
+    }
+}

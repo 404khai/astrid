@@ -341,3 +341,17 @@ Groups stop being cosmetic:
   the Reaction Bubble design (black emoji bubble, a small bubble with who reacted); hovering a bubble offers six
   quick picks. The composer is native Liquid Glass with @-suggestions; the settings button is a native glass
   circle in the card header, like New Chat and the sidebar toggle. The page's own gear and fake composer are gone.
+
+### Amendment 15 — @all and inline Bklit charts (2026-11-16, agent's calls pending maintainer review)
+
+Maintainer: "add an @all tag ... each individual tag should have the goblin beside it. me tagging @all I expect to
+get a response from each goblin. the goblins should use https://bklit.com/ for inline rendering and choose the best
+one for each situation". `@all` (or `@everyone`) tags every goblin, in roster order; the round's budget grows to
+everyone tagged plus two, so each goblin answers once. Every rendered tag shows its goblin beside it (all of them,
+overlapped, for @all; Astrid's mark for @astrid), as do the composer's @ suggestions. A reply's ```group block may
+carry one `chart`: a JSON spec of kind line, area, bar, sparkline, pie, ring, funnel, gauge or radar, with a guide
+in the prompt for picking the kind. The app keeps it on the message only after checking the kind, finite numbers,
+at most 64 items per list and 8 KB; the page checks it again and draws it with Bklit components (MIT, vendored from
+its shadcn registry into `web/src/bklit`; adds motion, d3-array/scale/shape, @number-flow/react, clsx,
+tailwind-merge, and Tailwind v4 with no preflight for the presence pages build). The model never sends code:
+only data drawn by fixed components, as with the canvas (ADR 0036).

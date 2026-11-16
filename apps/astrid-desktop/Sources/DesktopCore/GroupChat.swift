@@ -39,10 +39,12 @@ public struct GroupMessage: Codable, Equatable, Identifiable, Sendable {
     public var reactions: [String: [String]]
     /// Set when the reply failed or was stopped.
     public var outcome: String?
+    /// An inline chart the goblin drew (`GroupChart`), absent in older threads.
+    public var chart: JSONValue?
 
     public static let maxText = 4000
 
-    public init(id: UUID = UUID(), author: GroupAuthor, text: String, at: Date = Date(), mood: String? = nil, mentions: [String] = [], reactions: [String: [String]] = [:], outcome: String? = nil) {
+    public init(id: UUID = UUID(), author: GroupAuthor, text: String, at: Date = Date(), mood: String? = nil, mentions: [String] = [], reactions: [String: [String]] = [:], outcome: String? = nil, chart: JSONValue? = nil) {
         self.id = id
         self.author = author.key
         self.text = String(text.prefix(Self.maxText))
@@ -52,6 +54,7 @@ public struct GroupMessage: Codable, Equatable, Identifiable, Sendable {
         self.mentions = mentions
         self.reactions = reactions
         self.outcome = outcome
+        self.chart = chart
     }
 
     public var from: GroupAuthor { GroupAuthor(key: author) }
@@ -147,12 +150,15 @@ public struct GroupMember: Equatable, Sendable {
 }
 
 public enum Mentions {
+    /// `@all` (or `@everyone`) tags every goblin in the group.
+    public static let everyone = ["all", "everyone"]
+
     /// Who `text` tags, by author key, in the order first tagged: `@Name`
     /// (case-insensitive, whole name, longest names first) or `@astrid`.
     public static func find(in text: String, members: [GroupMember]) -> [String] {
         let lower = text.lowercased()
         var found: [(at: String.Index, key: String)] = []
-        let candidates = members.map { ($0.name.lowercased(), $0.id) } + [("astrid", "astrid")]
+        let candidates = members.map { ($0.name.lowercased(), $0.id) } + [("astrid", "astrid")] + everyone.map { ($0, "@all") }
         var taken: [Range<String.Index>] = []
         for (name, key) in candidates.sorted(by: { $0.0.count > $1.0.count }) where !name.isEmpty {
             var from = lower.startIndex
@@ -165,7 +171,11 @@ public enum Mentions {
                 if !found.contains(where: { $0.key == key }) { found.append((range.lowerBound, key)) }
             }
         }
-        return found.sorted { $0.at < $1.at }.map(\.key)
+        var keys: [String] = []
+        for key in found.sorted(by: { $0.at < $1.at }).map(\.key) {
+            for k in key == "@all" ? members.map(\.id) : [key] where !keys.contains(k) { keys.append(k) }
+        }
+        return keys
     }
 }
 
@@ -177,6 +187,9 @@ public struct GroupTurnPlan: Equatable, Sendable {
     public static let maxTurns = 6
     public static let maxPerSpeaker = 2
 
+    /// This round's turn budget: 6, or enough for everyone the user tagged
+    /// (as with @all) plus two follow-ups.
+    public private(set) var limit = maxTurns
     public private(set) var queue: [String] = []
     public private(set) var spoken: [String: Int] = [:]
     public private(set) var turns = 0
@@ -189,6 +202,7 @@ public struct GroupTurnPlan: Equatable, Sendable {
         spoken = [:]
         turns = 0
         enqueue(mentions.isEmpty ? ["astrid"] : mentions, after: nil)
+        limit = max(Self.maxTurns, queue.count + 2)
     }
 
     /// After `speaker` replies tagging `mentions`.
@@ -198,7 +212,7 @@ public struct GroupTurnPlan: Equatable, Sendable {
 
     /// The next speaker, or nil when the round is over.
     public mutating func next() -> String? {
-        guard turns < Self.maxTurns, !queue.isEmpty else {
+        guard turns < limit, !queue.isEmpty else {
             queue = []
             return nil
         }
@@ -224,6 +238,7 @@ public struct GroupReply: Equatable, Sendable {
     public var mood: String?
     public var react: String?
     public var remember: String?
+    public var chart: JSONValue?
 
     public static let moods: Set<String> = ["idle", "happy", "talking", "thinking", "wink", "surprised", "sad", "sleeping", "searching", "laughing", "confused", "celebrate", "angry"]
 
@@ -243,7 +258,8 @@ public struct GroupReply: Equatable, Sendable {
             let s = s.trimmingCharacters(in: .whitespacesAndNewlines)
             return s.isEmpty ? nil : String(s.prefix(GoblinMemory.maxFact))
         }
-        return GroupReply(text: text, mood: mood, react: react, remember: remember)
+        let chart = GroupChart.check(meta["chart"])
+        return GroupReply(text: text, mood: mood, react: react, remember: remember, chart: chart)
     }
 
     /// What to show while streaming: everything before the trailing block.
@@ -348,8 +364,41 @@ public enum GroupPrompt {
         out.append("""
         Reply as \(me) in one short chat message (a few sentences, no headings). Tag another member with @Name only to hand them something specific. \
         Then end with a fenced ```group block holding JSON: "mood" (one of happy, talking, thinking, wink, surprised, sad, laughing, confused, celebrate, searching), \
-        optionally "react" (one emoji for the message you're answering) and optionally "remember" (one short fact about your role or this group worth keeping).
+        optionally "react" (one emoji for the message you're answering), optionally "remember" (one short fact about your role or this group worth keeping) \
+        and optionally "chart" when numbers are clearer drawn. \(GroupChart.guide)
         """)
         return out.joined(separator: "\n\n")
+    }
+}
+
+/// An inline chart in a goblin's reply, drawn by the group page with Bklit.
+/// Checked here (kind, sizes, finite numbers) and again by the page.
+public enum GroupChart {
+    public static let kinds: Set<String> = ["line", "area", "bar", "sparkline", "pie", "ring", "funnel", "gauge", "radar"]
+    public static let maxBytes = 8 * 1024
+
+    /// How the model picks a chart, for the prompt.
+    public static let guide = """
+    Pick the chart that fits: "line" or "area" for a trend over dates ({"kind","title","labels":[ISO dates],"series":[{"name","values":[numbers]}]}); \
+    "bar" to compare categories (same shape, labels are names); "sparkline" for a tiny trend (one series); \
+    "pie" for parts of a whole and "ring" for progress per item ({"kind","title","items":[{"label","value","max"?}]}); \
+    "funnel" for stages that narrow (items); "gauge" for one score out of 100 ({"kind","title","value","label"}); \
+    "radar" to rate a few things 0-100 on the same axes ({"kind","title","axes":[names],"series":[...]}). At most one chart, only with real numbers.
+    """
+
+    public static func check(_ raw: Any?) -> JSONValue? {
+        guard let object = raw as? [String: Any], let kind = object["kind"] as? String, kinds.contains(kind),
+              let data = try? JSONSerialization.data(withJSONObject: object), data.count <= maxBytes,
+              let value = JSONValue(any: object) else { return nil }
+        return finite(value) ? value : nil
+    }
+
+    private static func finite(_ value: JSONValue) -> Bool {
+        switch value {
+        case .number(let n): return n.isFinite
+        case .array(let a): return a.count <= 64 && a.allSatisfy(finite)
+        case .object(let o): return o.values.allSatisfy(finite)
+        default: return true
+        }
     }
 }

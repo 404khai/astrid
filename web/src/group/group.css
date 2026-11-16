@@ -273,42 +273,6 @@ time { font-size: 11px; color: var(--secondary); padding-left: 4px; }
   .typing i { animation: none; }
 }
 
-.card {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: #ffffff0b;
-  box-shadow: inset 0 0 0 1px #ffffff14;
-  display: grid;
-  gap: 12px;
-  min-width: 340px;
-}
-.card strong { font-weight: 500; }
-.card-head {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-.card-head div { display: grid; }
-.card-head span { color: var(--secondary); font-size: 12px; }
-.ring { width: 64px; height: 64px; flex: none; transform: rotate(-90deg); }
-.ring text { transform: rotate(90deg); transform-origin: 40px 40px; fill: var(--text); font: 500 15px var(--mono); }
-.ring-bg { fill: none; stroke: #ffffff14; stroke-width: 8; }
-.ring-fg { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray 0.6s; }
-.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.bars li { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 10px; font-size: 12px; }
-.bar-who { display: inline-flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; }
-.bar { height: 7px; border-radius: 99px; background: #ffffff12; overflow: hidden; }
-.bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #00f7d5)); }
-.bar-n { font-family: var(--mono); color: var(--secondary); text-align: right; }
-.spark { width: 100%; height: 84px; }
-.spark-fill { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
-.spark-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.spark-dot { fill: var(--text); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { padding: 3px 10px; border-radius: 99px; font-size: 12px; background: #ffffff0f; }
-.chip.ok { color: #6fdc9b; }
-.chip.wait { color: #f7c600; }
-.chip.block { color: #ff7a7a; }
 
 .live-goblin {
   padding: 0;
@@ -523,3 +487,24 @@ time { font-size: 11px; color: var(--secondary); padding-left: 4px; }
 .forget { border: 0; background: none; color: #ff7a7a; font: inherit; cursor: pointer; padding: 0; }
 @media (prefers-reduced-motion: reduce) { .chat-logo.pop, .reaction, .bubble:hover .quick { animation: none; } }
 .line.you .mention { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+
+/* A tag with its goblin beside it. */
+.mention { display: inline-flex; align-items: center; gap: 3px; vertical-align: bottom; white-space: nowrap; }
+.tag-face { display: inline-flex; align-items: center; height: 20px; }
+.tag-face > * + * { margin-left: -9px; }
+.tag-face.astrid { width: 20px; height: 16px; }
+.tag-face.astrid .astrid-logo { width: 100%; height: 100%; }
+
+/* A goblin's inline Bklit chart, under its bubble. */
+.inline-chart {
+  margin: 2px 0 0; padding: 12px 14px; border-radius: 18px;
+  background: #ffffff08; box-shadow: inset 0 0 0 1px #ffffff12;
+  width: 460px; max-width: 100%; box-sizing: border-box; display: grid; justify-items: center; gap: 8px;
+  animation: pop-in 0.25s ease-out;
+}
+.inline-chart.line, .inline-chart.area, .inline-chart.bar, .inline-chart.funnel { justify-items: stretch; }
+.inline-chart.sparkline { width: 260px; justify-items: stretch; }
+.inline-chart figcaption { font-size: 12px; color: var(--secondary); justify-self: start; }
+.chart-failed { font-size: 12px; color: var(--secondary); }
+.said > .bubble { justify-self: start; }
+.line.you .said > .bubble { justify-self: end; }

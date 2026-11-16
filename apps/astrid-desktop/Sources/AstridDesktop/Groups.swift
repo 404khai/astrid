@@ -143,7 +143,7 @@ struct GroupChatView: View {
         let members = goblins.map { GroupMember(id: $0.id, name: $0.name) }
         ZStack(alignment: .bottom) {
             GroupWeb(ui: ui, mode: "chat", payload: payload(goblins)) { message in receive(message, members: members) }
-            GroupComposer(chat: chat, group: group, members: members)
+            GroupComposer(chat: chat, group: group, members: members, ui: ui, goblins: goblins)
         }
         .id(group.id)
     }
@@ -207,11 +207,25 @@ struct GroupComposer: View {
     private var running: Bool { chat.busy(group.id) }
     private var typing: Bool { !draft.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
+    var ui: URL
+    var goblins: [Goblin]
+
     /// Members matching the `@word` being typed at the end of the draft.
     private var suggestions: [String] {
         guard let last = draft.wrappedValue.split(separator: " ", omittingEmptySubsequences: false).last, last.hasPrefix("@") else { return [] }
         let typed = last.dropFirst().lowercased()
-        return (["Astrid"] + members.map(\.name)).filter { typed.isEmpty || $0.lowercased().hasPrefix(typed) && $0.lowercased() != typed }
+        return (["all", "Astrid"] + members.map(\.name)).filter { typed.isEmpty || $0.lowercased().hasPrefix(typed) && $0.lowercased() != typed }
+    }
+
+    /// The face beside a suggestion: the goblin, every goblin for @all, Astrid's mark.
+    @ViewBuilder private func face(_ name: String) -> some View {
+        if name == "Astrid" {
+            AstridLogoMark(size: 18)
+        } else {
+            let shown = name == "all" ? goblins : goblins.filter { $0.name == name }.prefix(1).map { $0 }
+            GroupWeb(ui: ui, mode: "cluster", payload: ["type": "group", "name": name, "members": shown.map(\.json)], interactive: false)
+                .frame(width: 20, height: 20)
+        }
     }
 
     var body: some View {
@@ -223,7 +237,12 @@ struct GroupComposer: View {
                 GlassEffectContainer(spacing: 6) {
                     HStack(spacing: 6) {
                         ForEach(suggestions, id: \.self) { name in
-                            Button("@\(name)") { complete(name) }
+                            Button { complete(name) } label: {
+                                HStack(spacing: 5) {
+                                    face(name)
+                                    Text("@\(name)")
+                                }
+                            }
                                 .buttonStyle(.glass)
                                 .controlSize(.small)
                         }
@@ -294,6 +313,7 @@ extension GroupMessage {
             "mood": mood ?? "talking", "mentions": mentions,
             "reactions": reactions.map { ["emoji": $0.key, "by": $0.value] }.sorted { ($0["emoji"] as! String) < ($1["emoji"] as! String) },
             "outcome": outcome as Any,
+            "chart": chart?.any as Any,
         ]
     }
 }

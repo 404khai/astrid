@@ -177,7 +177,7 @@ final class GroupChatModel: ObservableObject {
             if let emoji = reply.react, let target = turn.handoff, let i = thread.messages.firstIndex(where: { $0.id == target }) {
                 thread.messages[i].toggle(emoji, by: author)
             }
-            thread.append(GroupMessage(author: author, text: text, mood: reply.mood ?? (turn.error == nil ? "talking" : "sad"), mentions: mentions, outcome: turn.error != nil ? "failed" : outcome == "completed" ? nil : outcome))
+            thread.append(GroupMessage(author: author, text: text, mood: reply.mood ?? (turn.error == nil ? "talking" : "sad"), mentions: mentions, outcome: turn.error != nil ? "failed" : outcome == "completed" ? nil : outcome, chart: reply.chart))
         }
         if let fact = reply.remember, turn.speaker != "astrid" {
             var memory = self.memory(turn.speaker)

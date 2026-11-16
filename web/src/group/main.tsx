@@ -7,6 +7,7 @@ import "@fontsource/space-grotesk/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import { AstridLogo, type EyeExpression } from "../components/AstridLogo";
 import "./group.css";
+import { InlineChart, checkChart } from "./Chart";
 
 /**
  * Goblin groups in the desktop app (cosmetic, ADR 0037 amendment). One page,
@@ -25,7 +26,7 @@ type Incoming =
   | { type: "picker"; items: Goblin[]; selected: string[]; palette?: Palette }
   | { type: "group"; name: string; about?: string; members: Goblin[]; palette?: Palette; messages?: Message[]; roles?: Record<string, string>; astrid?: Overseer; panel?: number; memory?: Record<string, string[]>; live?: { speaker: string; text: string } };
 type Overseer = "idle" | "tagged" | "question" | "checking" | "talking";
-type Message = { id: string; author: string; text: string; at: string; mood: ExpressionId; mentions: string[]; reactions: { emoji: string; by: string[] }[]; outcome?: string | null };
+type Message = { id: string; author: string; text: string; at: string; mood: ExpressionId; mentions: string[]; reactions: { emoji: string; by: string[] }[]; outcome?: string | null; chart?: unknown };
 
 /** Astrid's eyes for what it is doing in the group. */
 const EYES: Record<Overseer, EyeExpression | undefined> = { idle: undefined, tagged: "listening", question: "solving", checking: "searching", talking: "composing" };
@@ -241,11 +242,22 @@ function Panel({ name, about, members, roles, memory, open, onClose, onPick }: {
   );
 }
 
-/** Text with @mentions picked out; tapping one puts it in the composer. */
-function Said({ text, names }: { text: string; names: string[] }) {
-  const all = [...names, "astrid"].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const parts = text.split(new RegExp(`(@(?:${all.join("|")}))(?![\\p{L}\\p{N}])`, "giu"));
-  return <>{parts.map((p, i) => (i % 2 ? <b key={i} className="mention" onClick={() => post({ type: "mention", name: p.slice(1) })}>{p}</b> : p))}</>;
+/** Text with @mentions picked out, each with its goblin beside it (every
+ * goblin for @all, Astrid's mark for @astrid); tapping one puts it in the composer. */
+function Said({ text, members }: { text: string; members: Goblin[] }) {
+  const all = [...members.map((b) => b.name), "astrid", "all", "everyone"].sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const parts = text.split(new RegExp(`(?<![\\p{L}\\p{N}])(@(?:${all.join("|")}))(?![\\p{L}\\p{N}])`, "giu"));
+  return (
+    <>
+      {parts.map((p, i) => {
+        if (i % 2 === 0) return p;
+        const name = p.slice(1).toLowerCase();
+        const who = name === "all" || name === "everyone" ? members : members.filter((b) => b.name.toLowerCase() === name);
+        const face = name === "astrid" ? <span className="tag-face astrid"><AstridLogo /></span> : who.length ? <span className={`tag-face n${Math.min(who.length, 3)}`}>{who.slice(0, 3).map((b) => <FlatGoblin key={b.id} item={b} size={20} />)}</span> : null;
+        return <b key={i} className="mention" onClick={() => post({ type: "mention", name: p.slice(1) })}>{face}{p}</b>;
+      })}
+    </>
+  );
 }
 
 /** Reactions under a bubble, as in the Reaction Bubble design: a dark bubble
@@ -289,7 +301,7 @@ function Chat() {
   }, [g?.astrid]);
   const count = g?.messages?.length ?? 0;
   const liveText = g?.live?.text ?? "";
-  useEffect(() => end.current?.scrollIntoView({ block: "end", behavior: "smooth" }), [count, liveText.length > 0, g?.live?.speaker]);
+  useEffect(() => { end.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [count, liveText.length > 0, g?.live?.speaker]);
   if (!g || !g.members.length) return null;
   const { members, name } = g;
   const messages = g.messages ?? [];
@@ -333,7 +345,7 @@ function Chat() {
             return (
               <div key={m.id} className="line you">
                 <div className="said">
-                  <p className="bubble"><Said text={m.text} names={members.map((b) => b.name)} />{picks}</p>
+                  <p className="bubble"><Said text={m.text} members={members} />{picks}</p>
                   <Reactions m={m} face={face} />
                   <time>{m.at}</time>
                 </div>
@@ -344,7 +356,8 @@ function Chat() {
               <span className="face">{avatar(m.author, m.mood)}</span>
               <div className="said">
                 <span className="who">{nameOf(m.author)}{m.author !== "astrid" && g.roles?.[m.author] ? <em> · {g.roles[m.author]}</em> : null}</span>
-                <p className={`bubble${m.outcome ? " failed" : ""}`}><Said text={m.text} names={members.map((b) => b.name)} />{picks}</p>
+                <p className={`bubble${m.outcome ? " failed" : ""}`}><Said text={m.text} members={members} />{picks}</p>
+                {(() => { const spec = checkChart(m.chart); return spec ? <InlineChart spec={spec} /> : null; })()}
                 <Reactions m={m} face={face} />
                 <time>{m.at}</time>
               </div>
@@ -356,7 +369,7 @@ function Chat() {
             <span className="face">{avatar(live.speaker, live.text ? "talking" : "thinking")}</span>
             <div className="said">
               <span className="who">{nameOf(live.speaker)}</span>
-              {live.text ? <p className="bubble"><Said text={live.text} names={members.map((b) => b.name)} /></p> : <p className="bubble typing" aria-label={`${nameOf(live.speaker)} is typing`}><i /><i /><i /></p>}
+              {live.text ? <p className="bubble"><Said text={live.text} members={members} /></p> : <p className="bubble typing" aria-label={`${nameOf(live.speaker)} is typing`}><i /><i /><i /></p>}
             </div>
           </div>
         )}
