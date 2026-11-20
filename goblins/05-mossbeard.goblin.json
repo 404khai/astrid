@@ -1,24 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g5",
-      "name": "Mossbeard",
-      "expression": "sleeping",
-      "skin": "#9AAE4C",
-      "head": "round",
-      "ears": "long",
-      "nose": "hook",
-      "eyes": "round",
-      "hat": "wizard",
-      "hatColor": "#5B3FA0",
-      "beard": "full",
-      "beardColor": "#9A948C",
-      "eyewear": "monocle",
-      "scarf": "none",
-      "scarfColor": "#E0A92B",
-      "extras": []
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Mossbeard",
+  "mood": "sleeping",
+  "form": "dome",
+  "corners": "curved",
+  "shape": "full",
+  "top": "5FBF5A, 2E8B3A, 5FBF5A",
+  "bottom": "5FBF5A, 2E8B3A, 5FBF5A",
+  "eyes": "F2F7A1",
+  "middle": "121212",
+  "ground": null
 }

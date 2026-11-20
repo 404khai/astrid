@@ -1,27 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g6",
-      "name": "Wort",
-      "expression": "angry",
-      "skin": "#7C8A99",
-      "head": "wide",
-      "ears": "pointy",
-      "nose": "hook",
-      "eyes": "beady",
-      "hat": "headband",
-      "hatColor": "#D8402F",
-      "beard": "none",
-      "beardColor": "#EDE8DF",
-      "eyewear": "none",
-      "scarf": "none",
-      "scarfColor": "#ECE6D6",
-      "extras": [
-        "tusks",
-        "earring"
-      ]
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Wort",
+  "mood": "serious",
+  "form": "steps",
+  "corners": "sharp",
+  "shape": "arches",
+  "top": "3A3A3A, 1A1A1A, 3A3A3A",
+  "bottom": "3A3A3A, 1A1A1A, 3A3A3A",
+  "eyes": "FF5A1F",
+  "middle": "121212",
+  "ground": null
 }

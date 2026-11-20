@@ -1,7 +1,6 @@
 import { StrictMode, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
-import { FlatGoblin, LiveGoblin, type Item } from "../goblins/live";
-import type { ExpressionId } from "@404khai/goblins/flat";
+import { FlatGoblin, LiveGoblin, look, moodLabel, moodOf, type Item, type Mood } from "../goblins/live";
 import "@fontsource/space-grotesk/latin-400.css";
 import "@fontsource/space-grotesk/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
@@ -17,7 +16,7 @@ import { InlineChart, checkChart } from "./Chart";
  * - `chat`: a mock chat between the group's goblins, with Astrid's mark up top.
  *   Its pill opens a side panel (name, description, goblins, save), and a
  *   goblin there opens its profile.
- * Goblins are drawn by the Goblins library (@404khai/goblins, MIT): live 3D
+ * Goblins are marks from the Goblins studio (../studio, MIT): live
  * where they talk, flat SVG where they are small. Nothing here talks to a model.
  */
 type Goblin = Item;
@@ -26,7 +25,7 @@ type Incoming =
   | { type: "picker"; items: Goblin[]; selected: string[]; palette?: Palette }
   | { type: "group"; name: string; about?: string; members: Goblin[]; palette?: Palette; messages?: Message[]; roles?: Record<string, string>; astrid?: Overseer; panel?: number; memory?: Record<string, string[]>; live?: { speaker: string; text: string } };
 type Overseer = "idle" | "tagged" | "question" | "checking" | "talking";
-type Message = { id: string; author: string; text: string; at: string; mood: ExpressionId; mentions: string[]; reactions: { emoji: string; by: string[] }[]; outcome?: string | null; chart?: unknown };
+type Message = { id: string; author: string; text: string; at: string; mood: Mood; mentions: string[]; reactions: { emoji: string; by: string[] }[]; outcome?: string | null; chart?: unknown };
 
 /** Astrid's eyes for what it is doing in the group. */
 const EYES: Record<Overseer, EyeExpression | undefined> = { idle: undefined, tagged: "listening", question: "solving", checking: "searching", talking: "composing" };
@@ -105,7 +104,7 @@ function Picker() {
       <div className="picker-grid">
         {items.map((b) => (
           <button key={b.id} type="button" className={`pick${picked.includes(b.id) ? " on" : ""}`} onClick={() => toggle(b.id)} aria-pressed={picked.includes(b.id)}>
-            <FlatGoblin item={b} size={52} expression={b.character.expression} />
+            <FlatGoblin item={b} size={52} expression={b.character.mood} />
             <span>{b.name}</span>
           </button>
         ))}
@@ -153,36 +152,28 @@ function GroupMark({ members }: { members: Goblin[] }) {
   );
 }
 
-const TRAITS: [string, (c: Goblin["character"]) => unknown][] = [
-  ["Head", (c) => c.head],
-  ["Ears", (c) => c.ears],
-  ["Eyes", (c) => c.eyes],
-  ["Nose", (c) => c.nose],
-  ["Hat", (c) => (c.hat && typeof c.hat === "object" ? (c.hat as { style?: string }).style : c.hat)],
-  ["Beard", (c) => c.beard],
-  ["Eyewear", (c) => c.eyewear],
-  ["Scarf", (c) => c.scarf],
-];
+const LABEL: Record<string, string> = { arches: "Arches", full: "Full", dual: "Dual", curved: "Curved", sharp: "Sharp" };
+const title = (v: string) => LABEL[v] ?? v[0].toUpperCase() + v.slice(1);
 
-/** A goblin's profile: big and live (click it for its expressions), with its traits. */
+/** A goblin's profile: big and live (click it for its moods), with its traits. */
 function Profile({ goblin, onClose }: { goblin: Goblin; onClose: () => void }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, [onClose]);
-  const c = goblin.character;
-  const traits = TRAITS.map(([k, f]) => [k, f(c)] as const).filter(([, v]) => typeof v === "string" && v && v !== "none");
+  const m = look(goblin.character);
+  const traits: [string, string][] = [["Form", title(m.form)], ["Shape", title(m.shape)], ["Corners", title(m.corners)], ["Mood", moodLabel(moodOf(goblin.character.mood))]];
   return (
     <div className="scrim" onClick={onClose}>
       <div className="profile" role="dialog" aria-modal="true" aria-label={`${goblin.name}'s profile`} onClick={(e) => e.stopPropagation()}>
         <button type="button" className="close" onClick={onClose} aria-label="Close">✕</button>
-        <LiveGoblin item={goblin} size={180} framing="full" title="Click for the next expression" />
+        <LiveGoblin item={goblin} size={180} framing="full" title="Click for the next mood" />
         <h2>{goblin.name}</h2>
-        <span className="skin"><i style={{ background: String(c.skin ?? "#888") }} />{String(c.skin ?? "")}</span>
+        <span className="skin">{m.top.map((s, i) => <i key={i} style={{ background: s }} />)}<i style={{ background: m.eyes }} />{m.top[Math.floor(m.top.length / 2)]}</span>
         <dl>
           {traits.map(([k, v]) => (
-            <div key={k}><dt>{k}</dt><dd>{String(v)}</dd></div>
+            <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
           ))}
         </dl>
       </div>
@@ -314,7 +305,7 @@ function Chat() {
     const b = byKey(k);
     return b ? <FlatGoblin item={b} size={size} /> : null;
   };
-  const avatar = (k: string, mood: ExpressionId) =>
+  const avatar = (k: string, mood: Mood) =>
     k === "astrid" ? <span className="astrid-face"><AstridLogo animated expression={mood === "thinking" ? "searching" : undefined} /></span> : byKey(k) ? <LiveGoblin item={byKey(k)!} size={FACE} expression={mood} /> : null;
   const live = g.live;
   return (

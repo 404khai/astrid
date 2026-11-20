@@ -1,26 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g11",
-      "name": "Dabble",
-      "expression": "surprised",
-      "skin": "#E8613C",
-      "head": "round",
-      "ears": "round",
-      "nose": "bulb",
-      "eyes": "round",
-      "hat": "headband",
-      "hatColor": "#2F4AA8",
-      "beard": "none",
-      "beardColor": "#5B3B28",
-      "eyewear": "none",
-      "scarf": "none",
-      "scarfColor": "#E0A92B",
-      "extras": [
-        "tusks"
-      ]
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Dabble",
+  "mood": "celebrate",
+  "form": "valley",
+  "corners": "curved",
+  "shape": "arches",
+  "top": "F2D06B, C99A2E, F2D06B",
+  "bottom": "F2D06B, C99A2E, F2D06B",
+  "eyes": "1A1A1A",
+  "middle": "121212",
+  "ground": null
 }

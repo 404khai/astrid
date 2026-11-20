@@ -1,26 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g4",
-      "name": "Pip",
-      "expression": "happy",
-      "skin": "#F2B630",
-      "head": "bean",
-      "ears": "tiny",
-      "nose": "button",
-      "eyes": "round",
-      "hat": "sprout",
-      "hatColor": "#E0A92B",
-      "beard": "none",
-      "beardColor": "#C9652B",
-      "eyewear": "none",
-      "scarf": "long",
-      "scarfColor": "#2F4AA8",
-      "extras": [
-        "freckles"
-      ]
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Pip",
+  "mood": "laughing",
+  "form": "round",
+  "corners": "curved",
+  "shape": "arches",
+  "top": "FFC93D, F59E0B, FFC93D",
+  "bottom": "FFC93D, F59E0B, FFC93D",
+  "eyes": "FFF8DC",
+  "middle": "121212",
+  "ground": null
 }

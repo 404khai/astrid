@@ -1,26 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g7",
-      "name": "Tansy",
-      "expression": "love",
-      "skin": "#E2508C",
-      "head": "egg",
-      "ears": "round",
-      "nose": "button",
-      "eyes": "oval",
-      "hat": "mushroom",
-      "hatColor": "#D8402F",
-      "beard": "none",
-      "beardColor": "#EDE8DF",
-      "eyewear": "none",
-      "scarf": "wrap",
-      "scarfColor": "#ECE6D6",
-      "extras": [
-        "freckles"
-      ]
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Tansy",
+  "mood": "love",
+  "form": "capsule",
+  "corners": "curved",
+  "shape": "dual",
+  "top": "FF8FC8, F0479A, FF8FC8",
+  "bottom": "FF8FC8, F0479A, FF8FC8",
+  "eyes": "FFF0F7",
+  "middle": "121212",
+  "ground": null
 }

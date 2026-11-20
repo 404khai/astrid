@@ -10,17 +10,16 @@ import WebKit
 /// Everything is drawn by `web/group.html`; group chats run through
 /// `GroupChatModel` (amendment 14).
 
-/// Bramble as a symbol-style glyph, like an SF Symbol: the maintainer's
-/// beardless recipe (wide head, long ears, bulb nose, beady eyes, gnome hat)
-/// drawn by the goblins library's own glyph renderer into
-/// `goblins/bramble-glyph.svg` (web/scripts/build-bramble-glyph.ts), shown as a
-/// template image so it takes the button's colour.
-struct BrambleGlyph: View {
+/// The goblin button's glyph, like an SF Symbol: a goblin mark (the studio's
+/// lynx form, eyes cut out) from `goblins/glyph.svg`, written by
+/// web/scripts/build-goblin-clan.ts, shown as a template image so it takes the
+/// button's colour.
+struct GoblinGlyph: View {
     var size: CGFloat
     var color: Color = .white
 
     static let image: NSImage? = {
-        guard let url = repoFile("goblins/bramble-glyph.svg"), let image = NSImage(contentsOf: url) else { return nil }
+        guard let url = repoFile("goblins/glyph.svg"), let image = NSImage(contentsOf: url) else { return nil }
         image.isTemplate = true
         return image
     }()
@@ -48,7 +47,7 @@ struct GoblinButton: View {
 
     var body: some View {
         Button { open.toggle() } label: {
-            BrambleGlyph(size: 21).frame(width: 22, height: 22)
+            GoblinGlyph(size: 21).frame(width: 22, height: 22)
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)

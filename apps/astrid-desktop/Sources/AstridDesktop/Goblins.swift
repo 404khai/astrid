@@ -3,8 +3,9 @@ import AstridWebUI
 import SwiftUI
 import WebKit
 
-/// A goblin from the Goblins library (github.com/404khai/goblins, MIT): its
-/// recipe (skin, head, hat, beard, eyewear, extras…) as the page draws it.
+/// A goblin: a mark from the Goblins studio (docs › Goblins, from
+/// github.com/404khai/goblins v2, MIT), an `astrid/mark@1` object (form,
+/// shape, corners, arch colours, eyes, mood) as the page draws it.
 struct Goblin: Identifiable, Equatable {
     var id: String
     var name: String
@@ -13,9 +14,9 @@ struct Goblin: Identifiable, Equatable {
     static func == (a: Goblin, b: Goblin) -> Bool { a.id == b.id && a.name == b.name }
 }
 
-/// Goblins: the Goblins clan, kept as goblins/v1 recipe files in the repo's
+/// Goblins: the built-in clan, kept as astrid/mark@1 files in the repo's
 /// `goblins/` (written by web/scripts/build-goblin-clan.ts), and any the user
-/// exports from the Goblins studio into Astrid's Goblins folder. A file may
+/// pastes from the Goblins studio into Astrid's Goblins folder. A file may
 /// hold several goblins. Up to five show in the sidebar, chosen in Settings.
 enum Goblins {
     static let limit = 5
@@ -67,8 +68,9 @@ enum Goblins {
 struct GoblinAddError: Error { var message: String }
 
 extension Goblins {
-    /// Adds pasted goblin JSON: checked like a file, then saved as a goblins/v1
-    /// file in the Goblins folder (0600). Returns the names added.
+    /// Adds pasted goblin JSON (marks from the studio's Copy JSON): checked like
+    /// a file, then saved as one file in the Goblins folder (0600). Returns the
+    /// names added.
     static func add(json text: String) -> Result<[String], GoblinAddError> {
         let data = Data(text.trimmingCharacters(in: .whitespacesAndNewlines).utf8)
         guard data.count <= maxBytes else { return .failure(.init(message: "That's too big for a goblin (512 KB at most).")) }
@@ -76,8 +78,8 @@ extension Goblins {
             return .failure(.init(message: "That isn't valid JSON."))
         }
         let found = recipes(in: json)
-        guard !found.isEmpty else { return .failure(.init(message: "No goblins in that: each needs a skin and a hat.")) }
-        let file: [String: Any] = ["$schema": "goblins/v1", "version": 1, "goblins": found]
+        guard !found.isEmpty else { return .failure(.init(message: "No goblins in that: each needs arch colours (\"top\") and eyes.")) }
+        let file: [String: Any] = ["$schema": "astrid/marks@1", "marks": found]
         guard let out = try? JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys]) else {
             return .failure(.init(message: "Couldn't save those goblins."))
         }
@@ -95,14 +97,19 @@ extension Goblins {
     }
 }
 
-/// The goblins in a goblins/v1 file, a bare goblin or an array of them, as the
-/// library's `fromJSON` accepts. Anything without a skin and a hat is left out.
+/// The goblins in pasted or stored JSON: one `astrid/mark@1` mark, a list of
+/// them, or `{"marks": [...]}`. A mark needs its arch colours (`top`, or the
+/// studio's older `arch`) and `eyes`; anything else, such as an old 3D goblin
+/// recipe, is left out. The page fills in what is missing.
 func recipes(in json: Any) -> [[String: Any]] {
     let list: [Any]
     if let array = json as? [Any] { list = array }
-    else if let object = json as? [String: Any], let goblins = object["goblins"] as? [Any] { list = goblins }
+    else if let object = json as? [String: Any], let marks = object["marks"] as? [Any] { list = marks }
     else { list = [json] }
-    return list.compactMap { $0 as? [String: Any] }.filter { $0["skin"] is String && $0["hat"] is String }.prefix(32).map { $0 }
+    func colours(_ value: Any?) -> Bool { value is String || (value as? [Any])?.allSatisfy { $0 is String } == true }
+    return list.compactMap { $0 as? [String: Any] }
+        .filter { colours($0["top"] ?? $0["arch"]) && colours($0["eyes"]) }
+        .prefix(32).map { $0 }
 }
 
 /// The row of goblins in the sidebar, drawn by `web/goblins.html`.
