@@ -1,0 +1,41 @@
+/* Bklit charts (bklit.com, MIT, vendored from its shadcn registry into
+ * src/bklit). Tailwind v4 theme and utilities only, no preflight, so the
+ * group page keeps its own base styles. Chart colours follow the app palette
+ * the page sets on :root (--accent, --text, --secondary, --content). */
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);
+@source "./";
+
+:root {
+  --foreground: var(--text, #f2f2f2);
+  --background: var(--content, #141414);
+  --muted-foreground: var(--secondary, #9a9a9a);
+  --border: #ffffff1f;
+  --chart-1: var(--accent, #4459f9);
+  --chart-2: #00d9be;
+  --chart-3: #f7c600;
+  --chart-4: #f94447;
+  --chart-5: #b07cff;
+  --chart-line-primary: var(--chart-1);
+  --chart-line-secondary: var(--chart-2);
+  --chart-grid: #ffffff14;
+  --chart-label: var(--muted-foreground);
+  --chart-foreground: var(--foreground);
+  --chart-foreground-muted: var(--muted-foreground);
+  --chart-background: transparent;
+  --chart-tooltip-background: #000;
+  --chart-tooltip-foreground: #fff;
+  --chart-tooltip-muted: #ffffffa0;
+  --chart-indicator-color: var(--chart-1);
+}
+@theme inline {
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --color-muted: #ffffff12;
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-chart-label: var(--chart-label);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --color-chart-tooltip-muted: var(--chart-tooltip-muted);
+}

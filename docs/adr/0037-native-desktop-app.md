@@ -311,3 +311,64 @@ a full-height side panel: up to three live goblins overlapping, editable name an
 Save, which sends `{type:"save", name, about}`; the app stores `about` as an optional `GoblinGroup` field (at most
 280 characters; older stored groups decode unchanged). A roster goblin opens a profile modal: the goblin live (click
 for its expressions), its skin and traits. Still cosmetic: no model is involved.
+
+### Amendment 14 — live goblin groups (2026-11-16, agent's calls pending maintainer review)
+
+Maintainer: "make goblins like grok bots, chatgpt dots ... they should be able to tag each other in a group ...
+sending context between each other. the name and description of a group is sort of the ai prompt ... each person can
+have a role and store it to memory. the floating astrid in a group is the sort of overseer, its eyes can react ...
+it can also talk in chat ... react to messages ... change expression ... I should also be able to chat to them".
+Groups stop being cosmetic:
+
+- **Threads.** Each group's messages are kept in `Application Support/Astrid/Groups/<group id>.json` (0600, at most
+  500 messages, removed with the group). A message has an author (`you`, `astrid` or a goblin id), text, mood
+  (a Goblins expression), mentions and reactions (at most 6 emoji, one each per author).
+- **Turns.** A user message goes to whoever it @tags, or to Astrid (the overseer) if nobody is tagged; each reply's
+  tags queue those members next. A round is bounded: 6 turns, 2 per speaker, Stop ends it. Every turn is one ask to
+  a separate `astrid presence-ask` child for groups **without a mail source**; any approval it raises is
+  **declined**, so goblins only talk. The "context" sent between goblins is the bounded recent thread (6,000
+  characters) plus who handed over the turn and their words.
+- **Prompt.** The group's name and description are its purpose; then the speaker's role, its memory, the roster and
+  the thread. The reply ends with a hidden ```group JSON block: `mood`, optional `react` (one emoji on the message
+  it answers) and optional `remember`.
+- **Roles and memory.** Roles are set per goblin in the side panel (`GoblinGroup.roles`, optional, 120 characters;
+  older groups decode unchanged). A goblin's memory is its own list (`Astrid/Goblins/Memory/<id>.json`, 0600, 40
+  facts), separate from the user's ADR 0040 memory; a role saved is noted there, `remember` adds to it, and the
+  panel lists it with Forget all.
+- **Astrid's eyes** in the group header: tagged → listening (with a pop), a question → solving, a round running →
+  searching, Astrid streaming → composing, else idle with pointer tracking.
+- **UI.** Live faces are 84 px and show thinking/talking while a goblin answers and its mood after. Reactions use
+  the Reaction Bubble design (black emoji bubble, a small bubble with who reacted); hovering a bubble offers six
+  quick picks. The composer is native Liquid Glass with @-suggestions; the settings button is a native glass
+  circle in the card header, like New Chat and the sidebar toggle. The page's own gear and fake composer are gone.
+
+### Amendment 15 — @all and inline Bklit charts (2026-11-16, agent's calls pending maintainer review)
+
+Maintainer: "add an @all tag ... each individual tag should have the goblin beside it. me tagging @all I expect to
+get a response from each goblin. the goblins should use https://bklit.com/ for inline rendering and choose the best
+one for each situation". `@all` (or `@everyone`) tags every goblin, in roster order; the round's budget grows to
+everyone tagged plus two, so each goblin answers once. Every rendered tag shows its goblin beside it (all of them,
+overlapped, for @all; Astrid's mark for @astrid), as do the composer's @ suggestions. A reply's ```group block may
+carry one `chart`: a JSON spec of kind line, area, bar, sparkline, pie, ring, funnel, gauge or radar, with a guide
+in the prompt for picking the kind. The app keeps it on the message only after checking the kind, finite numbers,
+at most 64 items per list and 8 KB; the page checks it again and draws it with Bklit components (MIT, vendored from
+its shadcn registry into `web/src/bklit`; adds motion, d3-array/scale/shape, @number-flow/react, clsx,
+tailwind-merge, and Tailwind v4 with no preflight for the presence pages build). The model never sends code:
+only data drawn by fixed components, as with the canvas (ADR 0036).
+
+### Amendment 16 — group turns never look (2026-11-16)
+
+A group turn's prompt says "this group" and "here", which `presence-ask`'s screen-task routing (ADR 0038) took as
+on-screen requests, so turns tried a look and failed with "observation deadline". `presence-ask --no-operator`
+(new, hidden like the command) leaves the operator out entirely: no routing, no hint, no look. The desktop app's
+group child always passes it. A short tag such as `@moss` now tags the one goblin whose name starts that way.
+
+### Amendment 17 — summary titles and pinned chats (2026-11-17)
+
+Maintainer: "titles of threads should be like one liner summaries of the first message sent. I want to be able to
+pin threads, and see pinned". A new chat still starts with the derived title (`ChatTitle.derive`), then a separate
+`presence-ask` child (no mail, `--no-operator`) asks the chat's model for a one-line summary of the first message
+(at most 7 words); the cleaned first line (60 characters at most) replaces the title, once, queued one chat at a
+time. A rename sets `titleSource: "user"` and is never replaced. Chats gain optional `pinned` and `titleSource`
+(older files decode unchanged); pinned chats sort first and list under "Pinned" above "Chats" in the sidebar,
+pinned and unpinned from the chat's context menu. The first message is sent to the model once more for this.

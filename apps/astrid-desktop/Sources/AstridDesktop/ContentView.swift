@@ -288,6 +288,7 @@ struct Sidebar: View {
                         .contextMenu {
                             Button("Delete Group", role: .destructive) {
                                 settings.groups.removeAll { $0.id == group.id }
+                                model.groupChat.forget(group.id)
                                 if model.page == .group(group.id) { model.page = .chat }
                             }
                         }
@@ -295,13 +296,12 @@ struct Sidebar: View {
                 Divider().opacity(0.5).padding(.vertical, 4)
                 ScrollView {
                     LazyVStack(spacing: 2) {
-                        ForEach(model.visibleChats) { chat in
-                            SidebarRow(symbol: chat.icon.map(ChatGlyph.symbol) ?? (chat.messages.contains { $0.diagram != nil } ? "scribble.variable" : "bubble.left"),
-                                       title: chat.title, selected: model.page == .chat && chat.id == model.selection,
-                                       tint: ChatStyle.hex(chat.color).map { Color(hex: $0) }) { model.show(chat: chat.id) }
-                                .help(chat.updated.formatted(.relative(presentation: .named)))
-                                .contextMenu { ChatMenu(model: model, chat: chat) { renaming = chat; newTitle = chat.title } }
+                        if !model.pinnedChats.isEmpty {
+                            SidebarHeading(title: "Pinned")
+                            ForEach(model.pinnedChats) { chat in row(chat) }
+                            SidebarHeading(title: "Chats")
                         }
+                        ForEach(model.unpinnedChats) { chat in row(chat) }
                         if model.visibleChats.isEmpty {
                             Text(model.chats.isEmpty ? "Your chats will show up here." : "No chats match.")
                                 .font(.callout)
@@ -338,6 +338,35 @@ struct Sidebar: View {
     }
 }
 
+extension Sidebar {
+    func row(_ chat: ChatSession) -> some View {
+        SidebarRow(symbol: chat.icon.map(ChatGlyph.symbol) ?? (chat.messages.contains { $0.diagram != nil } ? "scribble.variable" : "bubble.left"),
+                   title: chat.title, selected: model.page == .chat && chat.id == model.selection,
+                   tint: ChatStyle.hex(chat.color).map { Color(hex: $0) }) { model.show(chat: chat.id) }
+            .help(chat.updated.formatted(.relative(presentation: .named)))
+            .contextMenu { ChatMenu(model: model, chat: chat) { renaming = chat; newTitle = chat.title } }
+            .contentTransition(.opacity)
+            .animation(.smooth, value: chat.title)
+    }
+}
+
+/// A small label over a run of sidebar rows.
+struct SidebarHeading: View {
+    var title: String
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.medium))
+            .foregroundStyle(palette.sidebarText.opacity(0.5))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 2)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
 /// SF Symbols for `ChatStyle.icons`.
 enum ChatGlyph {
     static func symbol(_ name: String) -> String {
@@ -356,6 +385,7 @@ struct ChatMenu: View {
     var rename: () -> Void
 
     var body: some View {
+        Button(chat.isPinned ? "Unpin" : "Pin", systemImage: chat.isPinned ? "pin.slash" : "pin") { model.togglePin(chat.id) }
         Button("Rename…", systemImage: "pencil", action: rename)
         Menu("Icon") {
             Button("Default") { model.restyle(chat.id, icon: "") }
@@ -510,7 +540,7 @@ struct ContentCard: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let group {
-                GroupChatView(ui: model.config.ui, group: group)
+                GroupChatView(ui: model.config.ui, group: group, chat: model.groupChat)
             }
             VStack(spacing: 0) {
                 header
@@ -544,6 +574,9 @@ struct ContentCard: View {
                         .foregroundStyle(palette.secondary)
                 }
                 Spacer()
+                if group != nil {
+                    GlassCircle(symbol: "gearshape", help: "Group settings") { model.groupChat.panelRequest += 1 }
+                }
             }
             .padding(.horizontal, 16)
             .frame(height: 50)

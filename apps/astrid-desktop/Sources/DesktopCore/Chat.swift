@@ -46,6 +46,24 @@ public struct ChatSession: Codable, Equatable, Identifiable, Sendable {
     /// the defaults. Older files have neither.
     public var icon: String?
     public var color: String?
+    /// Pinned chats are listed first, under Pinned. Absent in older files.
+    public var pinned: Bool?
+    /// Where the title came from: nil (from the first message, until the
+    /// summary arrives), "summary" (the model's one-liner) or "user" (renamed,
+    /// never replaced).
+    public var titleSource: String?
+
+    public var isPinned: Bool { pinned == true }
+
+    /// Takes the model's one-line summary as the title, unless the user named
+    /// the chat; false if nothing changed.
+    @discardableResult
+    public mutating func applySummary(_ raw: String) -> Bool {
+        guard titleSource != "user", let summary = ChatTitle.summary(from: raw) else { return false }
+        title = summary
+        titleSource = "summary"
+        return true
+    }
 
     /// A chat starts with the first message the user sends; it is named from it.
     public init(id: UUID = UUID(), first: ChatMessage) {
@@ -99,6 +117,7 @@ public enum ChatStyle {
             let clean = title.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: " ")
             guard !clean.isEmpty else { return nil }
             next.title = String(clean.prefix(maxTitle))
+            if next.title != chat.title { next.titleSource = "user" }
         }
         if let icon {
             guard icon.isEmpty || icons.contains(icon) else { return nil }
@@ -127,6 +146,27 @@ public enum ChatLimits {
 /// sentence, without greetings and polite openers, cut to a few words.
 public enum ChatTitle {
     public static let fallback = "New chat"
+    public static let maxSummary = 60
+
+    /// The ask that gets a chat its title: a one-line summary of the first message.
+    public static func summaryPrompt(for first: String) -> String {
+        "Summarise this message as a chat title: one line, at most 7 words, sentence case, no quotes, no ending punctuation, no emoji. "
+            + "Reply with only the title.\n\nMessage:\n" + String(first.prefix(2000))
+    }
+
+    /// A model's reply cleaned into a title: its first non-empty line, without
+    /// markdown, quotes, a "Title:" label or ending punctuation; nil if empty.
+    public static func summary(from raw: String) -> String? {
+        guard var line = raw.split(whereSeparator: \.isNewline).map({ $0.trimmingCharacters(in: .whitespaces) }).first(where: { !$0.isEmpty && !$0.hasPrefix("```") }) else { return nil }
+        if line.lowercased().hasPrefix("title:") { line = String(line.dropFirst(6)) }
+        line = line.trimmingCharacters(in: CharacterSet(charactersIn: "#*_`\"'“”‘’ "))
+        line = line.trimmingCharacters(in: CharacterSet(charactersIn: ".!?:;,— "))
+        guard !line.isEmpty else { return nil }
+        if line.count > maxSummary {
+            line = String(line.prefix(maxSummary - 1)).trimmingCharacters(in: .whitespaces) + "…"
+        }
+        return line.prefix(1).uppercased() + line.dropFirst()
+    }
     static let maxWords = 6
     static let maxCharacters = 40
 

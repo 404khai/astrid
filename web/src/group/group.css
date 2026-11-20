@@ -214,7 +214,7 @@ html[data-mode="cluster"] #root {
 .lines {
   flex: 1;
   overflow: auto;
-  padding: 154px 28px 16px;
+  padding: 154px 28px 120px;
   -webkit-mask-image: linear-gradient(transparent 0, transparent 40px, #000c 110px, #000 154px);
   mask-image: linear-gradient(transparent 0, transparent 40px, #000c 110px, #000 154px);
   display: flex;
@@ -273,66 +273,7 @@ time { font-size: 11px; color: var(--secondary); padding-left: 4px; }
   .typing i { animation: none; }
 }
 
-.card {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: #ffffff0b;
-  box-shadow: inset 0 0 0 1px #ffffff14;
-  display: grid;
-  gap: 12px;
-  min-width: 340px;
-}
-.card strong { font-weight: 500; }
-.card-head {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-}
-.card-head div { display: grid; }
-.card-head span { color: var(--secondary); font-size: 12px; }
-.ring { width: 64px; height: 64px; flex: none; transform: rotate(-90deg); }
-.ring text { transform: rotate(90deg); transform-origin: 40px 40px; fill: var(--text); font: 500 15px var(--mono); }
-.ring-bg { fill: none; stroke: #ffffff14; stroke-width: 8; }
-.ring-fg { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; transition: stroke-dasharray 0.6s; }
-.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.bars li { display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 10px; font-size: 12px; }
-.bar-who { display: inline-flex; align-items: center; gap: 6px; overflow: hidden; white-space: nowrap; }
-.bar { height: 7px; border-radius: 99px; background: #ffffff12; overflow: hidden; }
-.bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #00f7d5)); }
-.bar-n { font-family: var(--mono); color: var(--secondary); text-align: right; }
-.spark { width: 100%; height: 84px; }
-.spark-fill { fill: color-mix(in srgb, var(--accent) 22%, transparent); }
-.spark-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.spark-dot { fill: var(--text); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { padding: 3px 10px; border-radius: 99px; font-size: 12px; background: #ffffff0f; }
-.chip.ok { color: #6fdc9b; }
-.chip.wait { color: #f7c600; }
-.chip.block { color: #ff7a7a; }
 
-.chat-compose {
-  margin: 8px auto 16px;
-  width: min(760px, calc(100% - 56px));
-  box-sizing: border-box;
-  height: 44px;
-  padding: 0 6px 0 18px;
-  border-radius: 99px;
-  background: #ffffff0d;
-  box-shadow: inset 0 0 0 1px #ffffff17;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--secondary);
-}
-.chat-compose .send {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: white;
-}
 .live-goblin {
   padding: 0;
   border: 0;
@@ -485,22 +426,85 @@ time { font-size: 11px; color: var(--secondary); padding-left: 4px; }
   .scrim, .profile { animation: none; }
 }
 
-/* Top right of the card, level with the app's header buttons. */
-.chat-settings {
-  position: absolute;
-  top: 9px;
-  right: 14px;
-  z-index: 4;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 0;
-  background: #ffffff10;
-  box-shadow: inset 0 0 0 1px #ffffff17;
-  color: var(--text);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
+
+/* Room for the app's native Liquid Glass composer, which floats over the bottom. */
+.lines { -webkit-mask-image: linear-gradient(transparent 0, transparent 40px, #000c 110px, #000 154px, #000 calc(100% - 110px), transparent calc(100% - 60px)); mask-image: linear-gradient(transparent 0, transparent 40px, #000c 110px, #000 154px, #000 calc(100% - 110px), transparent calc(100% - 60px)); }
+.line .face { width: 84px; display: grid; justify-items: center; }
+.astrid-face { width: 56px; height: 46px; display: grid; margin-top: 10px; }
+.astrid-face .astrid-logo, .mini-astrid .astrid-logo { width: 100%; height: 100%; }
+.line.astrid .bubble { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.who em { font-style: normal; opacity: 0.75; }
+.bubble { position: relative; }
+.bubble.failed { opacity: 0.7; font-style: italic; }
+.mention { cursor: pointer; }
+.line.you .said { justify-items: end; }
+.chat-logo.pop { animation: astrid-pop 0.7s cubic-bezier(.3,1.6,.5,1); }
+@keyframes astrid-pop { 30% { transform: scale(1.25) translateY(-3px); } }
+.empty { margin: auto; display: grid; gap: 6px; text-align: center; max-width: 360px; color: var(--secondary); }
+.empty strong { color: var(--text); font-weight: 500; font-size: 17px; }
+
+/* Quick reactions on hover, above the bubble's corner. */
+.quick {
+  position: absolute; top: -18px; right: 8px;
+  display: none; gap: 2px; padding: 3px 5px; border-radius: 99px;
+  background: #000; box-shadow: 0 4px 14px #0006, inset 0 0 0 1px #ffffff1a;
 }
-.chat-settings:hover { background: #ffffff1c; }
-.chat-settings svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.line.you .quick { right: auto; left: 8px; }
+.bubble:hover .quick { display: inline-flex; animation: pop-in 0.12s ease-out; }
+.quick button { border: 0; background: none; font-size: 15px; padding: 2px 3px; cursor: pointer; border-radius: 8px; transition: transform 0.1s; }
+.quick button:hover { transform: scale(1.3); }
+
+/* Reaction bubble (references/Reaction Bubble.svg): black bubble with the
+   emoji, a small black bubble at its lower left holding who reacted. */
+.reactions { display: flex; flex-wrap: wrap; gap: 6px; margin: -10px 0 0 10px; position: relative; z-index: 1; }
+.line.you .reactions { margin: -10px 10px 0 0; justify-content: flex-end; }
+.reaction { position: relative; border: 0; background: none; padding: 0 0 8px 12px; cursor: pointer; animation: pop-in 0.2s cubic-bezier(.3,1.5,.5,1); }
+.reaction-emoji {
+  display: inline-flex; align-items: center; gap: 3px;
+  min-width: 30px; height: 28px; padding: 0 8px; box-sizing: border-box; justify-content: center;
+  border-radius: 99px; background: #000; font-size: 15px; color: #fff;
+  box-shadow: 0 2px 8px #0005;
+}
+.reaction-emoji small { font: 500 11px var(--mono, monospace); color: #fff; }
+.reaction.mine .reaction-emoji { box-shadow: 0 2px 8px #0005, inset 0 0 0 1.5px var(--accent); }
+.reaction-who {
+  position: absolute; left: 0; bottom: 0;
+  display: inline-flex; padding: 2px; border-radius: 99px; background: #000;
+}
+.reaction-who i { width: 16px; height: 16px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; }
+.reaction-who i + i { margin-left: -5px; }
+.mini-astrid { display: grid; }
+.mini-you { display: block; border-radius: 50%; background: var(--accent); transform: scale(0.7); }
+
+.roster li { display: grid; gap: 4px; }
+.role {
+  margin: 0 8px 6px 54px; padding: 6px 10px; border-radius: 10px; border: 0;
+  background: #ffffff0a; box-shadow: inset 0 0 0 1px #ffffff14; color: var(--text); font: inherit; font-size: 12px;
+}
+.memory { margin: 0 8px 8px 54px; font-size: 12px; color: var(--secondary); }
+.memory summary { cursor: pointer; }
+.memory ul { margin: 6px 0; padding-left: 16px; display: grid; gap: 3px; }
+.forget { border: 0; background: none; color: #ff7a7a; font: inherit; cursor: pointer; padding: 0; }
+@media (prefers-reduced-motion: reduce) { .chat-logo.pop, .reaction, .bubble:hover .quick { animation: none; } }
+.line.you .mention { color: #fff; text-decoration: underline; text-underline-offset: 2px; }
+
+/* A tag with its goblin beside it. */
+.mention { display: inline-flex; align-items: center; gap: 3px; vertical-align: bottom; white-space: nowrap; }
+.tag-face { display: inline-flex; align-items: center; height: 20px; }
+.tag-face > * + * { margin-left: -9px; }
+.tag-face.astrid { width: 20px; height: 16px; }
+.tag-face.astrid .astrid-logo { width: 100%; height: 100%; }
+
+/* A goblin's inline Bklit chart, under its bubble. */
+.inline-chart {
+  margin: 2px 0 0; padding: 12px 14px; border-radius: 18px;
+  background: #ffffff08; box-shadow: inset 0 0 0 1px #ffffff12;
+  width: 460px; max-width: 100%; box-sizing: border-box; display: grid; justify-items: center; gap: 8px;
+  animation: pop-in 0.25s ease-out;
+}
+.inline-chart.line, .inline-chart.area, .inline-chart.bar, .inline-chart.funnel { justify-items: stretch; }
+.inline-chart.sparkline { width: 260px; justify-items: stretch; }
+.inline-chart figcaption { font-size: 12px; color: var(--secondary); justify-self: start; }
+.chart-failed { font-size: 12px; color: var(--secondary); }
+.said > .bubble { justify-self: start; }
+.line.you .said > .bubble { justify-self: end; }

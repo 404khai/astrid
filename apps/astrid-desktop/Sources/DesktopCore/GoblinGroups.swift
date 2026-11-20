@@ -9,8 +9,23 @@ public struct GoblinGroup: Codable, Equatable, Identifiable, Sendable {
     public var created: Date
     /// What the group is for, set in its side panel (absent in older groups).
     public var about: String?
+    /// Each goblin's role in this group, by member id (absent in older groups).
+    /// It is part of the goblin's prompt and kept in its memory.
+    public var roles: [String: String]?
 
     public static let maxAbout = 280
+    public static let maxRole = 120
+
+    public func role(of member: String) -> String? {
+        roles?[member].flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    public mutating func setRole(_ role: String, for member: String) {
+        let role = String(role.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxRole))
+        var all = roles ?? [:]
+        all[member] = role.isEmpty ? nil : role
+        roles = all.isEmpty ? nil : all
+    }
 
     public init(id: UUID = UUID(), name: String, members: [String], created: Date = Date(), about: String? = nil) {
         self.id = id
