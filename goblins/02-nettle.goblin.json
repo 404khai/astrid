@@ -1,26 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g2",
-      "name": "Nettle",
-      "expression": "thinking",
-      "skin": "#9C86C9",
-      "head": "egg",
-      "ears": "round",
-      "nose": "long",
-      "eyes": "oval",
-      "hat": "beret",
-      "hatColor": "#25221F",
-      "beard": "pointy",
-      "beardColor": "#2A2420",
-      "eyewear": "none",
-      "scarf": "wrap",
-      "scarfColor": "#D8402F",
-      "extras": [
-        "pipe"
-      ]
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Nettle",
+  "mood": "wink",
+  "form": "lynx",
+  "corners": "sharp",
+  "shape": "full",
+  "top": "9B6BFF, 6A2BEA, 9B6BFF",
+  "bottom": "9B6BFF, 6A2BEA, 9B6BFF",
+  "eyes": "FFB3E6",
+  "middle": "121212",
+  "ground": null
 }

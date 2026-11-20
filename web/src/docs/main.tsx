@@ -19,12 +19,15 @@ import "./cursors.css";
 import "./agent-states.css";
 import "./computer-use.css";
 import "./docs.css";
+import StudioApp from "../studio/App";
+import "../studio/studio.css";
 
 const repo = "https://github.com/404khai/astrid";
 const pages = [
   { id: "overview", title: "Overview" },
   { id: "brand", title: "Brand guidelines" },
   { id: "components", title: "Components" },
+  { id: "goblins", title: "Goblins" },
 ] as const;
 type PageId = (typeof pages)[number]["id"];
 
@@ -230,15 +233,42 @@ function Components() {
   );
 }
 
+function Goblins() {
+  return (
+    <>
+      <Section index={0} eyebrow="01 / STUDIO" title="Make a goblin">
+        <p className="doc-text">
+          Goblins are Astrid&rsquo;s little helpers, each one cut from the mark: sixteen forms, arches,
+          full or dual, curved or sharp corners, any colours, and thirty-two moods. Design one here,
+          then <b>Copy JSON</b> and paste it into the desktop app (Settings &rsaquo; Goblins) to add it
+          to your goblins. Ported from the <code>goblins</code> v2 studio.
+        </p>
+        <div className="studio-frame"><StudioApp /></div>
+      </Section>
+      <Section index={1} eyebrow="02 / FORMAT" title="A goblin is a mark">
+        <p className="doc-text">
+          A goblin is one <code>astrid/mark@1</code> JSON object: <code>name</code>, <code>mood</code>,{" "}
+          <code>form</code>, <code>corners</code>, <code>shape</code>, the <code>top</code> and{" "}
+          <code>bottom</code> arch stops, <code>eyes</code>, <code>middle</code> and <code>ground</code>.
+          Colours are hex stops like <code>"F94447, EC1A1D, F94447"</code>. The desktop app reads one
+          mark, a list of marks, or <code>{"{ \"marks\": [...] }"}</code>, and draws it live with its
+          moods in the sidebar, the picker and group chats.
+        </p>
+      </Section>
+    </>
+  );
+}
+
 const sectionTitles: Record<PageId, string[]> = {
   overview: ["Compass", "Start here"],
   brand: ["Mark", "Colour", "Backgrounds", "Type"],
   components: ["Cursors", "Agent states", "Computer use", "Navigation"],
+  goblins: ["Studio", "Format"],
 };
 
 function Docs() {
   const fromHash = (): PageId => {
-    const id = location.hash.slice(1);
+    const id = location.hash.slice(1).split(":")[0];
     return (pages.find((page) => page.id === id)?.id ?? "overview") as PageId;
   };
   const [page, setPage] = useState<PageId>(fromHash);
@@ -275,6 +305,7 @@ function Docs() {
         {page === "overview" && <Overview />}
         {page === "brand" && <Brand />}
         {page === "components" && <Components />}
+        {page === "goblins" && <Goblins />}
       </main>
       <aside className="docs-rail" aria-label="On this page">
         <ScrollIndicator key={page} sections={sectionTitles[page].map((title) => ({ id: title, title }))} />

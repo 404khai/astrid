@@ -1,26 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g3",
-      "name": "Bramble",
-      "expression": "searching",
-      "skin": "#4E9C8E",
-      "head": "wide",
-      "ears": "droopy",
-      "nose": "bulb",
-      "eyes": "visor",
-      "hat": "gnome",
-      "hatColor": "#2F4AA8",
-      "beard": "braid",
-      "beardColor": "#9A948C",
-      "eyewear": "none",
-      "scarf": "none",
-      "scarfColor": "#E0A92B",
-      "extras": [
-        "headphones"
-      ]
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Bramble",
+  "mood": "searching",
+  "form": "crest",
+  "corners": "curved",
+  "shape": "dual",
+  "top": "4FC3F7, 0277BD, 4FC3F7",
+  "bottom": "4FC3F7, 0277BD, 4FC3F7",
+  "eyes": "FFE066",
+  "middle": "121212",
+  "ground": null
 }

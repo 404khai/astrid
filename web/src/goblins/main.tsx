@@ -4,8 +4,8 @@ import { LiveGoblin, type Item } from "./live";
 import "./goblins.css";
 
 /**
- * The desktop sidebar's row of goblins, live in 3D. Clicking one picks it and
- * shows its next animation; the picked one thinks while Astrid works.
+ * The desktop sidebar's row of goblins, live marks. Clicking one picks it and
+ * shows its next mood; the picked one thinks while Astrid works.
  */
 type Incoming = { type: "goblins"; items: Item[]; selected: string | null } | { type: "state"; state: string };
 const host = window as unknown as {

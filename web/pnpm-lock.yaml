@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@404khai/goblins':
-        specifier: github:404khai/goblins#v0.7.0
-        version: https://codeload.github.com/404khai/goblins/tar.gz/4ce4c2879fb426bdef431f6eff6611ad25052fa3(react@19.3.0)(three@0.187.0)
       '@bible-strong/avatar-web':
         specifier: 1.0.1
         version: 1.0.1
@@ -107,18 +104,6 @@ importers:
         version: 7.3.7(jiti@2.7.0)(lightningcss@1.33.0)
 
 packages:
-
-  '@404khai/goblins@https://codeload.github.com/404khai/goblins/tar.gz/4ce4c2879fb426bdef431f6eff6611ad25052fa3':
-    resolution: {gitHosted: true, integrity: sha512-luwhNpi1dzsYqOn4ekrg2k9Yj8Rp8qDsq59MaERym9l5wy0MJ1NP1GJKFphzvqQHvSj0qDYottn77GI2yh05ww==, tarball: https://codeload.github.com/404khai/goblins/tar.gz/4ce4c2879fb426bdef431f6eff6611ad25052fa3}
-    version: 0.7.0
-    peerDependencies:
-      react: '>=18'
-      three: '>=0.160.0'
-    peerDependenciesMeta:
-      react:
-        optional: true
-      three:
-        optional: true
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1140,11 +1125,6 @@ packages:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
 snapshots:
-
-  '@404khai/goblins@https://codeload.github.com/404khai/goblins/tar.gz/4ce4c2879fb426bdef431f6eff6611ad25052fa3(react@19.3.0)(three@0.187.0)':
-    optionalDependencies:
-      react: 19.3.0
-      three: 0.187.0
 
   '@babel/code-frame@7.29.7':
     dependencies:

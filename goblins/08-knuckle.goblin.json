@@ -1,26 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g8",
-      "name": "Knuckle",
-      "expression": "laughing",
-      "skin": "#C07A55",
-      "head": "round",
-      "ears": "droopy",
-      "nose": "bulb",
-      "eyes": "wonky",
-      "hat": "beanie",
-      "hatColor": "#2E6B46",
-      "beard": "forked",
-      "beardColor": "#C9652B",
-      "eyewear": "none",
-      "scarf": "long",
-      "scarfColor": "#E0A92B",
-      "extras": [
-        "earring"
-      ]
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Knuckle",
+  "mood": "angry",
+  "form": "block",
+  "corners": "sharp",
+  "shape": "full",
+  "top": "FF8A3D, E8551A, FF8A3D",
+  "bottom": "FF8A3D, E8551A, FF8A3D",
+  "eyes": "FFF1D6",
+  "middle": "121212",
+  "ground": null
 }

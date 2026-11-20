@@ -372,3 +372,17 @@ pin threads, and see pinned". A new chat still starts with the derived title (`C
 time. A rename sets `titleSource: "user"` and is never replaced. Chats gain optional `pinned` and `titleSource`
 (older files decode unchanged); pinned chats sort first and list under "Pinned" above "Chats" in the sidebar,
 pinned and unpinned from the chat's context menu. The first message is sent to the model once more for this.
+
+### Amendment 18 — goblins are studio marks (2026-11-21)
+
+Maintainer: "https://github.com/404khai/goblins/tree/v2 port the astrid studio to docs -> Goblins. and use these to
+replace the current goblins in the desktop". The v2 branch's Astrid studio (`c2b10f8`, MIT) is ported into
+`web/src/studio` with its CSS scoped to `.studio-page` (container queries instead of window ones) and runs on a new
+docs page, Goblins (`docs.html#goblins`; share links are `#goblins:m=…`). A goblin is now an `astrid/mark@1` mark
+(form, shape, corners, arch stops, eyes, middle, mood) drawn by the studio's `Astrid` renderer, live (blinking, its
+mood's motion, click for every mood) or still. The 12 built-in goblins are rewritten as marks under their old file
+names, so stored row picks and group members keep resolving; the composer's goblin glyph is the lynx form with its
+eyes cut out (`goblins/glyph.svg`), and both come from `web/scripts/build-goblin-clan.ts`. The app reads one mark, a
+list, or `{"marks": [...]}`; a mark needs `top` (or `arch`) and `eyes`, and old 3D goblin recipes in the user's
+folder are no longer shown. Paste-to-add takes the studio's Copy JSON. Group moods keep their names, which all exist in
+the studio. The `@404khai/goblins` dependency (three.js avatars) is removed.

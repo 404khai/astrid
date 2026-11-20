@@ -83,7 +83,7 @@ struct SettingsView: View {
                         HStack(spacing: 10) {
                             Group {
                                 if item == .goblins {
-                                    BrambleGlyph(size: 20).frame(width: 20, height: 20)
+                                    GoblinGlyph(size: 20).frame(width: 20, height: 20)
                                 } else {
                                     Image(systemName: item.symbol)
                                         .font(.system(size: 13, weight: .semibold))
@@ -856,7 +856,7 @@ struct GoblinsPage: View {
             }
             SectionTitle(title: "Add goblins")
             SettingsGroup {
-                Text("Paste a goblin's JSON from the Goblins studio: a goblins/v1 file, one goblin, or a list. Each one needs at least a skin and a hat.")
+                Text("Make a goblin in the Goblins studio (Astrid docs › Goblins), press Copy JSON, and paste it here. One goblin, a list, or {\"marks\": [...]} all work.")
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
                 TextEditor(text: $pasted)

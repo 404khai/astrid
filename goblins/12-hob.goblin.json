@@ -1,24 +1,13 @@
 {
-  "$schema": "goblins/v1",
-  "version": 1,
-  "goblins": [
-    {
-      "id": "g12",
-      "name": "Hob",
-      "expression": "celebrate",
-      "skin": "#9AAE4C",
-      "head": "wide",
-      "ears": "pointy",
-      "nose": "bulb",
-      "eyes": "wonky",
-      "hat": "gnome",
-      "hatColor": "#E0A92B",
-      "beard": "full",
-      "beardColor": "#5B3B28",
-      "eyewear": "shades",
-      "scarf": "wrap",
-      "scarfColor": "#2F4AA8",
-      "extras": []
-    }
-  ]
+  "$schema": "astrid/mark@1",
+  "name": "Hob",
+  "mood": "idle",
+  "form": "sprocket",
+  "corners": "sharp",
+  "shape": "full",
+  "top": "9AA5B1, 5B6774, 9AA5B1",
+  "bottom": "9AA5B1, 5B6774, 9AA5B1",
+  "eyes": "7CFFB2",
+  "middle": "121212",
+  "ground": null
 }
