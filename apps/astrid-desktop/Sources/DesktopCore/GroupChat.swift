@@ -354,7 +354,7 @@ public enum GroupPrompt {
             switch GroupAuthor(key: key) {
             case .you: return "User"
             case .astrid: return "Astrid"
-            case .goblin(let id): return members.first { $0.id == id }?.name ?? "Goblin"
+            case .goblin(let id): return members.first { $0.id == id }?.name ?? "AstroNaut"
             }
         }
         let me = name(speaker)
@@ -362,7 +362,7 @@ public enum GroupPrompt {
         out.append("You are \(me), in a group chat called \"\(group.name)\".")
         if let about = group.about, !about.isEmpty { out.append("What this group is for: \(about)") }
         if speaker == "astrid" {
-            out.append("You are Astrid, the group's overseer: you keep the goblins on task, answer the user, check work and tag the goblin best suited (@Name) when someone else should pick something up.")
+            out.append("You are Astrid, the group's overseer: you keep the AstroNauts on task, answer the user, check work and tag the AstroNaut best suited (@Name) when someone else should pick something up.")
         } else if let role = group.role(of: speaker) {
             out.append("Your role here: \(role)")
         }

@@ -52,8 +52,8 @@ struct GoblinButton: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .controlSize(.large)
-        .help("Goblins")
-        .accessibilityLabel("Goblins: pick a group")
+        .help("AstroNauts")
+        .accessibilityLabel("AstroNauts: pick a group")
         .popover(isPresented: $open, arrowEdge: .top) {
             GroupWeb(ui: model.config.ui, mode: "picker", payload: [
                 "type": "picker",
@@ -268,7 +268,7 @@ struct GroupComposer: View {
                         .buttonBorderShape(.circle)
                         .controlSize(.large)
                         .keyboardShortcut(.cancelAction)
-                        .help("Stop the goblins (Esc)")
+                        .help("Stop the AstroNauts (Esc)")
                     } else {
                         Button(action: send) {
                             Image(systemName: "arrow.up").fontWeight(.semibold).frame(width: 22, height: 22)

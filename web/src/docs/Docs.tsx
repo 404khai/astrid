@@ -1,5 +1,4 @@
 import React, { useEffect, useState, type ReactNode } from "react";
-import ReactDOM from "react-dom/client";
 import "@fontsource/space-grotesk/latin-400.css";
 import "@fontsource/space-grotesk/latin-500.css";
 import "@fontsource/space-grotesk/latin-700.css";
@@ -27,7 +26,7 @@ const pages = [
   { id: "overview", title: "Overview" },
   { id: "brand", title: "Brand guidelines" },
   { id: "components", title: "Components" },
-  { id: "goblins", title: "Goblins" },
+  { id: "astronauts", title: "AstroNauts" },
 ] as const;
 type PageId = (typeof pages)[number]["id"];
 
@@ -233,21 +232,21 @@ function Components() {
   );
 }
 
-function Goblins() {
+function AstroNauts() {
   return (
     <>
-      <Section index={0} eyebrow="01 / STUDIO" title="Make a goblin">
+      <Section index={0} eyebrow="01 / STUDIO" title="Make an AstroNaut">
         <p className="doc-text">
-          Goblins are Astrid&rsquo;s little helpers, each one cut from the mark: sixteen forms, arches,
-          full or dual, curved or sharp corners, any colours, and thirty-two moods. Design one here,
-          then <b>Copy JSON</b> and paste it into the desktop app (Settings &rsaquo; Goblins) to add it
-          to your goblins. Ported from the <code>goblins</code> v2 studio.
+          AstroNauts are Astrid&rsquo;s little crew, each one cut from the mark: sixteen forms, arches,
+          full or dual, curved or sharp corners, any colours, and thirty-two moods, many of them animated. Design one here,
+          then <b>Copy JSON</b> and paste it into the desktop app (Settings &rsaquo; AstroNauts) to add it
+          to your crew. Ported from the <code>goblins</code> v2 studio.
         </p>
         <div className="studio-frame"><StudioApp /></div>
       </Section>
-      <Section index={1} eyebrow="02 / FORMAT" title="A goblin is a mark">
+      <Section index={1} eyebrow="02 / FORMAT" title="An AstroNaut is a mark">
         <p className="doc-text">
-          A goblin is one <code>astrid/mark@1</code> JSON object: <code>name</code>, <code>mood</code>,{" "}
+          An AstroNaut is one <code>astrid/mark@1</code> JSON object: <code>name</code>, <code>mood</code>,{" "}
           <code>form</code>, <code>corners</code>, <code>shape</code>, the <code>top</code> and{" "}
           <code>bottom</code> arch stops, <code>eyes</code>, <code>middle</code> and <code>ground</code>.
           Colours are hex stops like <code>"F94447, EC1A1D, F94447"</code>. The desktop app reads one
@@ -263,7 +262,7 @@ const sectionTitles: Record<PageId, string[]> = {
   overview: ["Compass", "Start here"],
   brand: ["Mark", "Colour", "Backgrounds", "Type"],
   components: ["Cursors", "Agent states", "Computer use", "Navigation"],
-  goblins: ["Studio", "Format"],
+  astronauts: ["Studio", "Format"],
 };
 
 function Docs() {
@@ -305,7 +304,7 @@ function Docs() {
         {page === "overview" && <Overview />}
         {page === "brand" && <Brand />}
         {page === "components" && <Components />}
-        {page === "goblins" && <Goblins />}
+        {page === "astronauts" && <AstroNauts />}
       </main>
       <aside className="docs-rail" aria-label="On this page">
         <ScrollIndicator key={page} sections={sectionTitles[page].map((title) => ({ id: title, title }))} />
@@ -314,8 +313,4 @@ function Docs() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <Docs />
-  </React.StrictMode>,
-);
+export default Docs;

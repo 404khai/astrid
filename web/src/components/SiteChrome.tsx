@@ -97,8 +97,8 @@ export function Navigation() {
               ["See it work", "/#demo"],
               ["Spatial", "/#spatial"],
               ["Gameplan", "/#gameplan"],
-              ["Changelog", "/changelog.html"],
-              ["Docs", "/docs.html"],
+              ["Changelog", "/changelog"],
+              ["Docs", "/docs"],
               ["Build notes", doc("docs/development.md")],
               ["Contributing", doc("AGENTS.md")],
               ["Issues", `${repo}/issues`],
@@ -114,7 +114,7 @@ export function Navigation() {
       <nav className="nav-box nav-left" aria-label="Sections">
         <a href="/#spatial">Spatial</a>
         <a href="/#gameplan">Gameplan</a>
-        <a href="/changelog.html">Changelog</a>
+        <a href="/changelog">Changelog</a>
       </nav>
       <BrandLink className="brand" href="/" label="Astrid home">
         <AstridLogo animated tracking />
@@ -124,7 +124,7 @@ export function Navigation() {
         <Icon name="arrow-up-right" />
       </a>
       <nav className="nav-box nav-right" aria-label="Project">
-        <a href="/docs.html">Docs</a>
+        <a href="/docs">Docs</a>
         <a href={repo}>GitHub</a>
         <div className="more" ref={menu}>
           <button
@@ -194,8 +194,8 @@ export function Footer() {
               links: [
                 ["GitHub", repo],
                 ["Gameplan", gameplan],
-                ["Docs", "/docs.html"],
-                ["Changelog", "/changelog.html"],
+                ["Docs", "/docs"],
+                ["Changelog", "/changelog"],
               ],
             },
             {

@@ -9,7 +9,7 @@ import "./group.css";
 import { InlineChart, checkChart } from "./Chart";
 
 /**
- * Goblin groups in the desktop app (cosmetic, ADR 0037 amendment). One page,
+ * AstroNaut groups (goblins in code and storage) in the desktop app (cosmetic, ADR 0037 amendment). One page,
  * three modes picked by `?mode=`:
  * - `picker`: every goblin, pick some, see them as a group, make the group.
  * - `cluster`: a group's avatar, its goblins overlapping in a dark circle.
@@ -25,7 +25,7 @@ type Incoming =
   | { type: "picker"; items: Goblin[]; selected: string[]; palette?: Palette }
   | { type: "group"; name: string; about?: string; members: Goblin[]; palette?: Palette; messages?: Message[]; roles?: Record<string, string>; astrid?: Overseer; panel?: number; memory?: Record<string, string[]>; live?: { speaker: string; text: string } };
 type Overseer = "idle" | "tagged" | "question" | "checking" | "talking";
-type Message = { id: string; author: string; text: string; at: string; mood: Mood; mentions: string[]; reactions: { emoji: string; by: string[] }[]; outcome?: string | null; chart?: unknown };
+type Message = { id: string; author: string; text: string; at: string; mood: string; mentions: string[]; reactions: { emoji: string; by: string[] }[]; outcome?: string | null; chart?: unknown };
 
 /** Astrid's eyes for what it is doing in the group. */
 const EYES: Record<Overseer, EyeExpression | undefined> = { idle: undefined, tagged: "listening", question: "solving", checking: "searching", talking: "composing" };
@@ -91,13 +91,13 @@ function Picker() {
     setPicked(next);
     post({ type: "toggle", selected: next });
   };
-  const placeholder = chosen.length === 0 ? "Pick some goblins" : chosen.length <= 2 ? chosen.map((b) => b.name).join(" & ") : `${chosen[0].name}, ${chosen[1].name} +${chosen.length - 2}`;
+  const placeholder = chosen.length === 0 ? "Pick some AstroNauts" : chosen.length <= 2 ? chosen.map((b) => b.name).join(" & ") : `${chosen[0].name}, ${chosen[1].name} +${chosen.length - 2}`;
   return (
     <main className="picker">
       <header className="picker-top">
         <Cluster key={chosen.map((b) => b.id).join()} goblins={chosen} size={64} />
         <div className="picker-title">
-          <strong>{chosen.length ? `${chosen.length} goblin${chosen.length === 1 ? "" : "s"}` : "Your goblins"}</strong>
+          <strong>{chosen.length ? `${chosen.length} AstroNaut${chosen.length === 1 ? "" : "s"}` : "Your AstroNauts"}</strong>
           <span>{chosen.length ? chosen.map((b) => b.name).join(", ") : "Pick who joins the group"}</span>
         </div>
       </header>
@@ -204,9 +204,9 @@ function Panel({ name, about, members, roles, memory, open, onClose, onPick }: {
           </label>
           <label>
             <span>Description</span>
-            <textarea value={draft.about} maxLength={280} rows={3} placeholder="What is this group for? Every goblin reads this." onChange={(e) => setDraft({ ...draft, about: e.target.value })} tabIndex={open ? 0 : -1} />
+            <textarea value={draft.about} maxLength={280} rows={3} placeholder="What is this group for? Every AstroNaut reads this." onChange={(e) => setDraft({ ...draft, about: e.target.value })} tabIndex={open ? 0 : -1} />
           </label>
-          <span className="panel-label">{members.length} goblin{members.length === 1 ? "" : "s"}</span>
+          <span className="panel-label">{members.length} AstroNaut{members.length === 1 ? "" : "s"}</span>
           <ul className="roster">
             {members.map((b) => (
               <li key={b.id}>
@@ -298,14 +298,14 @@ function Chat() {
   const messages = g.messages ?? [];
   const n = members.length;
   const byKey = (k: string) => members.find((b) => b.id === k);
-  const nameOf = (k: string) => (k === "you" ? "You" : k === "astrid" ? "Astrid" : byKey(k)?.name ?? "Goblin");
+  const nameOf = (k: string) => (k === "you" ? "You" : k === "astrid" ? "Astrid" : byKey(k)?.name ?? "AstroNaut");
   const face = (k: string, size: number) => {
     if (k === "astrid") return <span className="mini-astrid" style={{ width: size, height: size }}><AstridLogo /></span>;
     if (k === "you") return <span className="mini-you" style={{ width: size, height: size }} />;
     const b = byKey(k);
     return b ? <FlatGoblin item={b} size={size} /> : null;
   };
-  const avatar = (k: string, mood: Mood) =>
+  const avatar = (k: string, mood: string) =>
     k === "astrid" ? <span className="astrid-face"><AstridLogo animated expression={mood === "thinking" ? "searching" : undefined} /></span> : byKey(k) ? <LiveGoblin item={byKey(k)!} size={FACE} expression={mood} /> : null;
   const live = g.live;
   return (
@@ -313,9 +313,9 @@ function Chat() {
       <header className="chat-top">
         <div className="chat-center">
           <span className={`chat-logo${pop ? " pop" : ""}`} title={`Astrid: ${g.astrid ?? "idle"}`}><AstridLogo animated tracking={!g.astrid || g.astrid === "idle"} expression={EYES[g.astrid ?? "idle"]} /></span>
-          <button type="button" className="chat-count" onClick={() => setPanel(true)} aria-expanded={panel} aria-label={`${n} goblins. Open the group panel.`}>
+          <button type="button" className="chat-count" onClick={() => setPanel(true)} aria-expanded={panel} aria-label={`${n} AstroNauts. Open the group panel.`}>
             <Cluster key={members.map((b) => b.id).join()} goblins={members} size={26} />
-            {n} goblin{n === 1 ? "" : "s"}
+            {n} AstroNaut{n === 1 ? "" : "s"}
           </button>
         </div>
       </header>
@@ -323,7 +323,7 @@ function Chat() {
         {!messages.length && !live && (
           <div className="empty">
             <strong>Say hi to {name}</strong>
-            <span>Tag a goblin with @ to ask them, or just talk: Astrid watches over the group and hands work out.</span>
+            <span>Tag an AstroNaut with @ to ask them, or just talk: Astrid watches over the group and hands work out.</span>
           </div>
         )}
         {messages.map((m) => {

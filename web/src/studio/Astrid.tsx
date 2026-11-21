@@ -23,6 +23,14 @@ interface Props {
   animate?: boolean;
 }
 
+/** A darker shade of the eye colour for unlit parts; very dark eyes get a lighter one so it still shows. */
+function shade(hex: string) {
+  const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255];
+  const lum = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+  const out = c.map((v) => Math.round(lum < 0.2 ? v + (255 - v) * 0.3 : v * 0.42));
+  return "#" + out.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
 // Same gradient axes as references/astrid.svg; stops are spread evenly along them.
 function Fill({ id, stops, x1, y1, x2, y2 }: { id: string; stops: string[]; x1: number; y1: number; x2: number; y2: number }) {
   return (
@@ -56,9 +64,10 @@ export function Astrid({ top, bottom, eyes, shape, form = "classic", corners = "
       {shape === "dual" && bottom.join() !== top.join() && <path d={g.bottom} fill={`url(#${uid}b)`} clipPath={`url(#${uid}c)`} />}
       {shape === "dual" && <path d={g.window} fill={`url(#${uid}m)`} />}
       <g transform={look ? `translate(${look.x.toFixed(1)} ${look.y.toFixed(1)})` : undefined}>
-        <g className="astrid-eyes" fill={eyes} fillRule="evenodd">
-          <path d={eyePath("L", f.L)} />
-          <path d={eyePath("R", f.R)} />
+        <g className="astrid-eyes" fillRule="evenodd">
+          {(["L", "R"] as const).map((side) => f[side].ghost?.map((gh, i) => <path key={`${side}${i}`} d={eyePath(side, gh)} fill={shade(eyes)} />))}
+          <path d={eyePath("L", f.L)} fill={eyes} />
+          <path d={eyePath("R", f.R)} fill={eyes} />
         </g>
       </g>
     </svg>

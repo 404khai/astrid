@@ -5,8 +5,8 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      // Two pages: the homepage and the docs (overview, brand, components).
-      input: { main: "index.html", docs: "docs.html", changelog: "changelog.html" },
+      // One page: main.tsx routes /, /docs and /changelog.
+      input: { main: "index.html" },
     },
   },
 });

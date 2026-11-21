@@ -331,7 +331,7 @@ export function App() {
                 links: [
                   ["GitHub", repo],
                   ["Gameplan", gameplan],
-                  ["Docs", "/docs.html"],
+                  ["Docs", "/docs"],
                 ],
               },
               {

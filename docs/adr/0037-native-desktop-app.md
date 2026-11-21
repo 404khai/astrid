@@ -386,3 +386,16 @@ eyes cut out (`goblins/glyph.svg`), and both come from `web/scripts/build-goblin
 list, or `{"marks": [...]}`; a mark needs `top` (or `arch`) and `eyes`, and old 3D goblin recipes in the user's
 folder are no longer shown. Paste-to-add takes the studio's Copy JSON. Group moods keep their names, which all exist in
 the studio. The `@404khai/goblins` dependency (three.js avatars) is removed.
+
+### Amendment 19 — AstroNauts, the updated studio, one site entry (2026-11-21)
+
+Maintainer: "https://github.com/404khai/goblins/tree/v2 it was updated, port also change name from goblins to
+AstroNauts. also the docs and changelog, change from being html, make them tsx". The studio's renderer and faces are
+updated to v2 `c3a5965` (animated moods, one big radar, new moods; `talking`, `jotting`, `drawing` and `announcing`
+were dropped upstream, so the page maps them to `voice` and `posting`). Everything users and models read now says
+AstroNauts: the Settings page, the composer button, the picker, group chats, the group prompt and the docs page
+(`/docs#astronauts`, share links `#astronauts:m=…`). Code names and stored state keep "goblins" (Swift types, the
+`goblins.*` settings keys, the `Astrid/Goblins` folder, `goblins/*.goblin.json` ids), so saved picks, groups and
+memories carry over unchanged. The site has one HTML entry: `docs.html` and `changelog.html` are removed and
+`src/main.tsx` routes `/docs` and `/changelog` (the old `.html` addresses still work) to lazily loaded `Docs.tsx` and
+`Changelog.tsx`; `web/vercel.json` rewrites those paths to `index.html`.

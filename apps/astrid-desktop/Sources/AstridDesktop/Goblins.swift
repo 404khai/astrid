@@ -56,7 +56,7 @@ enum Goblins {
                       let data = try? Data(contentsOf: url),
                       let json = try? JSONSerialization.jsonObject(with: data) else { return [] }
                 return recipes(in: json).enumerated().map { index, recipe in
-                    let name = (recipe["name"] as? String).flatMap { $0.isEmpty ? nil : String($0.prefix(40)) } ?? "Goblin"
+                    let name = (recipe["name"] as? String).flatMap { $0.isEmpty ? nil : String($0.prefix(40)) } ?? "AstroNaut"
                     return Goblin(id: "\(url.lastPathComponent)#\(index)", name: name, character: recipe)
                 }
             }
@@ -73,17 +73,17 @@ extension Goblins {
     /// names added.
     static func add(json text: String) -> Result<[String], GoblinAddError> {
         let data = Data(text.trimmingCharacters(in: .whitespacesAndNewlines).utf8)
-        guard data.count <= maxBytes else { return .failure(.init(message: "That's too big for a goblin (512 KB at most).")) }
+        guard data.count <= maxBytes else { return .failure(.init(message: "That's too big for an AstroNaut (512 KB at most).")) }
         guard let json = try? JSONSerialization.jsonObject(with: data) else {
             return .failure(.init(message: "That isn't valid JSON."))
         }
         let found = recipes(in: json)
-        guard !found.isEmpty else { return .failure(.init(message: "No goblins in that: each needs arch colours (\"top\") and eyes.")) }
+        guard !found.isEmpty else { return .failure(.init(message: "No AstroNauts in that: each needs arch colours (\"top\") and eyes.")) }
         let file: [String: Any] = ["$schema": "astrid/marks@1", "marks": found]
         guard let out = try? JSONSerialization.data(withJSONObject: file, options: [.prettyPrinted, .sortedKeys]) else {
-            return .failure(.init(message: "Couldn't save those goblins."))
+            return .failure(.init(message: "Couldn't save those AstroNauts."))
         }
-        let names = found.map { ($0["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Goblin" }
+        let names = found.map { ($0["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "AstroNaut" }
         let slug = names[0].lowercased().filter { $0.isLetter || $0.isNumber }
         let url = folder.appendingPathComponent("\(slug.isEmpty ? "goblin" : slug)-\(Int(Date().timeIntervalSince1970)).goblin.json")
         do {
@@ -91,7 +91,7 @@ extension Goblins {
             try out.write(to: url, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         } catch {
-            return .failure(.init(message: "Couldn't save those goblins: \(error.localizedDescription)"))
+            return .failure(.init(message: "Couldn't save those AstroNauts: \(error.localizedDescription)"))
         }
         return .success(names)
     }
