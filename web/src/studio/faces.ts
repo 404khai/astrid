@@ -13,11 +13,14 @@ export const WINDOW = "M120 206.7C126.5 206.7 132 204 136.7 197.9L178 156.9C183.
 const W = 61, H = 101, CY = 255;
 const CX = { L: 204.6, R: 307.5 } as const;
 const MIDX = 255.75;
+const SCOPE = 140;
+const BLIPS: [number, number][] = [[50, 0.75], [140, 0.5], [230, 0.82], [310, 0.42]];
 
-export type EyeKind = "block" | "happy" | "sad-arc" | "line" | "heart" | "x" | "ring" | "dot" | "star" | "chev" | "plus" | "minus" | "divide" | "equals" | "scan" | "percent" | "sqrt" | "approx" | "lt" | "gt" | "plusminus" | "pi" | "power" | "wave";
+export type EyeKind = "block" | "happy" | "sad-arc" | "line" | "heart" | "x" | "ring" | "dot" | "star" | "chev" | "plus" | "minus" | "divide" | "equals" | "scan" | "percent" | "sqrt" | "approx" | "lt" | "gt" | "plusminus" | "pi" | "power" | "wave" | "sync" | "radar" | "slices" | "scope" | "scope-grid" | "scope-wedge" | "bang";
 /** One eye. lid/base cut the block from the top/bottom (0..1 of height) at its outer and inner corners. */
 /** beam: 0..1, where the scan line sits inside a "scan" eye. */
-export interface Eye { kind?: EyeKind; beam?: number; dx?: number; dy?: number; sx?: number; sy?: number; lid?: [number, number]; base?: [number, number] }
+/** ghost: extra eyes drawn in a darker shade of the eye colour (unlit stages, empty tracks). slices: glitch offsets per band, in eye widths. */
+export interface Eye { kind?: EyeKind; beam?: number; ghost?: Eye[]; slices?: number[]; dx?: number; dy?: number; sx?: number; sy?: number; lid?: [number, number]; base?: [number, number] }
 export interface Face { L: Eye; R: Eye }
 
 const r = (n: number) => Math.round(n * 10) / 10;
@@ -78,6 +81,57 @@ export function eyePath(side: "L" | "R", e: Eye): string {
       }
       return d;
     }
+    case "sync": {
+      // the eye's outline as tiny boxes; a run of bigger boxes chases round it
+      const N = 22, per = 2 * (w + h), run = 5, head = (e.beam ?? 0) * N;
+      let d = "";
+      for (let i = 0; i < N; i++) {
+        let u = (i / N) * per;
+        const [px, py] = u < w ? [x0 + u, y0] : (u -= w) < h ? [x1, y0 + u] : (u -= h) < w ? [x1 - u, y1] : [x0, y1 - (u - w)];
+        const lag = (head - i + N) % N, s2 = lag < run ? 7 - lag * 0.6 : 2.6;
+        d += rect(px - s2, py - s2, px + s2, py + s2);
+      }
+      return d;
+    }
+    case "radar": {
+      // a square scope: thin frame, a sweep arm turning from the centre out to the frame, a hub
+      const s = 6, half = Math.min(w, h) / 2, a = (e.beam ?? 0) * Math.PI * 2, reach = (half - s - 2) / Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
+      return rect(cx - half, cy - half, cx + half, cy + half) + rect(cx - half + s, cy - half + s, cx + half - s, cy + half - s)
+        + stroke([[cx, cy], [cx + Math.cos(a) * reach, cy + Math.sin(a) * reach]], 4) + rect(cx - 5, cy - 5, cx + 5, cy + 5);
+    }
+    // One big square radar across both eyes (drawn from the left eye; the right eye hides). beam is the sweep, 0..1.
+    case "scope": case "scope-grid": case "scope-wedge": {
+      const S2 = SCOPE / 2, mx = MIDX, my = CY, a = (e.beam ?? 0) * Math.PI * 2 - Math.PI / 2, R = S2 - 12;
+      const circle = (r: number) => poly(Array.from({ length: 48 }, (_, i) => [mx + Math.cos((i / 48) * Math.PI * 2) * r, my + Math.sin((i / 48) * Math.PI * 2) * r] as [number, number]));
+      if (e.kind === "scope-grid") {
+        // rings and a crosshair, in the darker shade
+        return [R, R * 0.68, R * 0.36].map((r) => circle(r) + circle(r - 2.5)).join("")
+          + rect(mx - R, my - 1.2, mx - 6, my + 1.2) + rect(mx + 6, my - 1.2, mx + R, my + 1.2) + rect(mx - 1.2, my - R, mx + 1.2, my - 6) + rect(mx - 1.2, my + 6, mx + 1.2, my + R);
+      }
+      if (e.kind === "scope-wedge") {
+        // the wake behind the arm
+        const pts: [number, number][] = [[mx, my]];
+        for (let i = 0; i <= 12; i++) { const b = a - (i / 12) * 0.9; pts.push([mx + Math.cos(b) * R, my + Math.sin(b) * R]); }
+        return poly(pts);
+      }
+      // lit: frame, rim ticks, arm, hub, and the blips the arm has just passed
+      const f = 5, ticks = rect(mx - 2, my - S2 + f + 3, mx + 2, my - S2 + f + 11) + rect(mx - 2, my + S2 - f - 11, mx + 2, my + S2 - f - 3)
+        + rect(mx - S2 + f + 3, my - 2, mx - S2 + f + 11, my + 2) + rect(mx + S2 - f - 11, my - 2, mx + S2 - f - 3, my + 2);
+      let d = rect(mx - S2, my - S2, mx + S2, my + S2) + rect(mx - S2 + f, my - S2 + f, mx + S2 - f, my + S2 - f) + ticks
+        + stroke([[mx + Math.cos(a) * 9, my + Math.sin(a) * 9], [mx + Math.cos(a) * R, my + Math.sin(a) * R]], 2.5) + rect(mx - 6, my - 6, mx + 6, my + 6);
+      for (const [deg, k] of BLIPS) {
+        const b = (deg / 180) * Math.PI - Math.PI / 2, behind = ((a - b) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+        const sz = behind < 1.4 ? 4.5 : 2.2, bx = mx + Math.cos(b) * R * k, by = my + Math.sin(b) * R * k;
+        d += rect(bx - sz, by - sz, bx + sz, by + sz);
+      }
+      return d;
+    }
+    case "bang": return rect(cx - 9, cy - 44, cx + 9, cy + 14) + rect(cx - 9, cy + 26, cx + 9, cy + 44);
+    case "slices": {
+      // glitch: the block cut into bands, each knocked sideways
+      const off = e.slices ?? [0, 0, 0, 0], bh = h / off.length;
+      return off.map((o, i) => rect(x0 + o * W, y0 + i * bh, x1 + o * W, y0 + (i + 1) * bh + (i < off.length - 1 ? 0.5 : 0))).join("");
+    }
     case "scan": {
       // a lit eye with a dark scanline sweeping through it, a fainter line trailing behind (cut out with evenodd)
       const by = y0 + 6 + (h - 20) * (e.beam ?? 0.5), trail = (e.lid?.[0] ?? 0) >= 0 ? -16 : 16;
@@ -106,7 +160,7 @@ export function eyePath(side: "L" | "R", e: Eye): string {
 
 const both = (e: Eye): Face => ({ L: e, R: e });
 
-export const MOODS = ["idle", "happy", "laughing", "love", "wink", "surprised", "thinking", "searching", "confused", "nervous", "sad", "angry", "talking", "sleeping", "celebrate", "serious", "calculating", "puzzling", "jotting", "drawing", "hearing", "announcing", "posting", "catching", "syncing", "waiting", "ringing", "low-battery", "scanning", "orbiting", "voice", "bored"] as const;
+export const MOODS = ["idle", "happy", "laughing", "love", "wink", "surprised", "thinking", "searching", "confused", "nervous", "sad", "angry", "sleeping", "celebrate", "serious", "calculating", "puzzling", "hearing", "posting", "catching", "syncing", "waiting", "ringing", "low-battery", "scanning", "orbiting", "voice", "bored", "loading", "error", "glitch", "shy"] as const;
 export type Mood = (typeof MOODS)[number];
 export const moodLabel = (m: Mood) => (m === "low-battery" ? "Low battery" : m[0].toUpperCase() + m.slice(1));
 
@@ -115,7 +169,7 @@ export const FACES: Record<Mood, Face> = {
   happy: both({ kind: "happy" }),
   laughing: both({ kind: "happy", sx: 1.15, dy: -0.06 }),
   love: both({ kind: "heart" }),
-  wink: { L: {}, R: { kind: "happy" } },
+  wink: { L: {}, R: { sy: 0.14 } },
   surprised: both({ kind: "ring" }),
   thinking: both({ sy: 0.62, dy: -0.19, dx: 0.12 }),
   searching: both({ sy: 0.7, dx: 0.26 }),
@@ -123,24 +177,24 @@ export const FACES: Record<Mood, Face> = {
   nervous: both({ sy: 0.62, lid: [0, 0.25], dx: -0.08 }),
   sad: both({ lid: [0.5, 0] }),
   angry: both({ lid: [0, 0.5] }),
-  talking: both({ base: [0.18, 0.18] }),
   sleeping: both({ kind: "line", dy: 0.24 }),
   celebrate: both({ kind: "star" }),
   serious: both({ lid: [0.38, 0.38] }),
   calculating: { L: { kind: "plus" }, R: { kind: "equals" } },
   puzzling: { L: { lid: [0.32, 0] }, R: { sy: 0.55, dy: 0.18 } },
-  jotting: both({ sy: 0.5, dy: 0.25 }),
-  drawing: both({ sy: 0.55, dy: 0.2, dx: -0.22 }),
   hearing: both({ sy: 0.8, dx: -0.28 }),
-  announcing: both({ sy: 1.12, base: [0, 0], lid: [0, 0] }),
-  posting: both({ kind: "happy", dy: -0.1 }),
+  posting: both({ kind: "happy", dy: -0.27, ghost: [{ kind: "happy", dy: 0.2 }] }),
   catching: both({ kind: "ring", sx: 0.85, sy: 0.85, dy: -0.14 }),
-  syncing: both({ kind: "chev" }),
+  syncing: { L: { kind: "sync", beam: 0.2 }, R: { kind: "sync", beam: 0.7 } },
   waiting: both({ kind: "line" }),
   ringing: { L: { kind: "ring", sx: 0.8, sy: 0.8 }, R: { kind: "ring", sx: 0.8, sy: 0.8, dy: -0.1 } },
   "low-battery": both({ lid: [0.68, 0.68] }),
   scanning: both({ kind: "scan", beam: 0.35 }),
   voice: both({ kind: "wave", beam: 0.6 }),
+  loading: { L: { lid: [0.45, 0.45], ghost: [{}] }, R: { lid: [1, 1], ghost: [{}] } },
+  error: both({ kind: "bang" }),
+  glitch: both({ kind: "slices", slices: [0.12, -0.08, 0.18, -0.04] }),
+  shy: both({ sy: 0.5, dy: 0.24, dx: -0.2, lid: [0.2, 0.2] }),
   bored: { L: { lid: [0.5, 0.5], dx: 0.18, dy: 0.06 }, R: { lid: [0.5, 0.5], dx: 0.18, dy: 0.06 } },
   orbiting: { L: { kind: "dot", dx: -0.5, dy: -0.2 }, R: { kind: "dot", dx: 0.5, dy: 0.2 } },
 };
@@ -180,16 +234,42 @@ const BORED: Face[] = [
   both({ lid: [0.5, 0.5], dx: 0.05, dy: 0.06 }),
 ];
 
-export const ANIMATED = new Set<Mood>(["orbiting", "calculating", "searching", "scanning", "thinking", "voice", "bored"]);
+const SEEK: Face[] = [
+  both({ sy: 0.7, dy: -0.2 }), both({ sy: 0.7, dy: 0.2 }), both({ sy: 0.7, dx: -0.28 }), both({ sy: 0.7, dx: 0.28 }),
+];
+const SHY: Face[] = [
+  both({ sy: 0.5, dy: 0.24, dx: -0.2, lid: [0.2, 0.2] }),
+  both({ sy: 0.5, dy: 0.24, dx: -0.2, lid: [0.2, 0.2] }),
+  both({ sy: 0.62, dy: -0.04, dx: 0.12 }),
+  both({ sy: 0.55, dy: 0.22, dx: -0.24, lid: [0.12, 0.12] }),
+];
+
+/** Two moons on one ring, half a turn apart; the near one swells, the far one shrinks. */
+function orbit(t: number): Face {
+  const at = (phase: number, side: "L" | "R"): Eye => {
+    const a = t * 1.6 + phase;
+    return { kind: "dot", dx: (MID + Math.cos(a) * 58 - CX[side]) / W, dy: (Math.sin(a) * 30) / H, sx: 1 + Math.sin(a) * 0.3 };
+  };
+  return { L: at(Math.PI, "L"), R: at(0, "R") };
+}
+
+export const ANIMATED = new Set<Mood>(["wink", "ringing", "loading", "error", "glitch", "shy", "laughing", "posting", "syncing", "orbiting", "calculating", "searching", "scanning", "thinking", "voice", "bored"]);
 export function faceAt(mood: Mood, t: number): Face {
   switch (mood) {
-    case "orbiting": {
-      // two moons on one ring, half a turn apart; the near one swells, the far one shrinks
-      const at = (phase: number, side: "L" | "R"): Eye => {
-        const a = t * 1.6 + phase;
-        return { kind: "dot", dx: (MID + Math.cos(a) * 58 - CX[side]) / W, dy: (Math.sin(a) * 30) / H, sx: 1 + Math.sin(a) * 0.3 };
-      };
-      return { L: at(Math.PI, "L"), R: at(0, "R") };
+    case "orbiting": return orbit(t);
+    case "laughing": {
+      // both eyes bob together, like a belly laugh
+      return both({ kind: "happy", sx: 1.15, dy: 0.02 - 0.17 * Math.abs(Math.sin(t * 9)) });
+    }
+    case "posting": {
+      // an upload: two chevrons stacked; the lit one climbs from the lower to the upper, the unlit one is a darker shade
+      const lo: Eye = { kind: "happy", dy: 0.2 }, hi: Eye = { kind: "happy", dy: -0.27 };
+      const k = Math.floor(t / 0.35) % 3;
+      return both(k === 0 ? { ...lo, ghost: [hi] } : k === 1 ? { ...hi, ghost: [lo] } : { kind: "dot", sx: 0, ghost: [lo, hi] });
+    }
+    case "syncing": {
+      const b = (t * 1.1) % 1;
+      return { L: { kind: "sync", beam: b }, R: { kind: "sync", beam: (b + 0.5) % 1 } };
     }
     case "calculating": {
       // one eye at a time: left, right, left, right…
@@ -197,15 +277,66 @@ export function faceAt(mood: Mood, t: number): Face {
       return { L: { kind: SYMBOLS[(2 * Math.floor((k + 1) / 2)) % n] }, R: { kind: SYMBOLS[(2 * Math.floor(k / 2) + 1) % n] } };
     }
     case "searching": {
-      const dx = 0.32 * Math.max(-1, Math.min(1, Math.sin(t * 1.7) * 1.8));
-      return both({ sy: 0.7, dx, dy: Math.sin(t * 0.9) * 0.06 });
+      // glance up, down, left, right, then square off into radar scopes that sweep, and back
+      const looks = SEEK.length * 0.75 - 0.3, morph = 0.45, sweep = 2.8, cycle = looks + morph * 2 + sweep, u = t % cycle;
+      if (u < looks) return keys(SEEK, u, 0.45, 0.3);
+      // the two eyes slide together and grow into one square, which becomes the radar
+      const last = SEEK[SEEK.length - 1], into = (MIDX - CX.L) / W;
+      const merged: Face = { L: { dx: into, sx: SCOPE / W, sy: SCOPE / H }, R: { dx: -into, sx: SCOPE / W, sy: SCOPE / H } };
+      const mix2 = (a: Face, b: Face, k: number): Face => ({ L: lerpEye(a.L, b.L, k), R: lerpEye(a.R, b.R, k) });
+      if (u < looks + morph) return mix2(last, merged, ease((u - looks) / morph));
+      if (u < looks + morph + sweep) {
+        const beam = ((u - looks - morph) / 1.6) % 1;
+        return { L: { kind: "scope", beam, ghost: [{ kind: "scope-grid" }, { kind: "scope-wedge", beam }] }, R: { kind: "dot", sx: 0 } };
+      }
+      return mix2(merged, SEEK[0], ease((u - looks - morph - sweep) / morph));
+    }
+    case "ringing": {
+      // rings shake in bursts, like a phone going off, then pause
+      const k = t % 1.4, on = k < 0.8, jig = on ? (Math.floor(k / 0.05) % 2 ? 0.07 : -0.07) : 0;
+      const s = on ? 0.85 + 0.06 * Math.sin(k * 40) : 0.8;
+      return { L: { kind: "ring", sx: s, sy: s, dx: jig }, R: { kind: "ring", sx: s, sy: s, dx: jig, dy: -0.1 } };
+    }
+    case "loading": {
+      // each eye is a track in a darker shade; the left fills from the bottom, then the right, then both empty
+      const k = (t % 3) / 3, l = Math.min(1, k / 0.45), r = Math.max(0, Math.min(1, (k - 0.45) / 0.45));
+      const fill = (p: number): Eye => ({ lid: [1 - Math.floor(p * 6) / 6, 1 - Math.floor(p * 6) / 6], ghost: [{}] });
+      return { L: fill(k > 0.95 ? 0 : l), R: fill(k > 0.95 ? 0 : r) };
+    }
+    case "error": {
+      // "!" eyes flash between lit and the darker shade, jolting sideways on each flash
+      const k = Math.floor(t / 0.22), on = k % 4 !== 3 && k % 2 === 0, jolt = on ? (k % 8 < 4 ? 0.05 : -0.05) : 0;
+      return on ? both({ kind: "bang", dx: jolt }) : both({ kind: "dot", sx: 0, ghost: [{ kind: "bang" }] });
+    }
+    case "glitch": {
+      // hold still, then judder: the bands jump to new offsets every 80ms for a moment
+      const k = t % 1.6;
+      if (k > 0.5) return both({});
+      const n = Math.floor(t / 0.08), rnd = (i: number) => ((Math.sin(n * 12.9898 + i * 78.233) * 43758.5453) % 1);
+      return { L: { kind: "slices", slices: [0, 1, 2, 3].map((i) => rnd(i) * 0.25) }, R: { kind: "slices", slices: [4, 5, 6, 7].map((i) => rnd(i) * 0.25) } };
+    }
+    case "shy": return keys(SHY, t, 1.2, 0.5);
+    case "wink": {
+      // open, squash down to a thin bar, hold the wink, open again
+      const k = t % 2.4, open = 1 - Math.min(1, Math.max(0, (k - 0.9) / 0.12)) + Math.min(1, Math.max(0, (k - 1.75) / 0.12));
+      return { L: {}, R: { sy: Math.max(0.14, Math.min(1, open)) } };
     }
     case "scanning": {
       // sweep down then back up; the trail follows on the side the beam came from
       const ph = t * 2.2, beam = (1 - Math.cos(ph)) / 2, down = Math.sin(ph) >= 0;
       return both({ kind: "scan", beam, lid: [down ? 0 : -1, 0] });
     }
-    case "thinking": return keys(THINK, t, 0.9, 0.45);
+    case "thinking": {
+      // look around, puzzle, then shrink into two moons that orbit for a while, and grow back
+      const looks = THINK.length * 1.35 - 0.45, morph = 0.5, spin = 2.6, cycle = looks + morph * 2 + spin;
+      const u = t % cycle;
+      if (u < looks) return keys(THINK, u, 0.9, 0.45);
+      const o = orbit(u - looks), moon = (e: Eye): Eye => ({ dx: e.dx, dy: e.dy, sx: (30 / W) * (e.sx ?? 1), sy: (30 / H) * (e.sx ?? 1) });
+      if (u < looks + morph) { const k = ease((u - looks) / morph); return { L: lerpEye(FACES.confused.L, moon(o.L), k), R: lerpEye(FACES.confused.R, moon(o.R), k) }; }
+      if (u < looks + morph + spin) return o;
+      const end = orbit(spin), k = ease((u - looks - morph - spin) / morph);
+      return { L: lerpEye(moon(end.L), THINK[0].L, k), R: lerpEye(moon(end.R), THINK[0].R, k) };
+    }
     // steps of 0.12s keep the bars blocky in time too
     case "voice": return both({ kind: "wave", beam: Math.floor(t / 0.12) * 0.12 });
     // slow sideways glances and a heavy-lidded sag

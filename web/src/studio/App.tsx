@@ -1,4 +1,4 @@
-// Astrid studio (github.com/404khai/goblins v2, MIT, ported into the docs' Goblins page): three bays. Left is identity, saved marks and the log; the middle is the mark on its ground,
+// Astrid studio (github.com/404khai/goblins v2, MIT, ported into the docs' AstroNauts page): three bays. Left is identity, saved marks and the log; the middle is the mark on its ground,
 // eyes tracking the pointer; the right bay holds mood, shape, arch colours, eyes, ground and export.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Astrid, type Shape } from "./Astrid";
@@ -32,7 +32,7 @@ function sanitize(v: unknown): Unit {
 }
 const toJSON = (u: Unit) => JSON.stringify({ $schema: "astrid/mark@1", name: u.name, mood: u.mood, form: u.form, corners: u.corners, shape: u.shape, top: formatStops(u.top), bottom: formatStops(u.bottom), eyes: formatStops([u.eyes]), middle: formatStops(u.middle), ground: u.ground && formatStops([u.ground]) }, null, 2);
 function load(): Unit {
-  // Share links open the docs' Goblins page: #goblins:m=<mark JSON>
+  // Share links open the docs' AstroNauts page: #astronauts:m=<mark JSON>
   try { const at = location.hash.indexOf("m="); if (at >= 0) return sanitize(JSON.parse(decodeURIComponent(location.hash.slice(at + 2)))); } catch {}
   try { return sanitize(JSON.parse(localStorage.getItem(STORE) ?? "null") ?? DEFAULT); } catch { return DEFAULT; }
 }
@@ -124,7 +124,7 @@ export default function App() {
     push("saved .png @1024");
   };
   const copy = async (text: string, what: string) => { try { await navigator.clipboard.writeText(text); push(`copied ${what}`); } catch { push("clipboard blocked"); } };
-  const share = () => copy(`${location.origin}${location.pathname}#goblins:m=${encodeURIComponent(JSON.stringify(JSON.parse(toJSON(u))))}`, "share link");
+  const share = () => copy(`${location.origin}${location.pathname}#astronauts:m=${encodeURIComponent(JSON.stringify(JSON.parse(toJSON(u))))}`, "share link");
 
   // R shuffles, ←/→ step through moods, mark JSON pasted outside a field is built
   const keys = useRef({ shuffle, cycle, build });
@@ -155,7 +155,7 @@ export default function App() {
   return (
     <div className="studio-page" style={{ ["--frame" as string]: accent, ["--eye" as string]: u.eyes }}>
       <header className="topbar">
-        <a className="brand" href="#goblins"><Astrid {...mark} mood={u.mood} size={34} /><span>Astrid</span><span className="crumb">/ studio</span></a>
+        <a className="brand" href="#astronauts"><Astrid {...mark} mood={u.mood} size={34} /><span>Astrid</span><span className="crumb">/ studio</span></a>
         <span className="status"><i />{MOODS.length} moods · {PRESETS.length} palettes</span>
       </header>
       <main className="bench">

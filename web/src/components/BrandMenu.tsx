@@ -15,7 +15,7 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import logoSvg from "../assets/astrid-logo.svg?raw";
 
-export const BRAND_GUIDELINES = "/docs.html#brand";
+export const BRAND_GUIDELINES = "/docs#brand";
 
 type Item = {
   id: string;

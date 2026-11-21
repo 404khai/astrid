@@ -1,4 +1,4 @@
-/* Astrid studio. Brand tokens from tryastrid.vercel.app/docs.html#brand: ground #121212, line #292929, paper #EEEEEE,
+/* Astrid studio. Brand tokens from tryastrid.vercel.app/docs#brand: ground #121212, line #292929, paper #EEEEEE,
    Space Grotesk for text, IBM Plex Mono for labels. --frame / --eye follow the mark being designed. */
 /* Ported into Astrid's docs (Goblins page): scoped to .studio-page so it leaves the docs alone. */
 .studio-page {
@@ -16,6 +16,7 @@
 .studio-page { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); height: 100vh; height: 100dvh; }
 .studio-page .topbar { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--line); }
 .studio-page .brand { display: flex; align-items: center; gap: 10px; color: var(--paper); text-decoration: none; font: 700 20px var(--text); letter-spacing: -0.02em; }
+.studio-page .brand { width: auto; height: auto; justify-content: flex-start; }
 .studio-page .brand > * { flex: none; white-space: nowrap; }
 .studio-page .brand .crumb { font: 400 13px var(--mono); color: var(--muted); }
 .studio-page .status { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; font: 12px var(--mono); color: var(--muted); }

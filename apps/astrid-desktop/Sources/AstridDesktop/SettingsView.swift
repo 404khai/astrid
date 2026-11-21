@@ -20,7 +20,7 @@ struct SettingsView: View {
         case memory = "Memory"
         case nudges = "Nudges"
         case phone = "Phone"
-        case goblins = "Goblins"
+        case goblins = "AstroNauts"
         case about = "About"
         var id: String { rawValue }
 
@@ -54,7 +54,7 @@ struct SettingsView: View {
             case .memory: "memory remember forget facts about me delete personal"
             case .nudges: "nudges proactive morning brief meeting reminder important email quiet hours focus speak"
             case .phone: "phone android pair qr code link sync devices revoke"
-            case .goblins: "goblins bots avatars characters sidebar row"
+            case .goblins: "astronauts goblins bots avatars characters sidebar row"
             case .about: "about version privacy credits"
             }
         }
@@ -826,11 +826,11 @@ struct GoblinsPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionTitle(title: "Goblins")
+            SectionTitle(title: "AstroNauts")
             SettingsGroup {
                 Toggle(isOn: $settings.showGoblins) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Show goblins in the sidebar")
+                        Text("Show AstroNauts in the sidebar")
                         Text("A row of little bots above Astrid's mark. Click one to pick it; it reacts while Astrid works.")
                             .font(.caption)
                             .foregroundStyle(palette.secondary)
@@ -854,9 +854,9 @@ struct GoblinsPage: View {
                     if goblin.id != every.last?.id { Divider() }
                 }
             }
-            SectionTitle(title: "Add goblins")
+            SectionTitle(title: "Add AstroNauts")
             SettingsGroup {
-                Text("Make a goblin in the Goblins studio (Astrid docs › Goblins), press Copy JSON, and paste it here. One goblin, a list, or {\"marks\": [...]} all work.")
+                Text("Make an AstroNaut in the studio (Astrid docs › AstroNauts), press Copy JSON, and paste it here. One AstroNaut, a list, or {\"marks\": [...]} all work.")
                     .font(.caption)
                     .foregroundStyle(palette.secondary)
                 TextEditor(text: $pasted)
@@ -865,7 +865,7 @@ struct GoblinsPage: View {
                     .frame(height: 120)
                     .padding(6)
                     .background(palette.text.opacity(0.05), in: .rect(cornerRadius: 10))
-                    .accessibilityLabel("Goblin JSON")
+                    .accessibilityLabel("AstroNaut JSON")
                 if let note {
                     Text(note.text).font(.caption).foregroundStyle(note.ok ? palette.secondary : .red)
                 }

@@ -5,8 +5,9 @@ import { MOODS, moodLabel, parseStops, type Mood } from "../studio/faces";
 import "../studio/mark.css";
 
 /**
- * Goblins for the desktop app's pages. A goblin is a mark from the Goblins
- * studio (../studio, from github.com/404khai/goblins v2, MIT; docs › Goblins).
+ * AstroNauts (called goblins in code and storage) for the desktop app's pages.
+ * An AstroNaut is a mark from the AstroNauts studio (../studio, from
+ * github.com/404khai/goblins v2, MIT; docs › AstroNauts).
  * The app sends each goblin as `{ id, name, character }`, where `character` is
  * its `astrid/mark@1` object.
  */
@@ -35,7 +36,9 @@ export function look(c: Mark) {
   };
 }
 
-export const moodOf = (m?: string): Mood => ((MOODS as readonly string[]).includes(m ?? "") ? (m as Mood) : "idle");
+/** Moods the studio has since renamed or dropped, as the nearest it has. */
+const ALIASES: Record<string, Mood> = { talking: "voice", announcing: "voice", jotting: "posting", drawing: "posting" };
+export const moodOf = (m?: string): Mood => ((MOODS as readonly string[]).includes(m ?? "") ? (m as Mood) : ALIASES[m ?? ""] ?? "idle");
 
 /** Every mood a goblin has. */
 export const ANIMATIONS: readonly Mood[] = MOODS;
