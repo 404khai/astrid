@@ -4,6 +4,7 @@
   "mood": "idle",
   "form": "sprocket",
   "corners": "sharp",
+  "fluffy": false,
   "shape": "full",
   "top": "9AA5B1, 5B6774, 9AA5B1",
   "bottom": "9AA5B1, 5B6774, 9AA5B1",

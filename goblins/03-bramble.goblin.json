@@ -4,6 +4,7 @@
   "mood": "searching",
   "form": "crest",
   "corners": "curved",
+  "fluffy": false,
   "shape": "dual",
   "top": "4FC3F7, 0277BD, 4FC3F7",
   "bottom": "4FC3F7, 0277BD, 4FC3F7",

@@ -23,6 +23,7 @@
     "d3-shape": "^3.2.1",
     "liquid-gooey": "^0.2.2",
     "motion": "^14.14.0",
+    "open-bot-avatar": "0.5.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "runeicons-react": "file:vendor/runeicons-react",

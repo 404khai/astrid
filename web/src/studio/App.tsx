@@ -1,12 +1,13 @@
-// Astrid studio (github.com/404khai/goblins v2, MIT, ported into the docs' AstroNauts page): three bays. Left is identity, saved marks and the log; the middle is the mark on its ground,
+// Astrid studio (github.com/404khai/goblins v2 826f015, MIT, ported into the docs' AstroNauts page): three bays. Left is identity, saved marks and the log; the middle is the mark on its ground,
 // eyes tracking the pointer; the right bay holds mood, shape, arch colours, eyes, ground and export.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Astrid, type Shape } from "./Astrid";
+import { FurBot } from "./FurBot";
 import { FORMS, FORM_LABEL, type Corners, type Form } from "./forms";
 import { MOODS, PRESETS, formatStops, moodLabel, parseStops, type Mood } from "./faces";
 
-interface Unit { name: string; mood: Mood; form: Form; corners: Corners; shape: Shape; top: string[]; bottom: string[]; linked: boolean; eyes: string; middle: string[]; ground: string | null }
-const DEFAULT: Unit = { name: "Astrid", mood: "idle", form: "classic", corners: "curved", shape: "arches", top: ["#4459F9", "#1A32EC", "#4459F9"], bottom: ["#4459F9", "#1A32EC", "#4459F9"], linked: true, eyes: "#00F7D5", middle: ["#121212"], ground: "#121212" };
+interface Unit { name: string; mood: Mood; form: Form; corners: Corners; fluffy: boolean; shape: Shape; top: string[]; bottom: string[]; linked: boolean; eyes: string; middle: string[]; ground: string | null }
+const DEFAULT: Unit = { name: "Astrid", mood: "idle", form: "classic", corners: "curved", fluffy: false, shape: "arches", top: ["#4459F9", "#1A32EC", "#4459F9"], bottom: ["#4459F9", "#1A32EC", "#4459F9"], linked: true, eyes: "#00F7D5", middle: ["#121212"], ground: "#121212" };
 const GROUNDS: { label: string; value: string | null }[] = [{ label: "Black", value: "#121212" }, { label: "Paper", value: "#EEEEEE" }, { label: "None", value: null }];
 const STORE = "astrid.studio.v1";
 const SHAPE_LABEL: Record<Shape, string> = { arches: "Arches", full: "Full", dual: "Dual" };
@@ -22,6 +23,7 @@ function sanitize(v: unknown): Unit {
     mood: MOODS.includes(o.mood as Mood) ? (o.mood as Mood) : "idle",
     form: FORMS.includes(o.form as Form) ? (o.form as Form) : "classic",
     corners: o.corners === "sharp" ? "sharp" : "curved",
+    fluffy: o.fluffy === true,
     shape: o.shape === "full" || o.shape === "dual" ? o.shape : "arches",
     middle: stops(o.middle, DEFAULT.middle),
     top, bottom: stops(o.bottom ?? o.arch, top),
@@ -30,7 +32,7 @@ function sanitize(v: unknown): Unit {
     ground: o.ground === null ? null : hex(o.ground, DEFAULT.ground!),
   };
 }
-const toJSON = (u: Unit) => JSON.stringify({ $schema: "astrid/mark@1", name: u.name, mood: u.mood, form: u.form, corners: u.corners, shape: u.shape, top: formatStops(u.top), bottom: formatStops(u.bottom), eyes: formatStops([u.eyes]), middle: formatStops(u.middle), ground: u.ground && formatStops([u.ground]) }, null, 2);
+const toJSON = (u: Unit) => JSON.stringify({ $schema: "astrid/mark@1", name: u.name, mood: u.mood, form: u.form, corners: u.corners, fluffy: u.fluffy, shape: u.shape, top: formatStops(u.top), bottom: formatStops(u.bottom), eyes: formatStops([u.eyes]), middle: formatStops(u.middle), ground: u.ground && formatStops([u.ground]) }, null, 2);
 function load(): Unit {
   // Share links open the docs' AstroNauts page: #astronauts:m=<mark JSON>
   try { const at = location.hash.indexOf("m="); if (at >= 0) return sanitize(JSON.parse(decodeURIComponent(location.hash.slice(at + 2)))); } catch {}
@@ -95,8 +97,8 @@ export default function App() {
   const shuffle = () => {
     const p = PRESETS[Math.floor(Math.random() * PRESETS.length)];
     const pick = <T,>(list: readonly T[]) => list[Math.floor(Math.random() * list.length)];
-    const m = pick(MOODS), form = pick(FORMS), shape = pick(["arches", "full", "dual"] as Shape[]), corners = pick(["curved", "sharp"] as Corners[]);
-    set({ top: parseStops(p.arch)!, bottom: parseStops(p.arch)!, linked: true, eyes: parseStops(p.eyes)![0], mood: m, form, shape, corners }, `shuffled → ${form} ${shape} ${corners} · ${p.name.toLowerCase()} · ${m}`);
+    const m = pick(MOODS), form = pick(FORMS), shape = pick(["arches", "full", "dual"] as Shape[]), corners = pick(["curved", "sharp"] as Corners[]), fluffy = Math.random() < 0.25;
+    set({ top: parseStops(p.arch)!, bottom: parseStops(p.arch)!, linked: true, eyes: parseStops(p.eyes)![0], mood: m, form, shape, corners, fluffy }, `shuffled → ${form} ${shape} ${fluffy ? "fluffy" : corners} · ${p.name.toLowerCase()} · ${m}`);
   };
   const build = (text: string) => {
     try { const next = sanitize(JSON.parse(text)); setU(next); push(`built ${next.name.toLowerCase()}`); return true; }
@@ -149,7 +151,7 @@ export default function App() {
     return () => { removeEventListener("keydown", onKey); removeEventListener("paste", onPaste); };
   }, []);
 
-  const mark = { top: u.top, bottom: u.bottom, eyes: u.eyes, shape: u.shape, form: u.form, corners: u.corners, middle: u.middle };
+  const mark = { top: u.top, bottom: u.bottom, eyes: u.eyes, shape: u.shape, form: u.form, corners: u.corners, fluffy: u.fluffy, middle: u.middle };
   const accent = u.top[Math.floor(u.top.length / 2)];
 
   return (
@@ -167,7 +169,7 @@ export default function App() {
             <input id="name" maxLength={16} spellCheck={false} value={u.name} onChange={(e) => set({ name: e.target.value })} onBlur={() => push(`renamed → ${u.name.toLowerCase()}`)} />
           </label>
           <dl className="spec">
-            <div><dt>Shape</dt><dd>{FORM_LABEL[u.form]} · {SHAPE_LABEL[u.shape]} · {u.corners}</dd></div>
+            <div><dt>Shape</dt><dd>{FORM_LABEL[u.form]} · {SHAPE_LABEL[u.shape]} · {u.fluffy ? "fluffy" : u.corners}</dd></div>
             {u.shape === "dual" && <div><dt>Middle</dt><dd>{formatStops(u.middle)}</dd></div>}
             <div><dt>Top</dt><dd>{formatStops(u.top)}</dd></div>
             <div><dt>Bottom</dt><dd>{formatStops(u.bottom)}</dd></div>
@@ -182,7 +184,7 @@ export default function App() {
             {saved.map((s, i) => (
               <li key={i}>
                 <button type="button" onClick={() => { setU(s); push(`loaded ${s.name.toLowerCase()}`); }}>
-                  <Astrid top={s.top} bottom={s.bottom} eyes={s.eyes} shape={s.shape} form={s.form} corners={s.corners} middle={s.middle} mood={s.mood} size={30} background={s.ground} />
+                  <Astrid top={s.top} bottom={s.bottom} eyes={s.eyes} shape={s.shape} form={s.form} corners={s.corners} fluffy={s.fluffy} middle={s.middle} mood={s.mood} size={30} background={s.ground} />
                   <span className="who">{s.name}</span>
                   <span className="n">{moodLabel(s.mood)}</span>
                 </button>
@@ -209,8 +211,10 @@ export default function App() {
               setLook({ x: Math.max(-1, Math.min(1, nx * 2)) * 16, y: Math.max(-1, Math.min(1, ny * 2)) * 12 });
             }}
             onPointerLeave={() => setLook({ x: 0, y: 0 })}>
-            <Astrid {...mark} mood={u.mood} size={560} look={look} blink animate title={`${u.name}, ${moodLabel(u.mood)}`} />
-            <div className="hud hud-top"><span className="readout">{u.form.toUpperCase()} · {u.shape.toUpperCase()} · {u.mood.toUpperCase()}</span><span>{u.ground ? formatStops([u.ground]) : "TRANSPARENT"}</span></div>
+            {u.fluffy
+              ? <FurBot form={u.form} corners={u.corners} shape={u.shape} color={u.top[Math.floor(u.top.length / 2)]} eyes={u.eyes} mood={u.mood} title={`${u.name}, ${moodLabel(u.mood)}`} />
+              : <Astrid {...mark} mood={u.mood} size={560} look={look} blink animate title={`${u.name}, ${moodLabel(u.mood)}`} />}
+            <div className="hud hud-top"><span className="readout">{u.form.toUpperCase()} · {u.shape.toUpperCase()}{u.fluffy ? " · FLUFFY" : ""} · {u.mood.toUpperCase()}</span><span>{u.ground ? formatStops([u.ground]) : "TRANSPARENT"}</span></div>
             <p className="hud hud-bottom">The eyes follow your pointer · ← → change mood · R shuffles</p>
           </div>
           <div className="deck">
@@ -222,7 +226,7 @@ export default function App() {
             <button type="button" className="btn" onClick={exportPng}>PNG ↓</button>
             <button type="button" className="btn" onClick={share}>Share ⧉</button>
           </div>
-          <div ref={exportRef} hidden><Astrid {...mark} mood={u.mood} size={512} background={u.ground} /></div>
+          <div ref={exportRef} hidden><Astrid {...mark} mood={u.mood} size={512} background={u.ground} fur={u.fluffy} /></div>
         </section>
 
         <aside className="bay bay-right">
@@ -260,6 +264,11 @@ export default function App() {
               </button>
             ))}
           </div>
+          <button type="button" id="fluffy" className={`toggle${u.fluffy ? " on" : ""}`} role="switch" aria-checked={u.fluffy} onClick={() => set({ fluffy: !u.fluffy }, `fluffy ${u.fluffy ? "off" : "on"}`)}>
+            <Astrid {...mark} fluffy mood={u.mood} size={28} />
+            <span>Fluffy</span>
+            <i />
+          </button>
 
           <Head index="06" title="Colour" aside={
             <button type="button" className="link" aria-pressed={u.linked} onClick={() => set(u.linked ? { linked: false } : { linked: true, bottom: u.top }, u.linked ? "arches split" : "arches linked")}>{u.linked ? "Split arches" : "Link arches"}</button>
@@ -275,7 +284,7 @@ export default function App() {
               const on = formatStops(u.top) === formatStops(arch) && formatStops(u.bottom) === formatStops(arch) && u.eyes === eyes;
               return (
                 <button key={p.id} type="button" aria-pressed={on} title={`${p.name}: ${p.arch} / ${p.eyes}`} onClick={() => set({ top: arch, bottom: arch, linked: true, eyes }, `palette → ${p.name.toLowerCase()}`)}>
-                  <Astrid top={arch} bottom={arch} eyes={eyes} shape={u.shape} form={u.form} corners={u.corners} middle={u.middle} mood={u.mood} size={34} />
+                  <Astrid top={arch} bottom={arch} eyes={eyes} shape={u.shape} form={u.form} corners={u.corners} fluffy={u.fluffy} middle={u.middle} mood={u.mood} size={34} />
                   <span>{p.name}</span>
                 </button>
               );

@@ -44,6 +44,9 @@ importers:
       motion:
         specifier: ^14.14.0
         version: 14.14.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      open-bot-avatar:
+        specifier: 0.5.1
+        version: 0.5.1
       react:
         specifier: ^19.2.0
         version: 19.3.0
@@ -979,6 +982,9 @@ packages:
   number-flow@0.6.2:
     resolution: {integrity: sha512-MCnImG4Q5vPwhSXnov56nOuyyKn6LC+Qd7II1UiKc+ACRtug5iAtn0+CwXNxM38AC5lSowEY+oYEtZX2qMnUyw==}
 
+  open-bot-avatar@0.5.1:
+    resolution: {integrity: sha512-Bu2ViCtE4CCzyICuL49o+I899xlLKkDuiuKAiE+VxVc3oYuzXz9MzSOwCMS6EFQi2NrAYWmUKl2EIQjPvGtBpQ==}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -1816,6 +1822,8 @@ snapshots:
   number-flow@0.6.2:
     dependencies:
       esm-env: 1.2.2
+
+  open-bot-avatar@0.5.1: {}
 
   picocolors@1.1.1: {}
 

@@ -4,6 +4,7 @@
   "mood": "love",
   "form": "capsule",
   "corners": "curved",
+  "fluffy": true,
   "shape": "dual",
   "top": "FF8FC8, F0479A, FF8FC8",
   "bottom": "FF8FC8, F0479A, FF8FC8",

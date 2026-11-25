@@ -152,3 +152,12 @@
 .studio-frame { container: studio / inline-size; border: 1px solid var(--line, #292929); border-radius: 14px; overflow: hidden; }
 .studio-frame .studio-page { height: min(900px, calc(100vh - 120px)); min-height: 640px; }
 @container studio (max-width: 760px) { .studio-frame .studio-page { height: auto; } }
+
+/* fluffy toggle and the 3D fur stage (goblins v2 826f015) */
+.studio-page .toggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 12px; background: var(--chip); border: 1px solid var(--line-2); color: var(--muted); font: 500 13px var(--text); cursor: pointer; }
+.studio-page .toggle span { flex: 1; text-align: left; }
+.studio-page .toggle i { position: relative; width: 34px; height: 18px; border: 1px solid var(--line-2); background: #0c0c0c; }
+.studio-page .toggle i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: var(--muted); transition: left 0.15s; }
+.studio-page .toggle.on { color: var(--paper); border-color: var(--paper); }
+.studio-page .toggle.on i::after { left: 18px; background: var(--eye); }
+.studio-page .furbot { width: min(600px, 78%); aspect-ratio: 1; }

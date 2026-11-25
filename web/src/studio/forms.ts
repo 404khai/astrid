@@ -93,16 +93,37 @@ export type Corners = "curved" | "sharp";
 export interface Geometry { top: string; bottom: string; full: string; window: string }
 const cache = new Map<string, Geometry>();
 
-export function geometry(form: Form, corners: Corners = "curved"): Geometry {
+/**
+ * Fluffy: walk the outline, cut it into even steps, and join the steps with small arcs that bulge outward,
+ * so every edge turns into a row of soft cloud bumps.
+ */
+function fluff(pts: P[], step = 26): string {
+  const f = (n: number) => Math.round(n * 10) / 10;
+  const n = pts.length, seg = pts.map((p, i) => Math.hypot(pts[(i + 1) % n][0] - p[0], pts[(i + 1) % n][1] - p[1]));
+  const per = seg.reduce((a, b) => a + b, 0), count = Math.max(6, Math.round(per / step)), len = per / count;
+  const at = (d: number): P => {
+    let i = 0;
+    while (d > seg[i] && i < n - 1) d -= seg[i++];
+    const a = pts[i], b = pts[(i + 1) % n], k = seg[i] ? d / seg[i] : 0;
+    return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+  };
+  // shoelace sign tells which way the outline turns, so the arcs bulge out rather than in
+  const area = pts.reduce((a, p, i) => a + p[0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * p[1], 0);
+  const sweep = area > 0 ? 1 : 0, r = f(len * 0.58);
+  const marks = Array.from({ length: count }, (_, i) => at(i * len));
+  return `M${f(marks[0][0])} ${f(marks[0][1])}` + marks.map((_, i) => { const q = marks[(i + 1) % count]; return `A${r} ${r} 0 0 ${sweep} ${f(q[0])} ${f(q[1])}`; }).join("") + "Z";
+}
+
+export function geometry(form: Form, corners: Corners = "curved", fluffy = false): Geometry {
   const sharp = corners === "sharp";
-  if (form === "classic" && !sharp) return { top: TOP_BAR, bottom: BOTTOM_BAR, full: FULL, window: WINDOW };
-  const key = `${form}:${corners}`;
+  if (form === "classic" && !sharp && !fluffy) return { top: TOP_BAR, bottom: BOTTOM_BAR, full: FULL, window: WINDOW };
+  const key = `${form}:${corners}:${fluffy}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const outer = mirrorX(HALF[form]);
   const inner = under(outer, T, sharp);
   const bend = sharp ? 0 : 12, side = sharp ? 0 : 28, wall = sharp ? 0 : 20;
-  const band = (o: P[], i: P[]) => rounded([...o, ...i.slice().reverse()], (k) => (k === 0 || k === o.length - 1 || k === o.length || k === o.length * 2 - 1 ? 1 : bend));
+  const band = (o: P[], i: P[]) => fluffy ? fluff([...o, ...i.slice().reverse()]) : rounded([...o, ...i.slice().reverse()], (k) => (k === 0 || k === o.length - 1 || k === o.length || k === o.length * 2 - 1 ? 1 : bend));
   const fullPts = [...outer, ...flipY(outer).reverse()];
   const sides = new Set([0, outer.length - 1, outer.length, fullPts.length - 1]);
   // the dual window: the inner edges, walled in at the arch-end thickness
@@ -121,9 +142,86 @@ export function geometry(form: Form, corners: Corners = "curved"): Geometry {
   const g: Geometry = {
     top: band(outer, inner),
     bottom: band(flipY(outer), flipY(inner)),
-    full: rounded(fullPts, (k) => (sides.has(k) ? side : bend)),
-    window: rounded(winPts, (k) => (walls.has(k) ? wall : bend)),
+    full: fluffy ? fluff(fullPts) : rounded(fullPts, (k) => (sides.has(k) ? side : bend)),
+    window: fluffy ? fluff(winPts, 22) : rounded(winPts, (k) => (walls.has(k) ? wall : bend)),
   };
   cache.set(key, g);
   return g;
+}
+
+/** Shoelace area: the sign tells which way an outline winds. */
+const area = (pts: P[]) => pts.reduce((a, p, i) => a + p[0] * pts[(i + 1) % pts.length][1] - pts[(i + 1) % pts.length][0] * p[1], 0);
+
+/** Astrid's 512 box into open-bot-avatar's 0 0 100 100 box: 8..92 wide, centred. */
+export const AVATAR_K = 84 / (R - L);
+export const toAvatar = ([x, y]: P): P => [(x - L) * AVATAR_K + 8, (y - MY) * AVATAR_K + 50];
+
+/**
+ * Astrid as an open-bot-avatar body for the fluffy 3D renderer, one path in its 0 0 100 100 box:
+ * the full silhouette, the two arches as separate pieces, or dual, the full shape with the eye
+ * window as a hole (wound the other way, as its nonzero fill needs). The eyes sit where Astrid's do.
+ */
+export function avatarDefinition(form: Form, corners: Corners, style: "arches" | "full" | "dual" = "full") {
+  const k = AVATAR_K, sharp = corners === "sharp";
+  const bend = sharp ? 0 : 12 * k, side = sharp ? 0 : 28 * k, wall = sharp ? 0 : 20 * k;
+  const outer = mirrorX(HALF[form]);
+  const full = [...outer, ...flipY(outer).reverse()];
+  const sides = new Set([0, outer.length - 1, outer.length, full.length - 1]);
+  const fullPath = rounded(full.map(toAvatar), (i) => (sides.has(i) ? side : bend));
+  let path = fullPath;
+  const inner = under(outer, T, sharp);
+  if (style !== "full") {
+    if (style === "arches") {
+      const band = (o: P[], i: P[]) => {
+        const pts = [...o, ...i.slice().reverse()];
+        return rounded(pts.map(toAvatar), (j) => (j === 0 || j === o.length - 1 || j === o.length || j === o.length * 2 - 1 ? 0.2 : bend));
+      };
+      path = band(outer, inner) + band(flipY(outer), flipY(inner));
+    } else {
+      const wl = L + T, wr = R - T;
+      const yAt = (x: number) => {
+        const i = inner.findIndex((p) => p[0] >= x), a = inner[Math.max(0, i - 1)], b = inner[i];
+        return b[0] === a[0] ? b[1] : a[1] + ((b[1] - a[1]) * (x - a[0])) / (b[0] - a[0]);
+      };
+      const wTop: P[] = [[wl, yAt(wl)], ...inner.filter(([x]) => x > wl + 1 && x < wr - 1), [wr, yAt(wr)]];
+      let win = [...wTop, ...flipY(wTop).reverse()];
+      const walls = new Set([0, wTop.length - 1, wTop.length, win.length - 1]);
+      let radius = (j: number) => (walls.has(j) ? wall : bend);
+      if (Math.sign(area(win)) === Math.sign(area(full))) {
+        const n = win.length, r0 = radius;
+        win = win.slice().reverse();
+        radius = (j: number) => r0(n - 1 - j);
+      }
+      path = fullPath + rounded(win.map(toAvatar), radius);
+    }
+  }
+  return {
+    version: 1 as const, id: `astrid-${form}-${style}`, name: "Astrid",
+    body: { path },
+    // the package checks that its eyes sit on fur, and arches and dual have none behind Astrid's eyes:
+    // there it gets a small valid pair inside the top arch, and FurBot moves the real eyes into the gap
+    eyes: style === "full"
+      ? { x: 50, y: 50, spacing: Math.round(102.9 * k * 10) / 10, scale: 1.8 }
+      : STAND_IN,
+  };
+}
+
+const STAND_IN = { x: 50, y: 21, spacing: 6, scale: 0.6 };
+const standIns = new Map<string, typeof STAND_IN>();
+
+/**
+ * For arches and dual: the first spot along the top arch where the package accepts the small
+ * stand-in eyes, found with its own validator and kept per shape.
+ */
+export function withStandIn<D extends { id: string; body: { path: string }; eyes: typeof STAND_IN }>(def: D, valid: (d: D) => boolean): D {
+  if (def.eyes !== STAND_IN) return def;
+  const hit = standIns.get(def.body.path);
+  if (hit) return { ...def, eyes: hit };
+  for (const x of [50, 38, 62, 26, 74, 16, 84, 12, 88]) {
+    for (let y = 8; y <= 92; y += 0.5) {
+      const eyes = { ...STAND_IN, x, y };
+      if (valid({ ...def, eyes })) { standIns.set(def.body.path, eyes); return { ...def, eyes }; }
+    }
+  }
+  return def;
 }

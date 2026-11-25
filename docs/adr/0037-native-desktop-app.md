@@ -399,3 +399,11 @@ AstroNauts: the Settings page, the composer button, the picker, group chats, the
 memories carry over unchanged. The site has one HTML entry: `docs.html` and `changelog.html` are removed and
 `src/main.tsx` routes `/docs` and `/changelog` (the old `.html` addresses still work) to lazily loaded `Docs.tsx` and
 `Changelog.tsx`; `web/vercel.json` rewrites those paths to `index.html`.
+
+### Amendment 20 — fluffy AstroNauts (2026-11-26)
+
+Maintainer: "new addition to v2, fluffy, port them over". The studio is updated to goblins v2 `826f015`: a mark can be
+`fluffy` (`astrid/mark@1` gains an optional boolean). The renderer draws a scalloped outline for small fluffy marks and
+SVG fur with glossy eyes (`fur`) at large sizes; the docs studio adds a Fluffy toggle and a 3D fur stage from
+`open-bot-avatar` 0.5.1 (MIT), a new web dependency used only by the docs page. The desktop passes `fluffy` through and
+uses fur for live AstroNauts 56 px and up. Mossbeard and Tansy are fluffy in the built-in crew.

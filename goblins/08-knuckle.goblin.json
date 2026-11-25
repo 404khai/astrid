@@ -4,6 +4,7 @@
   "mood": "angry",
   "form": "block",
   "corners": "sharp",
+  "fluffy": false,
   "shape": "full",
   "top": "FF8A3D, E8551A, FF8A3D",
   "bottom": "FF8A3D, E8551A, FF8A3D",
