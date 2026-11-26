@@ -12,7 +12,7 @@ import "../studio/mark.css";
  * its `astrid/mark@1` object.
  */
 export type Mark = {
-  name?: string; mood?: string; form?: string; corners?: string; shape?: string;
+  name?: string; mood?: string; form?: string; corners?: string; shape?: string; fluffy?: boolean;
   top?: string | string[]; bottom?: string | string[]; arch?: string | string[]; eyes?: string | string[]; middle?: string | string[];
 };
 export type Item = { id: string; name: string; character: Mark };
@@ -33,6 +33,7 @@ export function look(c: Mark) {
     form: (FORMS as readonly string[]).includes(c.form ?? "") ? (c.form as Form) : "classic",
     corners: (c.corners === "sharp" ? "sharp" : "curved") as Corners,
     shape: (c.shape === "full" || c.shape === "dual" ? c.shape : "arches") as Shape,
+    fluffy: c.fluffy === true,
   };
 }
 
@@ -63,7 +64,8 @@ export function LiveGoblin({ item, size, expression, title }: { item: Item; size
     <button type="button" className="live-goblin" onClick={play} title={shown ? `${item.name}: ${shown}` : title ?? item.name} aria-label={`${item.name}. Click to see the next mood.`}>
       {/* A mark fills its box more than a 3D head did: draw it at 80%, centred in the same space. */}
       <span style={{ display: "grid", placeItems: "center", width: size, height: size }}>
-        <Astrid {...look(item.character)} mood={mood} size={Math.round(size * 0.8)} blink animate />
+        {/* Fluffy marks get real fur and glossy eyes where there is room for it. */}
+        <Astrid {...look(item.character)} mood={mood} size={Math.round(size * 0.8)} fur={item.character.fluffy === true && size >= 56} blink animate />
       </span>
     </button>
   );

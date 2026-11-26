@@ -7,6 +7,7 @@ import { writeFileSync } from "node:fs";
 import { geometry } from "../src/studio/forms";
 import { FACES, PRESETS, eyePath } from "../src/studio/faces";
 
+const FLUFFY = new Set(["Mossbeard", "Tansy"]);
 const out = new URL("../../goblins/", import.meta.url).pathname;
 const palette = (id: string) => PRESETS.find((p) => p.id === id)!;
 const CLAN: [string, string, string, string, "arches" | "full" | "dual", "curved" | "sharp", string][] = [
@@ -25,7 +26,7 @@ const CLAN: [string, string, string, string, "arches" | "full" | "dual", "curved
 ];
 for (const [file, name, form, pal, shape, corners, mood] of CLAN) {
   const p = palette(pal);
-  const mark = { $schema: "astrid/mark@1", name, mood, form, corners, shape, top: p.arch, bottom: p.arch, eyes: p.eyes, middle: "121212", ground: null };
+  const mark = { $schema: "astrid/mark@1", name, mood, form, corners, fluffy: FLUFFY.has(name), shape, top: p.arch, bottom: p.arch, eyes: p.eyes, middle: "121212", ground: null };
   writeFileSync(`${out}${file}.goblin.json`, JSON.stringify(mark, null, 2) + "\n");
 }
 // The glyph: the lynx form's full plate with the eyes cut out, in black for a template image.

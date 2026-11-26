@@ -4,6 +4,7 @@
   "mood": "serious",
   "form": "steps",
   "corners": "sharp",
+  "fluffy": false,
   "shape": "arches",
   "top": "3A3A3A, 1A1A1A, 3A3A3A",
   "bottom": "3A3A3A, 1A1A1A, 3A3A3A",

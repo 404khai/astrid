@@ -4,6 +4,7 @@
   "mood": "happy",
   "form": "peak",
   "corners": "curved",
+  "fluffy": false,
   "shape": "arches",
   "top": "F94447, EC1A1D, F94447",
   "bottom": "F94447, EC1A1D, F94447",

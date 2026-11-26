@@ -4,6 +4,7 @@
   "mood": "laughing",
   "form": "round",
   "corners": "curved",
+  "fluffy": false,
   "shape": "arches",
   "top": "FFC93D, F59E0B, FFC93D",
   "bottom": "FFC93D, F59E0B, FFC93D",
