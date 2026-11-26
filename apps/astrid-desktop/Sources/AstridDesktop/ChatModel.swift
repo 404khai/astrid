@@ -21,6 +21,9 @@ struct LiveReply {
     var streamed = ""
     var label = "Thinking"
     var shapes: [JSONValue] = []
+    /// How many of `shapes` are the earlier drawing an edit-only reply changes
+    /// (Astrid Weaver); the canvas shows those at once and streams the edits.
+    var prefix = 0
     var drawing = false
     var approval: (id: Int, title: String)?
     var answer: (text: String, brief: JSONValue?)?
@@ -147,6 +150,12 @@ final class ChatModel: ObservableObject {
     func show(chat id: UUID) {
         selection = id
         page = .chat
+    }
+
+    /// Tapping a part of a drawing asks about it in that drawing's chat.
+    func askAbout(_ text: String, in chatID: UUID) {
+        guard live == nil else { return }
+        if let started = ask(text, in: chatID, from: .desktop) { show(chat: started.chat) }
     }
 
     /// Every saved drawing, newest first.
@@ -289,14 +298,23 @@ final class ChatModel: ObservableObject {
             live?.approval = (id, title)
         case .canvasBegin:
             live?.shapes = []
+            live?.prefix = 0
             live?.drawing = true
         case .canvasShape(let shape):
+            // A reply that starts by editing changes the chat's last drawing.
+            if let reply = live, reply.shapes.isEmpty, CanvasParts.isEdit(shape),
+               let base = chats.first(where: { $0.id == reply.chatID })?.latestDiagram {
+                let kept = Array(base.prefix(ChatLimits.maxShapes - 1))
+                live?.shapes = kept
+                live?.prefix = kept.count
+            }
             if (live?.shapes.count ?? 0) < ChatLimits.maxShapes { live?.shapes.append(shape) }
         case .canvasEnd:
             live?.drawing = false
         case .canvasCancel:
             live?.drawing = false
             live?.shapes = []
+            live?.prefix = 0
         case .answer(let text, let brief, _):
             live?.answer = (text, brief)
         case .error(let message):

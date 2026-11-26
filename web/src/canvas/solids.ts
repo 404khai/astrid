@@ -1,5 +1,5 @@
 import * as k from "../../vendor/anatomy/iso-kit.mjs";
-import type { Shape } from "./shapes";
+import { palette, type Shape } from "./shapes";
 
 /** ADR 0036 3D solids: one fixed Anatomy camera over the 1000 × 640 canvas,
  * world origin at its centre, x/y on the ground and z up. */
@@ -77,6 +77,45 @@ function cylinderPaths(base: P3, r1: number, r2: number, h: number, axis: string
   };
 }
 
+const cross = (a: P3, b: P3): P3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+
+/** A fan, propeller or turbine wheel turned to `angle` (radians): twisted
+ * blades shaded by the light they face, back to front, under a hub. Spinning
+ * re-projects it every frame, so it turns in 3D rather than on the screen. */
+export function rotorSvg(s: Shape, cam: Camera, angle: number): string {
+  const { light: LIGHT } = lighting(cam);
+  const [a, u, v] = axes[s.axis ?? "z"] ?? axes.z;
+  const centre: P3 = [s.x!, s.y!, s.z ?? 0];
+  const R = s.radius!;
+  const n = Math.max(2, Math.round(s.blades ?? 6));
+  const hub = Math.min(s.hub ?? R * 0.22, R * 0.8);
+  const twist = ((s.pitch ?? 24) * Math.PI) / 180;
+  const chord = Math.min(R * 0.55, ((2 * Math.PI * R) / n) * 0.62);
+  const blades = Array.from({ length: n }, (_, i) => {
+    const t = angle + (i / n) * Math.PI * 2;
+    const out = add(add([0, 0, 0], u, Math.cos(t)), v, Math.sin(t));
+    const side = add(add([0, 0, 0], u, -Math.sin(t)), v, Math.cos(t));
+    const c = add(add([0, 0, 0], side, Math.cos(twist)), a, Math.sin(twist));
+    const at = (radius: number, along: number): P3 => add(add(centre, out, radius), c, along);
+    const ring: P3[] = [at(hub, -chord * 0.28), at(R * 0.92, -chord * 0.5), at(R, 0), at(R * 0.92, chord * 0.5), at(hub, chord * 0.28)];
+    const normal = cross(out, c);
+    const lit = (Math.abs(dot(normal, LIGHT)) + 0.15) / 1.15;
+    return {
+      d: k.pathOf(ring.map((p) => project(p, cam)), true),
+      shade: Math.min(k.SHADES - 1, Math.floor(lit * k.SHADES)),
+      depth: depth(at(R * 0.6, 0), cam),
+    };
+  }).sort((x, y) => x.depth - y.depth);
+  const len = Math.max(6, hub * 0.9);
+  const hubPaths = cylinderPaths(add(centre, a, -len / 2), hub, hub * 0.7, len, s.axis ?? "z", cam);
+  return (
+    `<g class="iso-solid">` +
+    blades.map((b) => `<path class="iso-shade" data-shade="${b.shade}" d="${b.d}"/><path class="iso-line iso-edge" data-tone="hi" d="${b.d}"/>`).join("") +
+    `</g>` +
+    k.solidSvg(hubPaths, { tone: "hi" })
+  );
+}
+
 /** World bounds: x0..x1, y0..y1, z0..z1. */
 export type Bounds = [number, number, number, number, number, number];
 export type Solid = { svg: string; anchor: P2; labelAt: P2; depth: number; world: P3; bounds: Bounds };
@@ -107,6 +146,20 @@ export function solid(s: Shape, cam: Camera = defaultCamera): Solid | null {
       : axis === "y" ? [s.x! - r, s.x! + r, s.y!, s.y! + s.h!, z - r, z + r]
       : [s.x! - r, s.x! + r, s.y! - r, s.y! + r, z, z + s.h!];
     return { svg: k.solidSvg(paths, { tone: "hi" }), anchor: tip, labelAt: [tip[0], tip[1] - 16], depth: depth(mid, cam), world, bounds };
+  }
+  if (s.shape === "rotor") {
+    const axis = s.axis ?? "z";
+    const [a] = axes[axis];
+    const centre: P3 = [s.x!, s.y!, z];
+    const R = s.radius!;
+    const r = R + 2;
+    const bounds: Bounds =
+      axis === "x" ? [s.x! - 6, s.x! + 6, s.y! - r, s.y! + r, z - r, z + r]
+      : axis === "y" ? [s.x! - r, s.x! + r, s.y! - 6, s.y! + 6, z - r, z + r]
+      : [s.x! - r, s.x! + r, s.y! - r, s.y! + r, z - 6, z + 6];
+    const world = axis === "z" ? add(centre, a, 8) : add(centre, [0, 0, 1], R);
+    const tip = project(world, cam);
+    return { svg: rotorSvg(s, cam, 0), anchor: tip, labelAt: [tip[0], tip[1] - 16], depth: depth(centre, cam), world, bounds };
   }
   const pts = s.points as unknown as number[][] | undefined;
   if ((s.shape === "line" || s.shape === "polygon") && pts && pts.every((q) => q.length === 3)) {
@@ -149,17 +202,14 @@ export function paintOrder<T extends { built: Solid; n: number }>(items: T[]): T
   return out;
 }
 
-const named: Record<string, string> = {
-  ink: "#e6e6e6", paper: "#1d1d1f", blue: "#6575ff", violet: "#9b7bff", pink: "#ec6a8a", red: "#f94447",
-  orange: "#ff8a3d", yellow: "#f7c600", green: "#30a46c", teal: "#00c2b8", grey: "#8a8a8a", none: "none",
-};
+
 /** Colours were validated by the runtime: a palette name or a #hex. */
-const paint = (c?: string) => (c ? named[c] ?? (/^#[0-9a-f]{3,8}$/i.test(c) ? c : undefined) : undefined);
+const paint = (c?: string) => (c ? palette[c] ?? (/^#[0-9a-f]{3,8}$/i.test(c) ? c : undefined) : undefined);
 
 /** Text, points and arrows given in world coordinates land on the canvas. */
 export function flatten(s: Shape, cam: Camera = defaultCamera): Shape {
   const p = (q: number[]) => (q.length === 3 ? project(q as P3, cam) : (q as P2));
-  if ((s.shape === "text" || s.shape === "point") && s.z !== undefined) {
+  if ((s.shape === "text" || s.shape === "point" || s.shape === "callout" || s.shape === "value" || s.shape === "step") && s.z !== undefined) {
     const [x, y] = project([s.x!, s.y!, s.z], cam);
     return { ...s, x, y, z: undefined };
   }

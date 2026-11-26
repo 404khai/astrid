@@ -13,7 +13,7 @@
 //!
 //! An ask starting with `/operator` runs a guided walkthrough instead (ADR
 //! 0038); its extra messages are listed in `operator_bridge`.
-use crate::presence_canvas::{CANVAS_INSTRUCTIONS, CanvasStream};
+use crate::presence_canvas::{CanvasStream, WEAVER_SKILL};
 use astrid::{
     cancellation::Cancellation,
     events::EventKind,
@@ -103,9 +103,7 @@ pub fn compose_task_with(ask: &str, history: &[Turn], remembered: &str) -> Strin
         }
         task.push_str("\nThe user now asks:\n");
     }
-    task.push_str(&format!(
-        "{ask}\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}"
-    ));
+    task.push_str(&format!("{ask}\n\n{BRIEF_INSTRUCTIONS}\n\n{WEAVER_SKILL}"));
     task
 }
 
@@ -703,7 +701,7 @@ mod tests {
         let plain = compose_task_with("hi", &[], "");
         assert_eq!(
             plain,
-            format!("hi\n\n{BRIEF_INSTRUCTIONS}\n\n{CANVAS_INSTRUCTIONS}")
+            format!("hi\n\n{BRIEF_INSTRUCTIONS}\n\n{WEAVER_SKILL}")
         );
         let task = compose_task_with(
             "make it bigger",

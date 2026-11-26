@@ -724,7 +724,10 @@ struct MessageRow: View {
             }
             if let brief = message.brief { BriefView(brief: brief) }
             if let shapes = message.diagram, !shapes.isEmpty {
-                DiagramView(ui: model.config.ui, shapes: shapes, animate: model.animated.contains(message.id), finished: live.map { !$0.drawing } ?? true)
+                DiagramView(ui: model.config.ui, shapes: shapes, animate: model.animated.contains(message.id), finished: live.map { !$0.drawing } ?? true,
+                            prefix: live?.prefix ?? 0, title: message.diagramTitle) { text in
+                    if let chat = model.selection { model.askAbout(text, in: chat) }
+                }
                     .frame(height: 420)
                     .clipShape(.rect(cornerRadius: 18))
             }

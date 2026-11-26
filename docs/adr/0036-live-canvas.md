@@ -77,6 +77,63 @@ templates, but it doesn't need model-written code.
   (ADRs 0034/0035), so a dictated ask hears the short reply while the canvas
   draws.
 
+- **Astrid Weaver (amended 2026-11-26).** The maintainer asked to "improve the
+  quality of astrid's drawing ... call it our astrid weaver skill", to "change
+  the color of the canvas ... if asked" and to "add motion for stuff it draws if
+  necessary, like how a dam works, plane turbine", pointing at the plates in
+  `references/weaver-engine`. These are the agent's calls, pending the
+  maintainer's review:
+  - **The skill.** The drawing instructions now live in `src/weaver_skill.md`
+    (`WEAVER_SKILL`). They include a house style taken from the references: a
+    monochrome figure, one glowing accent part, quiet labels and one spec card.
+  - **Canvas colour.** A `canvas` line (`background`, `grid`) recolours the
+    sheet. On a light sheet the ink, chrome and Anatomy solids switch to their
+    light tones. A recolour is a redraw that starts with that line.
+  - **Motion.** Any shape may carry `motion` (`spin`, `flow`, `pulse`, `bob` or
+    `sway`) and a `speed` from -4 to 4. The page animates these with fixed CSS
+    templates; no model code runs. Reduced Motion keeps everything still.
+  - **Rotors.** `rotor` is a fan, propeller or turbine wheel (`blades`, `hub`,
+    `pitch`, `axis`). With `spin` it is re-projected every frame, so it turns
+    in 3D instead of rotating flat on the screen.
+  - **Callouts.** `callout` is a spec card (`title`, an accent `tag`, up to 4
+    `rows`) placed at `at`, with a leader line to a canvas or world point. All
+    of its text is validated plain text.
+  - **Glow.** `glow` adds a halo in the shape's own colour.
+  - **Authority.** Authority is unchanged: this is presentation only.
+
+- **Weaver interactions and desktop export (amended 2026-11-26).** The maintainer
+  answered a list of interaction ideas with "go with all these add them to the
+  desktop app. also add export to the desktop app". These are the agent's calls,
+  pending the maintainer's review:
+  - **Parts.** A part with an `id` can be hovered (it lights up and the rest
+    dims) and tapped. In the desktop app, a tap sends "Tell me about the …" as
+    an ordinary ask in that drawing's chat. Desktop history now lists each
+    drawing's part ids.
+  - **Edits.** A reply whose canvas block is only `edit` lines (`id` plus fill,
+    stroke, motion, speed, glow, hidden, label, explode, value and `focus`)
+    changes the drawing already on screen instead of redrawing it. The desktop
+    app shows the earlier drawing at once, streams the edits onto it, and saves
+    the combined list.
+  - **Guided steps.** `step` lines (text, an optional focus id and an optional
+    place) start a walkthrough when a new drawing finishes. The cursor moves to
+    each step and its part lights up. The toolbar or the arrow keys move
+    between steps.
+  - **Exploded views and cutaway.** `explode: [dx,dy,dz]` moves a part along a
+    slider. `shell: true` parts hide when the cutaway is on.
+  - **Live values.** `value` is a large readout with a slider. Its `drives` ids
+    speed up in proportion to the value, relative to its first reading.
+  - **Playback.** Play/pause and a tempo control (0.25× to 2×) apply to every
+    motion, including rotors.
+  - **Export.** The toolbar exports PNG (2×) or SVG with all styles inlined. In
+    the desktop app the page sends the bytes, the app checks them (SVG text or
+    PNG magic bytes) and saves them through a save panel. The presence panel
+    has no export.
+  - **Not done.** Video export, voice "next"/"back" for steps, part ids in
+    presence history, and placing the canvas next to its subject on screen.
+    That last one still needs the ADR 0027 look plus a placement decision.
+  - **Authority.** Authority is unchanged. A tap is the same ask a user types,
+    and saving needs the user to choose a file in the save panel.
+
 ## Alternatives considered
 
 - **Model-written HTML, SVG or JavaScript in a sandboxed web view** (D3 a). This
