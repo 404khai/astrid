@@ -7,8 +7,8 @@ import { ThinkingOrb } from "thinking-orbs";
 import type { OrbState } from "thinking-orbs";
 import { AstridLogo, type EyeExpression } from "../components/AstridLogo";
 import { astridCursor } from "../components/cursors";
-import { anchor, ShapeView, type Shape } from "./shapes";
-import { defaultCamera, flatten, ISO_CSS, paintOrder, project, solid, type Camera } from "./solids";
+import { anchor, glowStyle, motionStyle, palette, ShapeView, type Shape } from "./shapes";
+import { defaultCamera, flatten, ISO_CSS, paintOrder, project, rotorSvg, solid, type Camera } from "./solids";
 import { demo } from "./demo";
 import "./canvas.css";
 
@@ -52,10 +52,7 @@ if (embed) document.documentElement.classList.add("cv-embedded");
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const palette: Record<string, string> = {
-  ink: "#e6e6e6", paper: "#1d1d1f", blue: "#6575ff", violet: "#9b7bff", pink: "#ec6a8a", red: "#f94447",
-  orange: "#ff8a3d", yellow: "#f7c600", green: "#30a46c", teal: "#00c2b8", grey: "#8a8a8a",
-};
+
 /** A highlighted solid: the kit's tone variables, mixed from one colour. */
 function tint(fill?: string): CSSProperties | undefined {
   const c = fill && fill !== "none" ? palette[fill] ?? fill : null;
@@ -70,6 +67,47 @@ function tint(fill?: string): CSSProperties | undefined {
     "--anatomy-shade-3": mix(82),
     "--anatomy-hi": `color-mix(in srgb, ${c} 60%, #fff)`,
   } as CSSProperties;
+}
+
+/** The sheet Astrid draws on (Astrid Weaver): its colour, whether it is
+ * light enough to need dark ink, and the dot grid. */
+type Sheet = { background: string | null; light: boolean; grid: boolean };
+const plainSheet: Sheet = { background: null, light: false, grid: true };
+function sheetOf(s: Shape): Sheet {
+  const c = s.background && s.background !== "none" ? palette[s.background] ?? s.background : null;
+  return { background: c, light: c ? luminance(c) > 0.45 : false, grid: s.grid ?? true };
+}
+/** Relative luminance of a validated #hex colour (0 dark … 1 light). */
+function luminance(hex: string): number {
+  let h = hex.replace("#", "");
+  if (h.length <= 4) h = [...h].map((c) => c + c).join("");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** A spinning rotor redraws itself each frame outside React, so a turning
+ * fan costs one path rebuild per frame and nothing else re-renders. */
+function SpinningRotor({ shape, cam }: { shape: Shape; cam: Camera }) {
+  const ref = useRef<SVGGElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const speed = shape.speed || 1;
+    const turn = (Math.PI * 2) / 3.2;
+    if (reducedMotion()) {
+      el.innerHTML = rotorSvg(shape, cam, 0);
+      return;
+    }
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      el.innerHTML = rotorSvg(shape, cam, ((now - start) / 1000) * turn * speed);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [shape, cam]);
+  return <g ref={ref} />;
 }
 
 /** Where the cursor points: a spot on the canvas, or a spot in the 3D world
@@ -89,6 +127,7 @@ function App() {
   const [view, setView] = useState<View>(home);
   const [moving, setMoving] = useState(false);
   const [size, setSize] = useState({ w: W, h: H });
+  const [sheet, setSheet] = useState<Sheet>(plainSheet);
   const queue = useRef<Shape[]>([]);
   const ended = useRef(true);
   const touched = useRef(false);
@@ -137,15 +176,16 @@ function App() {
       return;
     }
     setDrawing("sketching");
-    if (next.shape === "title") {
-      setTitle(next.text ?? null);
+    if (next.shape === "title" || next.shape === "canvas") {
+      if (next.shape === "title") setTitle(next.text ?? null);
+      else setSheet(sheetOf(next));
       timer.current = window.setTimeout(step, 120);
       return;
     }
     const built = solid(next);
     if (built) setTarget({ world: built.world });
     else if (next.shape === "point" && next.z !== undefined) setTarget({ world: [next.x!, next.y!, next.z] });
-    else if (next.shape === "text" && next.z !== undefined) setTarget({ world: [next.x!, next.y!, next.z] });
+    else if ((next.shape === "text" || next.shape === "callout") && next.z !== undefined) setTarget({ world: [next.x!, next.y!, next.z] });
     else if (next.points?.length && (next.points[next.points.length - 1] as number[]).length === 3)
       setTarget({ world: next.points[next.points.length - 1] as unknown as [number, number, number] });
     else if (next.shape === "arrow" && next.to!.length === 3) setTarget({ world: next.to as [number, number, number] });
@@ -190,6 +230,7 @@ function App() {
           setTitle(null);
           setDrawn([]);
           setSay(null);
+          setSheet(plainSheet);
           setDrawing("composing");
           setCam(defaultCamera);
           setView(home);
@@ -217,7 +258,9 @@ function App() {
           touched.current = false;
           const titled = m.shapes.find((s) => s.shape === "title");
           setTitle(titled?.text ?? null);
-          setDrawn(m.shapes.filter((s) => s.shape !== "title" && s.shape !== "point"));
+          const painted = [...m.shapes].reverse().find((s) => s.shape === "canvas");
+          setSheet(painted ? sheetOf(painted) : plainSheet);
+          setDrawn(m.shapes.filter((s) => s.shape !== "title" && s.shape !== "point" && s.shape !== "canvas"));
           setSay(null);
           setDrawing(null);
           setCam(defaultCamera);
@@ -325,17 +368,30 @@ function App() {
   const [hx, hy] = astridCursor.hot;
   const flip = cursor[0] > size.w - 300;
   return (
-    <main className={`cv-card${moving ? " cv-moving" : ""}${embed && !drawing ? " cv-at-rest" : ""}`}>
+    <main
+      className={`cv-card${moving ? " cv-moving" : ""}${embed && !drawing ? " cv-at-rest" : ""}${sheet.light ? " cv-light" : ""}${sheet.grid ? "" : " cv-no-grid"}`}
+      style={sheet.background ? ({ "--sheet": sheet.background } as CSSProperties) : undefined}
+    >
       <style>{ISO_CSS}</style>
       <div className="cv-stage" ref={stage} onPointerDown={onPointerDown} onWheel={onWheel} onDoubleClick={reset}>
         <svg viewBox={`0 0 ${W} ${H}`} className="cv-svg" role="img" aria-label={title ?? "Astrid's drawing"}>
           <g ref={content} className="cv-view" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
-            <g className="iso cv-solids" data-theme="dark">
-              {scene.solids.map(({ shape, n, built }) => (
-                <g key={n} className={`cv-solid3${n === scene.last ? " cv-new" : ""}`} style={tint(shape.fill)}>
-                  <g dangerouslySetInnerHTML={{ __html: built.svg }} />
-                </g>
-              ))}
+            <g className="iso cv-solids" data-theme={sheet.light ? "light" : "dark"}>
+              {scene.solids.map(({ shape, n, built }) => {
+                const moving = shape.shape === "rotor" ? null : motionStyle(shape);
+                const spin = shape.shape === "rotor" && shape.motion === "spin";
+                return (
+                  <g
+                    key={n}
+                    className={`cv-solid3${n === scene.last ? " cv-new" : ""}${shape.glow ? " cv-glow" : ""}`}
+                    style={{ ...tint(shape.fill), ...glowStyle(shape) }}
+                  >
+                    <g className={moving?.className} style={moving?.style}>
+                      {spin ? <SpinningRotor shape={shape} cam={cam} /> : <g dangerouslySetInnerHTML={{ __html: built.svg }} />}
+                    </g>
+                  </g>
+                );
+              })}
               {scene.solids.map(({ shape, n, built }) =>
                 shape.label ? (
                   <text key={`l${n}`} className="cv-label" x={built.labelAt[0]} y={built.labelAt[1]} textAnchor="middle">

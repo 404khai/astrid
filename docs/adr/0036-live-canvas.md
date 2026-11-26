@@ -77,6 +77,30 @@ templates, but it doesn't need model-written code.
   (ADRs 0034/0035), so a dictated ask hears the short reply while the canvas
   draws.
 
+- **Astrid Weaver (amended 2026-11-26).** The maintainer asked to "improve the
+  quality of astrid's drawing ... call it our astrid weaver skill", to "change
+  the color of the canvas ... if asked" and to "add motion for stuff it draws if
+  necessary, like how a dam works, plane turbine", pointing at the plates in
+  `references/weaver-engine`. These are the agent's calls, pending the
+  maintainer's review:
+  - **The skill.** The drawing instructions now live in `src/weaver_skill.md`
+    (`WEAVER_SKILL`). They include a house style taken from the references: a
+    monochrome figure, one glowing accent part, quiet labels and one spec card.
+  - **Canvas colour.** A `canvas` line (`background`, `grid`) recolours the
+    sheet. On a light sheet the ink, chrome and Anatomy solids switch to their
+    light tones. A recolour is a redraw that starts with that line.
+  - **Motion.** Any shape may carry `motion` (`spin`, `flow`, `pulse`, `bob` or
+    `sway`) and a `speed` from -4 to 4. The page animates these with fixed CSS
+    templates; no model code runs. Reduced Motion keeps everything still.
+  - **Rotors.** `rotor` is a fan, propeller or turbine wheel (`blades`, `hub`,
+    `pitch`, `axis`). With `spin` it is re-projected every frame, so it turns
+    in 3D instead of rotating flat on the screen.
+  - **Callouts.** `callout` is a spec card (`title`, an accent `tag`, up to 4
+    `rows`) placed at `at`, with a leader line to a canvas or world point. All
+    of its text is validated plain text.
+  - **Glow.** `glow` adds a halo in the shape's own colour.
+  - **Authority.** Authority is unchanged: this is presentation only.
+
 ## Alternatives considered
 
 - **Model-written HTML, SVG or JavaScript in a sandboxed web view** (D3 a). This

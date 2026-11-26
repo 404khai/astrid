@@ -2,7 +2,9 @@ import type { CSSProperties, ReactNode } from "react";
 
 /** A shape exactly as the runtime validated it (ADR 0036). */
 export type Shape = {
-  shape: "title" | "rect" | "ellipse" | "line" | "polygon" | "path" | "arrow" | "text" | "box" | "point" | "slab" | "cylinder";
+  shape:
+    | "title" | "canvas" | "rect" | "ellipse" | "line" | "polygon" | "path" | "arrow" | "text" | "box" | "point"
+    | "slab" | "cylinder" | "rotor" | "callout";
   z?: number;
   radius?: number;
   r2?: number;
@@ -32,23 +34,60 @@ export type Shape = {
   dashed?: boolean;
   sketchy?: boolean;
   label?: string;
+  /** Astrid Weaver: the sheet colour, and motion and glow on any shape. */
+  background?: string;
+  grid?: boolean;
+  motion?: Motion;
+  speed?: number;
+  glow?: boolean;
+  /** A rotor's blades, hub radius and blade twist. */
+  blades?: number;
+  hub?: number;
+  pitch?: number;
+  /** A callout card: heading, accent tag, key/value rows, card corner. */
+  title?: string;
+  tag?: string;
+  rows?: [string, string][];
+  at?: [number, number];
 };
+export type Motion = "spin" | "flow" | "pulse" | "bob" | "sway";
 
-const palette: Record<string, string> = {
-  ink: "#f4f4f4",
-  paper: "#1d1d1f",
+/** The accent the reference plates use for the part that matters. */
+export const ACCENT = "#ff6a2b";
+
+/** Motion as fixed CSS templates: a class plus its duration and direction. */
+export function motionStyle(s: Shape): { className: string; style: CSSProperties } | null {
+  if (!s.motion) return null;
+  const speed = s.speed === undefined || s.speed === 0 ? 1 : s.speed;
+  const base = { spin: 3.2, flow: 1.1, pulse: 2.2, bob: 2.4, sway: 3 }[s.motion];
+  return {
+    className: `cv-motion cv-m-${s.motion}`,
+    style: {
+      animationDuration: `${(base / Math.abs(speed)).toFixed(2)}s`,
+      animationDirection: speed < 0 ? "reverse" : undefined,
+    },
+  };
+}
+
+/** A glowing part: a soft halo in its own colour. */
+export const glowStyle = (s: Shape): CSSProperties | undefined =>
+  s.glow ? ({ "--glow": paint(s.stroke ?? s.fill, ACCENT) } as CSSProperties) : undefined;
+
+export const palette: Record<string, string> = {
+  ink: "currentColor",
+  paper: "#f4efe6",
   blue: "#6575ff",
   violet: "#9b7bff",
   pink: "#ec6a8a",
   red: "#f94447",
-  orange: "#ff8a3d",
+  orange: ACCENT,
   yellow: "#f7c600",
   green: "#30a46c",
   teal: "#00c2b8",
   grey: "#8a8a8a",
   none: "none",
 };
-const paint = (value: string | undefined, fallback: string) => (value ? palette[value] ?? value : fallback);
+export const paint = (value: string | undefined, fallback: string) => (value ? palette[value] ?? value : fallback);
 
 /** Deterministic jitter, so a sketchy shape looks drawn but never flickers. */
 const noise = (seed: number) => {
@@ -128,6 +167,8 @@ export function anchor(s: Shape): [number, number] | null {
     case "text":
     case "point":
       return [s.x!, s.y!];
+    case "callout":
+      return [s.x!, s.y!];
     case "box":
       return [s.x!, s.y! - s.h! / 2];
     case "path": {
@@ -162,34 +203,36 @@ function labelPosition(s: Shape): [number, number] | null {
 /** One validated shape, drawn by a trusted template. Text is always text. */
 export function ShapeView({ shape: s, index }: { shape: Shape; index: number }) {
   const seed = index * 7 + 3;
-  const stroke = paint(s.stroke, "#f4f4f4");
+  const stroke = paint(s.stroke, "currentColor");
+  // Flowing strokes keep real lengths so their dashes have a fixed rhythm.
+  const pl = s.motion === "flow" ? undefined : 1;
   const style = {
     "--i": index,
     strokeWidth: s.width ?? 2,
     strokeDasharray: s.dashed ? "7 7" : undefined,
   } as CSSProperties;
-  const cls = `cv-shape cv-${s.shape}${s.dashed ? " cv-dashed" : ""}`;
+  const cls = `cv-shape cv-${s.shape}${s.dashed ? " cv-dashed" : ""}${s.glow ? " cv-glow" : ""}`;
   let body: ReactNode = null;
   switch (s.shape) {
     case "rect": {
       const d = s.sketchy
         ? roughPath([[s.x!, s.y!], [s.x! + s.w!, s.y!], [s.x! + s.w!, s.y! + s.h!], [s.x!, s.y! + s.h!]], seed, true)
         : rectPath(s.x!, s.y!, s.w!, s.h!, s.r);
-      body = <path d={d} pathLength={1} fill={paint(s.fill, "none")} stroke={stroke} />;
+      body = <path d={d} pathLength={pl} fill={paint(s.fill, "none")} stroke={stroke} />;
       break;
     }
     case "ellipse":
-      body = <path d={ellipsePath(s.cx!, s.cy!, s.rx!, s.ry!, seed, !!s.sketchy)} pathLength={1} fill={paint(s.fill, "none")} stroke={stroke} />;
+      body = <path d={ellipsePath(s.cx!, s.cy!, s.rx!, s.ry!, seed, !!s.sketchy)} pathLength={pl} fill={paint(s.fill, "none")} stroke={stroke} />;
       break;
     case "line":
     case "polygon": {
       const closed = s.shape === "polygon";
       const d = s.sketchy ? roughPath(s.points!, seed, closed) : `M${s.points!.map((p) => p.join(" ")).join("L")}${closed ? "Z" : ""}`;
-      body = <path d={d} pathLength={1} fill={closed ? paint(s.fill, "none") : "none"} stroke={stroke} />;
+      body = <path d={d} pathLength={pl} fill={closed ? paint(s.fill, "none") : "none"} stroke={stroke} />;
       break;
     }
     case "path":
-      body = <path d={s.d as string} pathLength={1} fill={paint(s.fill, "none")} stroke={stroke} />;
+      body = <path d={s.d as string} pathLength={pl} fill={paint(s.fill, "none")} stroke={stroke} />;
       break;
     case "arrow": {
       const [x1, y1] = s.from!;
@@ -201,7 +244,7 @@ export function ShapeView({ shape: s, index }: { shape: Shape; index: number }) 
       const head = (o: number) => `M${x2} ${y2}L${f(x2 - Math.cos(angle + o) * 13)} ${f(y2 - Math.sin(angle + o) * 13)}`;
       body = (
         <>
-          <path d={`M${x1} ${y1}Q${f(mx)} ${f(my)} ${x2} ${y2}`} pathLength={1} fill="none" stroke={stroke} />
+          <path d={`M${x1} ${y1}Q${f(mx)} ${f(my)} ${x2} ${y2}`} pathLength={pl} fill="none" stroke={stroke} />
           <path className="cv-arrowhead" d={head(0.45) + head(-0.45)} fill="none" stroke={stroke} />
         </>
       );
@@ -213,26 +256,31 @@ export function ShapeView({ shape: s, index }: { shape: Shape; index: number }) 
       const shade = (amount: number) => (fill === "none" ? "none" : `color-mix(in srgb, ${fill} ${amount}%, #000)`);
       body = (
         <>
-          <path d={faces.left} pathLength={1} style={{ fill: shade(62) }} stroke={paint(s.stroke, "#0008")} />
-          <path d={faces.right} pathLength={1} style={{ fill: shade(80) }} stroke={paint(s.stroke, "#0008")} />
-          <path d={faces.top} pathLength={1} style={{ fill: shade(100) }} stroke={paint(s.stroke, "#0008")} />
+          <path d={faces.left} pathLength={pl} style={{ fill: shade(62) }} stroke={paint(s.stroke, "#0008")} />
+          <path d={faces.right} pathLength={pl} style={{ fill: shade(80) }} stroke={paint(s.stroke, "#0008")} />
+          <path d={faces.top} pathLength={pl} style={{ fill: shade(100) }} stroke={paint(s.stroke, "#0008")} />
         </>
       );
       break;
     }
     case "text":
       body = (
-        <text x={s.x} y={s.y} fontSize={s.size ?? 18} textAnchor={s.align ?? "start"} fill={paint(s.fill ?? s.stroke, "#f4f4f4")} stroke="none">
+        <text x={s.x} y={s.y} fontSize={s.size ?? 18} textAnchor={s.align ?? "start"} fill={paint(s.fill ?? s.stroke, "currentColor")} stroke="none">
           {s.text}
         </text>
       );
       break;
+    case "callout":
+      body = <Callout s={s} />;
+      break;
     default:
       return null;
   }
+  const moving = motionStyle(s);
+  if (moving) body = <g className={moving.className} style={moving.style}>{body}</g>;
   const at = s.label ? labelPosition(s) : null;
   return (
-    <g className={cls} style={style}>
+    <g className={cls} style={{ ...style, ...glowStyle(s) }}>
       {body}
       {at && (
         <text className="cv-label" x={at[0]} y={at[1]} textAnchor="middle" stroke="none">
@@ -240,5 +288,38 @@ export function ShapeView({ shape: s, index }: { shape: Shape; index: number }) 
         </text>
       )}
     </g>
+  );
+}
+
+/** A spec card in the reference plates' style: heading with an accent tag,
+ * quiet key/value rows, an underline, and a leader to the part it names. */
+function Callout({ s }: { s: Shape }) {
+  const tx = s.x!, ty = s.y!;
+  const rows = s.rows ?? [];
+  const width = 270;
+  const [cx, cy] = s.at ?? [tx < 500 ? 690 : 40, 70];
+  const bottom = cy + 30 + rows.length * 22;
+  // The leader leaves the underline from the end nearer the part.
+  const from: [number, number] = [tx < cx + width / 2 ? cx : cx + width, bottom];
+  return (
+    <>
+      <path className="cv-leader" d={`M${from[0]} ${from[1]}L${tx} ${ty}`} pathLength={1} fill="none" />
+      <path className="cv-leader" d={`M${cx} ${bottom}h${width}`} pathLength={1} fill="none" />
+      <circle className="cv-callout-dot" cx={tx} cy={ty} r={4} />
+      <text className="cv-callout-title" x={cx} y={cy + 16}>
+        {s.title}
+        {s.tag && (
+          <tspan className="cv-callout-tag" dx={10}>
+            {s.tag}
+          </tspan>
+        )}
+      </text>
+      {rows.map(([k, v], i) => (
+        <text key={i} className="cv-callout-row" y={cy + 42 + i * 22}>
+          <tspan className="cv-callout-key" x={cx}>{k}</tspan>
+          <tspan x={cx + 64}>{v}</tspan>
+        </text>
+      ))}
+    </>
   );
 }

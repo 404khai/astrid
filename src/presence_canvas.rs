@@ -12,15 +12,20 @@ const MAX_LINE: usize = 8 * 1024;
 const MAX_POINTS: usize = 64;
 const MAX_PATH: usize = 4000;
 const MAX_TEXT: usize = 160;
+const MAX_TAG: usize = 24;
+const MAX_ROWS: usize = 4;
+const MAX_CELL: usize = 48;
+/// Motion the page animates with fixed templates (Astrid Weaver).
+const MOTIONS: [&str; 5] = ["spin", "flow", "pulse", "bob", "sway"];
 const FENCE: &str = "```canvas";
 /// 3D solids live in a world around the canvas centre, projected with the
 /// Anatomy kit's isometric camera: x and y on the ground, z up.
 const WORLD: f64 = 600.0;
 const WORLD_Z: (f64, f64) = (-200.0, 800.0);
 
-pub const CANVAS_INSTRUCTIONS: &str = "When the user asks you to draw, design, sketch, diagram, illustrate, explain how something works or make anything visual, draw it on Astrid's on-screen canvas: put one fenced code block tagged `canvas` in your reply, with one JSON object per line and nothing else inside.\n\nFirst pick the look that fits the subject. Living and natural things (the human body, organs such as the brain or heart, anatomy, cells, animals, plants, landscapes, weather) are never blocks: draw them as a flat, illustrated textbook diagram on the 1000 × 640 canvas, with each region as its own smooth closed {\"shape\":\"path\"} using C/S/Q curves and its true outline (a brain is a rounded walnut seen from the side, its lobes as curved regions inside it that share edges, the cerebellum a ridged lobe under the back, the brainstem a tapering stalk), soft fills in distinct colours per region, thin darker fold or vessel lines drawn as curved paths on top, and labels outside the figure joined to their region by straight leader lines. Use 3D only for built, man-made things.
-
-For built, man-made physical things (machines, devices, buildings, rooms, products, layouts) build a 3D isometric Anatomy figure from solids in a world with x and y on the ground, z up, origin at the centre, roughly -300..300 on x and y and 0..400 on z: {\"shape\":\"slab\",\"x\",\"y\",\"z\"?,\"w\",\"d\",\"h\",\"r\"?} is a block whose ground corner is x,y at height z, w along x, d along y, h tall, r rounds its corners; {\"shape\":\"cylinder\",\"x\",\"y\",\"z\"?,\"radius\",\"h\",\"r2\"?,\"axis\"?: \"z\"|\"x\"|\"y\"} has its base centre at x,y,z and runs h along the axis (z, up, by default; x or y lies it down); r2 is the far-end radius for cones and tapers. Build it like a finished technical illustration, not a sketch: a physical figure needs 40 to 120 shapes. Model every real part at its true relative size: the base or housing, then each component with its own sub-parts (a chip is a body slab plus a row of pin slabs on each side; a capacitor is a can cylinder plus a darker top disc; a connector is a housing plus pins; a screw is a cylinder plus a head), plus mounting holes, edges, seams and fasteners. Draw surface detail as 3D lines: {\"shape\":\"line\",\"points\":[[x,y,z],...]} for traces, wires, pipes, seams and flow paths sitting on or between parts (z = the top of the surface they lie on), with pads as thin slabs under component pins. Add depth: stack layers (cores, plates, covers), raise parts on standoffs, and cut away one part when the inside matters. Leave most solids unfilled for the classic grey Anatomy look, using a fill or stroke colour only for the parts the explanation is about. Emit solids back to front: farther parts (smaller x + y, lower z) first. Label 4 to 8 key parts with short labels (one or two words), and give text, point or arrow ends a z (or [x,y,z] arrow ends) so they use world coordinates.\n\nFor flat diagrams, charts, flows and sketches use the 1000 × 640 canvas, origin top-left: {\"shape\":\"rect\",\"x\",\"y\",\"w\",\"h\",\"r\"?}; {\"shape\":\"ellipse\",\"cx\",\"cy\",\"rx\",\"ry\"}; {\"shape\":\"line\",\"points\":[[x,y],...]}; {\"shape\":\"polygon\",\"points\":[[x,y],...]}; {\"shape\":\"path\",\"d\": SVG path data using only M L H V C S Q T A Z and numbers}; {\"shape\":\"arrow\",\"from\":[x,y],\"to\":[x,y],\"bend\"?: -1..1}; {\"shape\":\"text\",\"x\",\"y\",\"text\",\"size\"?: 10..64,\"align\"?: \"start\"|\"middle\"|\"end\"}.\n\nAlways: {\"shape\":\"title\",\"text\"} first, and end with 1–4 {\"shape\":\"point\",\"x\",\"y\",\"z\"?,\"say\"} lines that move your cursor to parts you drew and label them. Optional on any shape: \"id\", \"fill\", \"stroke\" (#hex or one of ink, paper, blue, violet, pink, red, orange, yellow, green, teal, grey, none), \"width\" 0.5..12, \"dashed\", \"sketchy\" (hand-drawn look), \"label\" (a short caption). Use up to 180 shapes. Outside the block, say in one or two sentences what you drew; skip the brief for drawings.";
+/// The Astrid Weaver skill: how the model draws, in its own file so it reads
+/// as a skill rather than a string literal.
+pub const WEAVER_SKILL: &str = include_str!("weaver_skill.md");
 
 const COLORS: [&str; 12] = [
     "ink", "paper", "blue", "violet", "pink", "red", "orange", "yellow", "green", "teal", "grey",
@@ -212,6 +217,29 @@ fn text(raw: &Map<String, Value>, key: &str) -> Option<String> {
     let value = value.trim().to_owned();
     (!value.is_empty()).then_some(value)
 }
+/// Callout rows: up to four [key, value] pairs of short plain text.
+fn rows(raw: &Map<String, Value>) -> Option<Value> {
+    let cell = |v: &Value| -> Option<String> {
+        let t: String = v
+            .as_str()?
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(MAX_CELL)
+            .collect();
+        Some(t.trim().to_owned())
+    };
+    let list: Vec<Value> = raw
+        .get("rows")?
+        .as_array()?
+        .iter()
+        .take(MAX_ROWS)
+        .filter_map(|row| match row.as_array()?.as_slice() {
+            [k, v] => Some(json!([cell(k)?, cell(v)?])),
+            _ => None,
+        })
+        .collect();
+    (!list.is_empty()).then(|| list.into())
+}
 fn color(value: &Value) -> Option<String> {
     let value = value.as_str()?.trim().to_ascii_lowercase();
     let hex = value
@@ -309,6 +337,49 @@ pub fn validate(raw: &Map<String, Value>) -> Option<Value> {
                     .map(Value::from),
             );
         }
+        "canvas" => {
+            let _ = put(
+                "background",
+                raw.get("background").and_then(color).map(Value::from),
+            );
+            let _ = put(
+                "grid",
+                raw.get("grid").and_then(Value::as_bool).map(Value::from),
+            );
+        }
+        "rotor" => {
+            put("x", f(wx(raw, "x")))?;
+            put("y", f(wx(raw, "y")))?;
+            put("z", Some(wz(raw).into()))?;
+            put("radius", f(num(raw, "radius", 4.0, WORLD / 2.0)))?;
+            put("blades", f(num(raw, "blades", 2.0, 24.0).map(f64::round)))?;
+            let _ = put("hub", f(num(raw, "hub", 0.0, WORLD / 4.0)));
+            let _ = put("pitch", f(num(raw, "pitch", 0.0, 60.0)));
+            let axis = raw.get("axis").and_then(Value::as_str);
+            let _ = put(
+                "axis",
+                axis.filter(|a| ["x", "y", "z"].contains(a))
+                    .map(Value::from),
+            );
+        }
+        "callout" => {
+            let (px, py, pz) = at(raw)?;
+            put("x", Some(px.into()))?;
+            put("y", Some(py.into()))?;
+            let _ = put("z", f(pz));
+            put("title", text(raw, "title").map(Value::from))?;
+            let _ = put(
+                "tag",
+                text(raw, "tag").map(|t| Value::from(t.chars().take(MAX_TAG).collect::<String>())),
+            );
+            let _ = put(
+                "at",
+                raw.get("at")
+                    .and_then(point)
+                    .filter(|p| p.as_array().is_some_and(|a| a.len() == 2)),
+            );
+            let _ = put("rows", rows(raw));
+        }
         "point" => {
             let (px, py, pz) = at(raw)?;
             put("x", Some(px.into()))?;
@@ -330,10 +401,18 @@ pub fn validate(raw: &Map<String, Value>) -> Option<Value> {
         let _ = put(key, raw.get(key).and_then(color).map(Value::from));
     }
     let _ = put("width", f(num(raw, "width", 0.5, 12.0)));
-    for key in ["dashed", "sketchy"] {
+    let _ = put(
+        "motion",
+        raw.get("motion")
+            .and_then(Value::as_str)
+            .filter(|m| MOTIONS.contains(m))
+            .map(Value::from),
+    );
+    let _ = put("speed", f(num(raw, "speed", -4.0, 4.0)));
+    for key in ["dashed", "sketchy", "glow"] {
         let _ = put(key, raw.get(key).and_then(Value::as_bool).map(Value::from));
     }
-    if kind != "title" && kind != "text" && kind != "point" {
+    if !["title", "text", "point", "callout", "canvas"].contains(&kind) {
         let _ = put("label", text(raw, "label").map(Value::from));
     }
     Some(Value::Object(shape))
@@ -444,6 +523,48 @@ mod tests {
         .unwrap();
         assert_eq!(arrow["to"], json!([10.0, 20.0, WORLD_Z.1]));
         assert!(validate(&raw(r#"{"shape":"arrow","from":[0],"to":[1,2]}"#)).is_none());
+    }
+
+    #[test]
+    fn weaver_canvas_colour_motion_rotors_and_callouts_are_validated() {
+        let raw = |s: &str| serde_json::from_str::<Map<String, Value>>(s).unwrap();
+        let sheet = validate(&raw(
+            r##"{"shape":"canvas","background":"#F4EFE6","grid":false}"##,
+        ))
+        .unwrap();
+        assert_eq!(
+            (sheet["background"].as_str(), sheet["grid"].as_bool()),
+            (Some("#f4efe6"), Some(false))
+        );
+        let bad = validate(&raw(r#"{"shape":"canvas","background":"url(x)"}"#)).unwrap();
+        assert!(bad.get("background").is_none());
+        let rotor = validate(&raw(
+            r#"{"shape":"rotor","x":0,"y":0,"z":80,"radius":90,"blades":99.6,"axis":"x","pitch":200,"motion":"spin","speed":-9}"#,
+        ))
+        .unwrap();
+        assert_eq!(
+            (rotor["blades"].as_f64(), rotor["pitch"].as_f64()),
+            (Some(24.0), Some(60.0))
+        );
+        assert_eq!(
+            (rotor["motion"].as_str(), rotor["speed"].as_f64()),
+            (Some("spin"), Some(-4.0))
+        );
+        assert!(validate(&raw(r#"{"shape":"rotor","x":0,"y":0,"radius":9}"#)).is_none());
+        let flow = validate(&raw(
+            r#"{"shape":"line","points":[[0,0],[1,1]],"motion":"explode","glow":true}"#,
+        ))
+        .unwrap();
+        assert!(flow.get("motion").is_none());
+        assert_eq!(flow["glow"], true);
+        let card = validate(&raw(
+            r#"{"shape":"callout","x":10,"y":0,"z":40,"at":[640,80],"title":"Turbine","tag":"T-01-and-a-very-long-code","rows":[["Role","Generator"],["bad"],["Spec",5],["a","b"],["c","d"],["e","f"]],"label":"x"}"#,
+        ))
+        .unwrap();
+        assert_eq!(card["tag"].as_str().unwrap().chars().count(), MAX_TAG);
+        assert_eq!(card["rows"], json!([["Role", "Generator"], ["a", "b"]]));
+        assert!(card.get("label").is_none());
+        assert!(validate(&raw(r#"{"shape":"callout","x":1,"y":1}"#)).is_none());
     }
 
     #[test]

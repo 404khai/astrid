@@ -9,6 +9,8 @@
   --line: #2a2a2a;
   --sheet: #141415;
   --accent: #5756f5;
+  --hot: #ff6a2b;
+  --dot: #2a2a2c;
   color-scheme: dark;
 }
 html,
@@ -36,7 +38,7 @@ body {
   border-radius: 24px;
   overflow: hidden;
   background: var(--sheet);
-  background-image: radial-gradient(#2a2a2c 1px, transparent 1px);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
   background-size: 24px 24px;
   box-shadow:
     inset 0 0 0 1px #2a2a2c,
@@ -64,6 +66,7 @@ body {
   height: 100%;
   overflow: visible;
   font-family: var(--sans);
+  color: var(--ink);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -325,4 +328,140 @@ body {
 }
 .cv-at-rest .cv-cursor {
   opacity: 0;
+}
+
+/* Astrid Weaver: the sheet can take any colour. On a light sheet the ink,
+   labels, chrome and the Anatomy solids switch to their light-theme tones. */
+.cv-card {
+  transition: background-color 0.5s ease;
+}
+.cv-light {
+  --ink: #1b1b1d;
+  --muted: #6b6b70;
+  --dot: #0000001f;
+  color-scheme: light;
+  box-shadow:
+    inset 0 0 0 1px #0000001a,
+    0 14px 34px #0005;
+}
+.cv-no-grid {
+  background-image: none;
+}
+.cv-light .cv-title,
+.cv-light .cv-close {
+  background: #ffffffb3;
+  box-shadow: inset 0 0 0 1px #0000001a;
+  color: var(--ink);
+}
+.cv-light .cv-solids {
+  --anatomy-paper: #fbfbfa;
+}
+
+/* Glow: the reference plates light the one part that matters. */
+.cv-glow {
+  filter: drop-shadow(0 0 4px var(--glow)) drop-shadow(0 0 14px color-mix(in srgb, var(--glow) 55%, transparent));
+}
+
+/* Motion templates. Duration and direction come from the shape's speed. */
+.cv-motion {
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.cv-m-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: cv-spin;
+}
+@keyframes cv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.cv-m-flow path,
+.cv-shape .cv-m-flow path {
+  stroke-dasharray: 10 14;
+  stroke-dashoffset: 0;
+  animation: cv-flow linear infinite;
+  animation-duration: inherit;
+  animation-direction: inherit;
+  fill-opacity: 1;
+}
+.cv-shape .cv-m-flow path.cv-arrowhead {
+  stroke-dasharray: none;
+  animation: none;
+  opacity: 1;
+}
+@keyframes cv-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+.cv-m-pulse {
+  animation-name: cv-pulse;
+  animation-timing-function: ease-in-out;
+}
+@keyframes cv-pulse {
+  50% {
+    opacity: 0.55;
+    filter: brightness(1.5);
+  }
+}
+.cv-m-bob {
+  animation-name: cv-bob-y;
+  animation-timing-function: ease-in-out;
+}
+@keyframes cv-bob-y {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.cv-m-sway {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation-name: cv-sway;
+  animation-timing-function: ease-in-out;
+}
+@keyframes cv-sway {
+  0%,
+  100% {
+    transform: rotate(-7deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+/* Callout: a spec card with an underline and a leader to its part. */
+.cv-callout .cv-leader {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.cv-callout-dot {
+  fill: var(--hot);
+  stroke: none;
+  opacity: 0;
+  animation: cv-fade 0.3s 0.5s forwards;
+}
+.cv-callout-title {
+  fill: var(--ink);
+  font: 500 17px var(--sans);
+}
+.cv-callout-tag {
+  fill: var(--hot);
+  font: 400 12px var(--mono);
+  letter-spacing: 0.06em;
+}
+.cv-callout-row {
+  fill: var(--ink);
+  font: 400 13.5px var(--sans);
+}
+.cv-callout-key {
+  fill: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-motion,
+  .cv-m-flow path {
+    animation: none;
+  }
 }
