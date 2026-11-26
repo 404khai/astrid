@@ -89,7 +89,12 @@ public struct ChatSession: Codable, Equatable, Identifiable, Sendable {
                 if text.isEmpty, let brief = message.brief {
                     text = [brief["title"]?.string, brief["summary"]?.string].compactMap { $0 }.joined(separator: ". ")
                 }
-                if let title = message.diagramTitle { text += (text.isEmpty ? "" : " ") + "[Drew on the canvas: \(title)]" }
+                if let title = message.diagramTitle {
+                    // Part ids let a follow-up edit the drawing instead of redrawing it.
+                    let ids = CanvasParts.ids(in: message.diagram ?? [])
+                    let parts = ids.isEmpty ? "" : "; part ids: \(ids.prefix(24).joined(separator: ", "))"
+                    text += (text.isEmpty ? "" : " ") + "[Drew on the canvas: \(title)\(parts)]"
+                }
             }
             guard !text.isEmpty else { return nil }
             return ["role": message.role.rawValue, "text": text]

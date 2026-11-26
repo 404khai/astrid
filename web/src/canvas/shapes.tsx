@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 export type Shape = {
   shape:
     | "title" | "canvas" | "rect" | "ellipse" | "line" | "polygon" | "path" | "arrow" | "text" | "box" | "point"
-    | "slab" | "cylinder" | "rotor" | "callout";
+    | "slab" | "cylinder" | "rotor" | "callout" | "edit" | "step" | "value";
   z?: number;
   radius?: number;
   r2?: number;
@@ -49,6 +49,21 @@ export type Shape = {
   tag?: string;
   rows?: [string, string][];
   at?: [number, number];
+  /** Interactive parts: where a part goes when pulled apart, an outer casing
+   * the cutaway hides, and a hidden part. */
+  explode?: [number, number, number];
+  shell?: boolean;
+  hidden?: boolean;
+  /** An edit zooms to its part (true); a step highlights a part (its id). */
+  focus?: boolean | string;
+  /** A live value readout and the parts whose motion it drives. */
+  value?: number;
+  min?: number;
+  max?: number;
+  unit?: string;
+  drives?: string[];
+  /** Page-only: a value's first reading, kept when an edit changes it. */
+  base?: number;
 };
 export type Motion = "spin" | "flow" | "pulse" | "bob" | "sway";
 
@@ -58,12 +73,15 @@ export const ACCENT = "#ff6a2b";
 /** Motion as fixed CSS templates: a class plus its duration and direction. */
 export function motionStyle(s: Shape): { className: string; style: CSSProperties } | null {
   if (!s.motion) return null;
-  const speed = s.speed === undefined || s.speed === 0 ? 1 : s.speed;
+  const speed = s.speed ?? 1;
+  // A value slid to zero stops the parts it drives.
+  if (speed === 0) return { className: `cv-motion cv-m-${s.motion}`, style: { animationPlayState: "paused" } };
   const base = { spin: 3.2, flow: 1.1, pulse: 2.2, bob: 2.4, sway: 3 }[s.motion];
   return {
     className: `cv-motion cv-m-${s.motion}`,
     style: {
-      animationDuration: `${(base / Math.abs(speed)).toFixed(2)}s`,
+      // The toolbar's tempo scales every motion at once.
+      animationDuration: `calc(${(base / Math.abs(speed)).toFixed(2)}s / var(--tempo, 1))`,
       animationDirection: speed < 0 ? "reverse" : undefined,
     },
   };
@@ -273,12 +291,15 @@ export function ShapeView({ shape: s, index }: { shape: Shape; index: number }) 
     case "callout":
       body = <Callout s={s} />;
       break;
+    case "value":
+      body = <Readout s={s} />;
+      break;
     default:
       return null;
   }
   const moving = motionStyle(s);
   if (moving) body = <g className={moving.className} style={moving.style}>{body}</g>;
-  const at = s.label ? labelPosition(s) : null;
+  const at = s.label && s.shape !== "value" ? labelPosition(s) : null;
   return (
     <g className={cls} style={{ ...style, ...glowStyle(s) }}>
       {body}
@@ -320,6 +341,28 @@ function Callout({ s }: { s: Shape }) {
           <tspan x={cx + 64}>{v}</tspan>
         </text>
       ))}
+    </>
+  );
+}
+
+/** A live value: a large number with its unit, and a quiet label above. */
+function Readout({ s }: { s: Shape }) {
+  const shown = (s.value ?? 0).toLocaleString(undefined, { maximumFractionDigits: Math.abs(s.value ?? 0) < 10 ? 1 : 0 });
+  return (
+    <>
+      {s.label && (
+        <text className="cv-value-label" x={s.x} y={s.y! - 44}>
+          {s.label}
+        </text>
+      )}
+      <text className="cv-value" x={s.x} y={s.y}>
+        {shown}
+        {s.unit && (
+          <tspan className="cv-value-unit" dx={6}>
+            {s.unit}
+          </tspan>
+        )}
+      </text>
     </>
   );
 }

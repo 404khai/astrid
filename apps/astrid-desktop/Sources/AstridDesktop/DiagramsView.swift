@@ -105,7 +105,10 @@ struct DiagramModal: View {
                 }
                 .padding(.horizontal, 18)
                 .frame(height: 58)
-                DiagramView(ui: model.config.ui, shapes: item.shapes, animate: false, finished: true)
+                DiagramView(ui: model.config.ui, shapes: item.shapes, animate: false, finished: true, title: item.title) { text in
+                    model.askAbout(text, in: item.chatID)
+                    close()
+                }
                     .clipShape(.rect(cornerRadius: 16, style: .continuous))
                     .padding([.horizontal, .bottom], 14)
             }

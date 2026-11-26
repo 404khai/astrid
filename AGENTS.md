@@ -136,6 +136,12 @@ feat/live-canvas, ensure you're up to date with main, then go". `feat/live-canva
 amendment (agent's calls pending review): `src/weaver_skill.md` house style, `canvas` sheet colour, `motion`/`speed`,
 3D `rotor`, `callout` spec cards and `glow`. Presentation only; no new authority. PR, no merge.
 
+**Weaver interactions 2026-11-26.** Maintainer: "go with all these add them to the desktop app. also add
+export to the desktop app, open a PR when done". ADR 0036 amendment (agent's calls pending review): tappable and
+hoverable parts, `edit`-only follow-ups, `step` walkthroughs, `explode`/`shell` cutaway, `value` sliders, motion
+play/pause/tempo, and PNG/SVG export saved by the desktop app. Branch `feat/weaver-interactions` stacked on
+`feat/live-canvas` (#62). No video export or canvas placement on screen yet. PR, no merge.
+
 # Visual upload/response deadline amendment — 2026-10-23
 
 Maintainer instructed “Switch back to the branch for this session. I accept option 1”.
