@@ -209,7 +209,7 @@ const paint = (c?: string) => (c ? palette[c] ?? (/^#[0-9a-f]{3,8}$/i.test(c) ? 
 /** Text, points and arrows given in world coordinates land on the canvas. */
 export function flatten(s: Shape, cam: Camera = defaultCamera): Shape {
   const p = (q: number[]) => (q.length === 3 ? project(q as P3, cam) : (q as P2));
-  if ((s.shape === "text" || s.shape === "point" || s.shape === "callout") && s.z !== undefined) {
+  if ((s.shape === "text" || s.shape === "point" || s.shape === "callout" || s.shape === "value" || s.shape === "step") && s.z !== undefined) {
     const [x, y] = project([s.x!, s.y!, s.z], cam);
     return { ...s, x, y, z: undefined };
   }

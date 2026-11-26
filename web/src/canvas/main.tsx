@@ -10,6 +10,9 @@ import { astridCursor } from "../components/cursors";
 import { anchor, glowStyle, motionStyle, palette, ShapeView, type Shape } from "./shapes";
 import { defaultCamera, flatten, ISO_CSS, paintOrder, project, rotorSvg, solid, type Camera } from "./solids";
 import { demo } from "./demo";
+import { applyEdit, driven, fold, liveValues, placed, visible } from "./interact";
+import { Toolbar } from "./Toolbar";
+import { drawingPng, drawingSvg, fileName } from "./exporter";
 import "./canvas.css";
 
 /** Astrid's live canvas (ADR 0036). The presence app shows this page in its
@@ -48,6 +51,9 @@ let listener: (m: Incoming) => void = () => {};
 /** The desktop app's thread embeds this page per diagram (ADR 0037): no close
  * button or window drag, and a saved drawing can be replayed at once. */
 const embed = new URLSearchParams(location.search).has("embed");
+/** A gallery thumbnail: drawing only, no controls. */
+const thumb = new URLSearchParams(location.search).has("thumb");
+if (thumb) document.documentElement.classList.add("cv-thumb");
 if (embed) document.documentElement.classList.add("cv-embedded");
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -87,21 +93,27 @@ function luminance(hex: string): number {
 
 /** A spinning rotor redraws itself each frame outside React, so a turning
  * fan costs one path rebuild per frame and nothing else re-renders. */
+/** The toolbar's play/pause and tempo, read by rotors every frame. */
+const clock = { tempo: 1, paused: false };
+
 function SpinningRotor({ shape, cam }: { shape: Shape; cam: Camera }) {
   const ref = useRef<SVGGElement>(null);
+  const angle = useRef(0);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const speed = shape.speed || 1;
+    const speed = shape.speed ?? 1;
     const turn = (Math.PI * 2) / 3.2;
     if (reducedMotion()) {
-      el.innerHTML = rotorSvg(shape, cam, 0);
+      el.innerHTML = rotorSvg(shape, cam, angle.current);
       return;
     }
     let frame = 0;
-    const start = performance.now();
+    let last = performance.now();
     const tick = (now: number) => {
-      el.innerHTML = rotorSvg(shape, cam, ((now - start) / 1000) * turn * speed);
+      if (!clock.paused) angle.current += ((now - last) / 1000) * turn * speed * clock.tempo;
+      last = now;
+      el.innerHTML = rotorSvg(shape, cam, angle.current);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -128,6 +140,24 @@ function App() {
   const [moving, setMoving] = useState(false);
   const [size, setSize] = useState({ w: W, h: H });
   const [sheet, setSheet] = useState<Sheet>(plainSheet);
+  // Astrid Weaver interactions.
+  const [explode, setExplode] = useState(0);
+  const [cut, setCut] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [tempo, setTempo] = useState(1);
+  const [overrides, setOverrides] = useState<Record<string, number>>({});
+  const [stepAt, setStepAt] = useState<number | null>(null);
+  const [hovered, setHovered] = useState<{ id: string; at: [number, number] } | null>(null);
+  const [tapped, setTapped] = useState<string | null>(null);
+  clock.tempo = tempo;
+  clock.paused = paused;
+  /** A new drawing clears the old one at its first real shape, so a reply of
+   * only edits changes the drawing already there. */
+  const fresh = useRef(false);
+  const latest = useRef<Shape[]>([]);
+  /** Whether this reply drew something new (not only edits): only a new
+   * drawing starts its walkthrough by itself. */
+  const drewNew = useRef(false);
   const queue = useRef<Shape[]>([]);
   const ended = useRef(true);
   const touched = useRef(false);
@@ -139,15 +169,31 @@ function App() {
 
   // Built from the raw shapes for the current camera, so turning the figure
   // re-projects every solid, label and arrow. Solids are drawn back to front.
+  latest.current = drawn;
+  const values = useMemo(() => liveValues(drawn, overrides), [drawn, overrides]);
+  const steps = useMemo(() => drawn.filter((s) => s.shape === "step"), [drawn]);
   const scene = useMemo(() => {
-    const solids = paintOrder(drawn
-      .map((shape, n) => ({ shape, n, built: solid(shape, cam) }))
+    // What is on the canvas now: hidden parts and cut-away casings left out,
+    // exploded parts moved, live values shown and driving their parts' speed.
+    const shown = drawn
+      .map((shape, n) => ({ shape, n }))
+      .filter(({ shape }) => visible(shape) && !(cut && shape.shell))
+      .map(({ shape, n }) => {
+        let s = placed(shape, explode);
+        const live = values.find((v) => v.id === s.id && s.shape === "value");
+        if (live) s = { ...s, value: live.now };
+        const factor = driven(s, values);
+        if (s.motion && factor !== 1) s = { ...s, speed: (s.speed ?? 1) * factor };
+        return { shape: s, n };
+      });
+    const solids = paintOrder(shown
+      .map(({ shape, n }) => ({ shape, n, built: solid(shape, cam) }))
       .filter((s) => s.built)
       .map((s) => ({ ...s, built: s.built! }))
     );
-    const flats = drawn.map((shape, n) => ({ shape: flatten(shape, cam), n })).filter((s) => !solid(s.shape, cam));
-    return { solids, flats, last: drawn.length - 1 };
-  }, [drawn, cam]);
+    const flats = shown.map(({ shape, n }) => ({ shape: flatten(shape, cam), n })).filter((s) => !solid(s.shape, cam));
+    return { solids, flats, last: drawn.length - 1, motion: shown.some((s) => s.shape.motion) };
+  }, [drawn, cam, explode, cut, values]);
 
   /** Frames everything drawn so far; while drawing it only ever zooms out. */
   const fit = (outOnly: boolean) => {
@@ -165,6 +211,57 @@ function App() {
     });
   };
 
+  /** Zooms to the parts with an id (an edit's focus). */
+  const focusOn = (id: string) => {
+    const parts = content.current?.querySelectorAll<SVGGraphicsElement>(`[data-part="${CSS.escape(id)}"]`);
+    if (!parts?.length) return;
+    let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
+    parts.forEach((p) => {
+      const b = p.getBBox();
+      [x0, y0, x1, y1] = [Math.min(x0, b.x), Math.min(y0, b.y), Math.max(x1, b.x + b.width), Math.max(y1, b.y + b.height)];
+    });
+    const zoom = Math.min((W * 0.5) / Math.max(x1 - x0, 1), (H * 0.5) / Math.max(y1 - y0, 1), 1.8);
+    touched.current = true;
+    setTapped(id);
+    setView({ zoom, x: W / 2 - ((x0 + x1) / 2) * zoom, y: H / 2 + 24 - ((y0 + y1) / 2) * zoom });
+  };
+
+  /** Clears the canvas for a new drawing. */
+  const clear = () => {
+    touched.current = false;
+    setTitle(null);
+    setDrawn([]);
+    setSay(null);
+    setSheet(plainSheet);
+    setCam(defaultCamera);
+    setView(home);
+    setExplode(0);
+    setCut(false);
+    setOverrides({});
+    setStepAt(null);
+    setTapped(null);
+  };
+
+  /** Shows one step of a walkthrough: the cursor goes to it, its part lights. */
+  const goStep = (i: number | null) => {
+    const list = latest.current.filter((s) => s.shape === "step");
+    if (i === null || !list[i]) {
+      setStepAt(null);
+      setSay(null);
+      setTapped(null);
+      return;
+    }
+    const s = list[i];
+    setStepAt(i);
+    setSay(s.text ?? null);
+    setTapped(typeof s.focus === "string" ? s.focus : null);
+    if (s.x !== undefined) setTarget(s.z !== undefined ? { world: [s.x, s.y!, s.z] } : { flat: [s.x, s.y!] });
+  };
+  const stepRef = useRef(stepAt);
+  stepRef.current = stepAt;
+  const goStepRef = useRef(goStep);
+  goStepRef.current = goStep;
+
   // One shape at a time, so the drawing reads as being made: the cursor
   // travels to each shape, then it is drawn there.
   const pump = () => {
@@ -173,9 +270,26 @@ function App() {
     if (!next) {
       setDrawing(ended.current ? null : "weaving");
       if (ended.current && !touched.current) requestAnimationFrame(() => fit(false));
+      // A drawing that explains in steps starts walking through them.
+      if (ended.current && drewNew.current && latest.current.some((s) => s.shape === "step")) {
+        drewNew.current = false;
+        window.setTimeout(() => goStepRef.current(0), 700);
+      }
       return;
     }
+    if (fresh.current) {
+      fresh.current = false;
+      drewNew.current = next.shape !== "edit";
+      if (drewNew.current) clear();
+    }
     setDrawing("sketching");
+    if (next.shape === "edit") {
+      if (next.value !== undefined) setOverrides(({ [next.id!]: _, ...rest }) => rest);
+      setDrawn((list) => applyEdit(list, next));
+      if (next.focus === true) requestAnimationFrame(() => requestAnimationFrame(() => focusOn(next.id!)));
+      timer.current = window.setTimeout(step, 220);
+      return;
+    }
     if (next.shape === "title" || next.shape === "canvas") {
       if (next.shape === "title") setTitle(next.text ?? null);
       else setSheet(sheetOf(next));
@@ -226,15 +340,10 @@ function App() {
           timer.current = undefined;
           queue.current = [];
           ended.current = false;
-          touched.current = false;
-          setTitle(null);
-          setDrawn([]);
+          fresh.current = true;
           setSay(null);
-          setSheet(plainSheet);
+          setStepAt(null);
           setDrawing("composing");
-          setCam(defaultCamera);
-          setView(home);
-          setTarget({ flat: [W / 2, H / 2] });
           break;
         case "shape":
           queue.current.push(m.shape);
@@ -255,12 +364,13 @@ function App() {
           timer.current = undefined;
           queue.current = [];
           ended.current = true;
-          touched.current = false;
+          fresh.current = false;
           const titled = m.shapes.find((s) => s.shape === "title");
+          clear();
           setTitle(titled?.text ?? null);
           const painted = [...m.shapes].reverse().find((s) => s.shape === "canvas");
           setSheet(painted ? sheetOf(painted) : plainSheet);
-          setDrawn(m.shapes.filter((s) => s.shape !== "title" && s.shape !== "point" && s.shape !== "canvas"));
+          setDrawn(fold(m.shapes.filter((s) => s.shape !== "title" && s.shape !== "point" && s.shape !== "canvas")));
           setSay(null);
           setDrawing(null);
           setCam(defaultCamera);
@@ -302,6 +412,8 @@ function App() {
     setMoving(true);
     fingers.current.set(e.pointerId, [e.clientX, e.clientY]);
     let last = { x: e.clientX, y: e.clientY };
+    const start = last;
+    const part = (e.target as Element).closest<SVGElement>("[data-part]")?.dataset.part;
     const turn = hasSolids && !e.shiftKey;
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== e.pointerId) return;
@@ -333,6 +445,8 @@ function App() {
       if (ev.pointerId !== e.pointerId) return;
       fingers.current.delete(e.pointerId);
       if (!fingers.current.size) setMoving(false);
+      // A click that didn't drag, on a part with an id, asks about it.
+      if (part && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 4) tap(part);
       removeEventListener("pointermove", move);
       removeEventListener("pointerup", up);
       removeEventListener("pointercancel", up);
@@ -357,11 +471,68 @@ function App() {
       setView((v) => ({ ...v, x: v.x - e.deltaX / unit, y: v.y - e.deltaY / unit }));
     }
   };
+  /** Tapping a part lights it and asks Astrid about it in this conversation. */
+  const tap = (id: string) => {
+    setTapped(id);
+    const part = latest.current.find((s) => s.id === id);
+    const name = part?.label ?? part?.title ?? id;
+    native()?.postMessage({ type: "ask", text: `Tell me about the ${name}${title ? ` in the ${title}` : ""}.`, part: id });
+  };
+  const onHover = (e: React.PointerEvent) => {
+    if (moving || e.pointerType === "touch") return;
+    const id = (e.target as Element).closest<SVGElement>("[data-part]")?.dataset.part;
+    const rect = stage.current!.getBoundingClientRect();
+    setHovered(id ? { id, at: [e.clientX - rect.left, e.clientY - rect.top] } : null);
+  };
+
+  const exportAs = async (format: "svg" | "png") => {
+    const svg = stage.current?.querySelector<SVGSVGElement>(".cv-svg");
+    const card = stage.current?.parentElement;
+    if (!svg || !card) return;
+    const background = getComputedStyle(card).backgroundColor;
+    const text = drawingSvg(svg, background, W, H);
+    const data = format === "svg" ? text : await drawingPng(text, W, H);
+    const name = `${fileName(title)}.${format}`;
+    if (native()) {
+      native()!.postMessage({ type: "export", format, name, data });
+      return;
+    }
+    const link = document.createElement("a");
+    link.href = format === "svg" ? URL.createObjectURL(new Blob([data], { type: "image/svg+xml" })) : `data:image/png;base64,${data}`;
+    link.download = name;
+    link.click();
+  };
+
+  // Arrow keys walk the steps; space pauses the motion.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as Element).closest?.("input")) return;
+      const count = latest.current.filter((s) => s.shape === "step").length;
+      if (e.key === "ArrowRight" && count) goStepRef.current(Math.min(count - 1, (stepRef.current ?? -1) + 1));
+      else if (e.key === "ArrowLeft" && count) goStepRef.current(Math.max(0, (stepRef.current ?? 1) - 1));
+      else if (e.key === "Escape") goStepRef.current(null);
+      else if (e.key === " ") setPaused((p) => !p);
+      else return;
+      e.preventDefault();
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, []);
+
   const reset = () => {
     touched.current = false;
     setCam(defaultCamera);
     requestAnimationFrame(() => fit(false));
   };
+
+  const lit = hovered?.id ?? tapped;
+  const highlighting = !!lit && drawn.some((s) => s.id === lit && visible(s));
+  const partOf = (shape: Shape) => (shape.id ? { "data-part": shape.id } : {});
+  const litClass = (shape: Shape) => (shape.id ? ` cv-part${shape.id === lit ? " cv-lit" : ""}` : " cv-part");
+  const hoverName = hovered && (() => {
+    const part = drawn.find((s) => s.id === hovered.id);
+    return part?.label ?? part?.title ?? hovered.id;
+  })();
 
   const activity = drawing ?? external;
   const look = activity ? looks[activity] : null;
@@ -369,11 +540,11 @@ function App() {
   const flip = cursor[0] > size.w - 300;
   return (
     <main
-      className={`cv-card${moving ? " cv-moving" : ""}${embed && !drawing ? " cv-at-rest" : ""}${sheet.light ? " cv-light" : ""}${sheet.grid ? "" : " cv-no-grid"}`}
-      style={sheet.background ? ({ "--sheet": sheet.background } as CSSProperties) : undefined}
+      className={`cv-card${moving ? " cv-moving" : ""}${embed && !drawing && stepAt === null ? " cv-at-rest" : ""}${sheet.light ? " cv-light" : ""}${sheet.grid ? "" : " cv-no-grid"}${highlighting ? " cv-highlighting" : ""}${paused ? " cv-paused" : ""}`}
+      style={{ ...(sheet.background ? { "--sheet": sheet.background } : {}), "--tempo": tempo } as CSSProperties}
     >
       <style>{ISO_CSS}</style>
-      <div className="cv-stage" ref={stage} onPointerDown={onPointerDown} onWheel={onWheel} onDoubleClick={reset}>
+      <div className="cv-stage" ref={stage} onPointerDown={onPointerDown} onPointerMove={onHover} onPointerLeave={() => setHovered(null)} onWheel={onWheel} onDoubleClick={reset}>
         <svg viewBox={`0 0 ${W} ${H}`} className="cv-svg" role="img" aria-label={title ?? "Astrid's drawing"}>
           <g ref={content} className="cv-view" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
             <g className="iso cv-solids" data-theme={sheet.light ? "light" : "dark"}>
@@ -383,7 +554,8 @@ function App() {
                 return (
                   <g
                     key={n}
-                    className={`cv-solid3${n === scene.last ? " cv-new" : ""}${shape.glow ? " cv-glow" : ""}`}
+                    {...partOf(shape)}
+                    className={`cv-solid3${n === scene.last ? " cv-new" : ""}${shape.glow ? " cv-glow" : ""}${litClass(shape)}`}
                     style={{ ...tint(shape.fill), ...glowStyle(shape) }}
                   >
                     <g className={moving?.className} style={moving?.style}>
@@ -401,7 +573,9 @@ function App() {
               )}
             </g>
             {scene.flats.map(({ shape, n }) => (
-              <ShapeView key={n} shape={shape} index={n} />
+              <g key={n} {...partOf(shape)} className={litClass(shape).trim()}>
+                <ShapeView shape={shape} index={n} />
+              </g>
             ))}
           </g>
         </svg>
@@ -418,6 +592,36 @@ function App() {
           {say && <span className={`cv-say${flip ? " cv-say-left" : ""}`}>{say}</span>}
         </div>
       </div>
+      {hovered && hoverName && !moving && (
+        <span className="cv-hover" style={{ left: hovered.at[0] + 14, top: hovered.at[1] + 18 }}>
+          {hoverName}
+        </span>
+      )}
+      {!thumb && !drawing && drawn.some(visible) && (
+        <Toolbar
+          motion={scene.motion && !reducedMotion()}
+          paused={paused}
+          onPause={() => setPaused((p) => !p)}
+          tempo={tempo}
+          onTempo={() => setTempo((t) => ({ 0.25: 0.5, 0.5: 1, 1: 2, 2: 0.25 })[t as 0.25 | 0.5 | 1 | 2] ?? 1)}
+          steps={steps.length}
+          step={stepAt}
+          onStep={goStep}
+          explodable={drawn.some((s) => s.explode && visible(s))}
+          explode={explode}
+          onExplode={(t) => {
+            touched.current = true;
+            setExplode(t);
+          }}
+          shelled={drawn.some((s) => s.shell && visible(s))}
+          cut={cut}
+          onCut={() => setCut((c) => !c)}
+          values={values}
+          onValue={(id, v) => setOverrides((o) => ({ ...o, [id]: v }))}
+          exportable={embed || !native()}
+          onExport={exportAs}
+        />
+      )}
       <header className="cv-float">
         {title && (
           <h1 className="cv-title" onPointerDown={() => !embed && native()?.postMessage({ type: "drag-start" })}>

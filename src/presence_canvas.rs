@@ -217,6 +217,16 @@ fn text(raw: &Map<String, Value>, key: &str) -> Option<String> {
     let value = value.trim().to_owned();
     (!value.is_empty()).then_some(value)
 }
+/// A part id: letters, digits, `-` and `_`, at most 32.
+fn ident(value: Option<&Value>) -> Option<String> {
+    let id: String = value?
+        .as_str()?
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || "-_".contains(*c))
+        .take(32)
+        .collect();
+    (!id.is_empty()).then_some(id)
+}
 /// Callout rows: up to four [key, value] pairs of short plain text.
 fn rows(raw: &Map<String, Value>) -> Option<Value> {
     let cell = |v: &Value| -> Option<String> {
@@ -380,6 +390,49 @@ pub fn validate(raw: &Map<String, Value>) -> Option<Value> {
             );
             let _ = put("rows", rows(raw));
         }
+        "edit" => {
+            // Changes parts of the drawing already on the canvas, by id.
+            put("id", ident(raw.get("id")).map(Value::from))?;
+            let _ = put("value", f(num(raw, "value", -1e9, 1e9)));
+            let _ = put(
+                "focus",
+                raw.get("focus").and_then(Value::as_bool).map(Value::from),
+            );
+        }
+        "step" => {
+            put("text", text(raw, "text").map(Value::from))?;
+            if let Some((px, py, pz)) = at(raw) {
+                put("x", Some(px.into()))?;
+                put("y", Some(py.into()))?;
+                let _ = put("z", f(pz));
+            }
+            let _ = put("focus", ident(raw.get("focus")).map(Value::from));
+        }
+        "value" => {
+            let (px, py, pz) = at(raw)?;
+            put("x", Some(px.into()))?;
+            put("y", Some(py.into()))?;
+            let _ = put("z", f(pz));
+            put("value", f(num(raw, "value", -1e9, 1e9)))?;
+            let _ = put("min", f(num(raw, "min", -1e9, 1e9)));
+            let _ = put("max", f(num(raw, "max", -1e9, 1e9)));
+            let _ = put(
+                "unit",
+                text(raw, "unit").map(|t| Value::from(t.chars().take(12).collect::<String>())),
+            );
+            let drives: Vec<Value> = raw
+                .get("drives")
+                .and_then(Value::as_array)
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|v| ident(Some(v)))
+                        .take(8)
+                        .map(Value::from)
+                        .collect()
+                })
+                .unwrap_or_default();
+            let _ = put("drives", (!drives.is_empty()).then(|| drives.into()));
+        }
         "point" => {
             let (px, py, pz) = at(raw)?;
             put("x", Some(px.into()))?;
@@ -389,13 +442,31 @@ pub fn validate(raw: &Map<String, Value>) -> Option<Value> {
         }
         _ => return None,
     }
-    if let Some(id) = raw.get("id").and_then(Value::as_str) {
-        let id: String = id
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || "-_".contains(*c))
-            .take(32)
-            .collect();
-        let _ = put("id", (!id.is_empty()).then(|| id.into()));
+    if kind != "edit" {
+        let _ = put("id", ident(raw.get("id")).map(Value::from));
+    }
+    // Interactive parts: pulled apart, hidden by the cutaway, or hidden.
+    let _ = put(
+        "explode",
+        raw.get("explode")
+            .and_then(point)
+            .filter(|p| p.as_array().is_some_and(|a| a.len() == 3))
+            .map(|p| {
+                let v: Vec<f64> = p
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter_map(Value::as_f64)
+                    .collect();
+                json!([
+                    v[0].clamp(-300.0, 300.0),
+                    v[1].clamp(-300.0, 300.0),
+                    v[2].clamp(-300.0, 300.0)
+                ])
+            }),
+    );
+    for key in ["shell", "hidden"] {
+        let _ = put(key, raw.get(key).and_then(Value::as_bool).map(Value::from));
     }
     for key in ["fill", "stroke"] {
         let _ = put(key, raw.get(key).and_then(color).map(Value::from));
@@ -412,7 +483,7 @@ pub fn validate(raw: &Map<String, Value>) -> Option<Value> {
     for key in ["dashed", "sketchy", "glow"] {
         let _ = put(key, raw.get(key).and_then(Value::as_bool).map(Value::from));
     }
-    if !["title", "text", "point", "callout", "canvas"].contains(&kind) {
+    if !["title", "text", "point", "callout", "canvas", "step"].contains(&kind) {
         let _ = put("label", text(raw, "label").map(Value::from));
     }
     Some(Value::Object(shape))
@@ -565,6 +636,47 @@ mod tests {
         assert_eq!(card["rows"], json!([["Role", "Generator"], ["a", "b"]]));
         assert!(card.get("label").is_none());
         assert!(validate(&raw(r#"{"shape":"callout","x":1,"y":1}"#)).is_none());
+    }
+
+    #[test]
+    fn interactive_edits_steps_values_and_exploded_parts_are_validated() {
+        let raw = |s: &str| serde_json::from_str::<Map<String, Value>>(s).unwrap();
+        let edit = validate(&raw(
+            r#"{"shape":"edit","id":"tur bine!","motion":"spin","speed":3,"hidden":true,"focus":true,"value":240}"#,
+        ))
+        .unwrap();
+        assert_eq!(edit["id"], "turbine");
+        assert_eq!(
+            (edit["hidden"].as_bool(), edit["focus"].as_bool()),
+            (Some(true), Some(true))
+        );
+        assert!(validate(&raw(r#"{"shape":"edit","motion":"spin"}"#)).is_none());
+        let step = validate(&raw(
+            r#"{"shape":"step","text":"Water falls","focus":"penstock","x":1,"y":2,"z":3}"#,
+        ))
+        .unwrap();
+        assert_eq!(
+            (step["focus"].as_str(), step["z"].as_f64()),
+            (Some("penstock"), Some(3.0))
+        );
+        assert!(
+            validate(&raw(r#"{"shape":"step","text":"No place"}"#))
+                .unwrap()
+                .get("x")
+                .is_none()
+        );
+        let value = validate(&raw(
+            r#"{"shape":"value","id":"flow","x":0,"y":0,"z":200,"value":120,"min":0,"max":400,"unit":"m³/s per second","drives":["turbine","<x>",5]}"#,
+        ))
+        .unwrap();
+        assert_eq!(value["unit"].as_str().unwrap().chars().count(), 12);
+        assert_eq!(value["drives"], json!(["turbine", "x"]));
+        let slab = validate(&raw(
+            r#"{"shape":"slab","x":0,"y":0,"w":9,"d":9,"h":9,"explode":[0,0,9000],"shell":true}"#,
+        ))
+        .unwrap();
+        assert_eq!(slab["explode"], json!([0.0, 0.0, 300.0]));
+        assert_eq!(slab["shell"], true);
     }
 
     #[test]
